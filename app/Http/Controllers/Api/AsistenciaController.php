@@ -65,6 +65,143 @@ class AsistenciaController extends Controller
         }
     }
 
+        public function store(Request $request)
+        {
+            try {
+                $validated = $request->validate([
+                    'usuario_id' => 'required|integer|exists:usuarios_app,id',
+                    'institucion_id' => 'required|integer|exists:instituciones,id',
+                    'fecha_hora' => 'required|date',
+                    'latitud' => 'required|numeric',
+                    'longitud' => 'required|numeric',
+                    'dentro_rango' => 'required|boolean',
+                    'tipo' => 'required|in:entrada,salida',
+                    'turno' => 'nullable|string',
+                    'foto' => 'nullable|string' // base64
+                ]);
+
+                $fecha = Carbon::parse($validated['fecha_hora']);
+
+                /*
+                |--------------------------------------------------------------------------
+                | 1) Validar feriados nacionales e institucionales
+                |--------------------------------------------------------------------------
+                */
+                $fn = Feriado::where('tipo', 'nacional')
+                    ->where('dia', $fecha->day)
+                    ->where('mes', $fecha->month)
+                    ->where('activo', true)
+                    ->first();
+
+                if ($fn) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => "No laborable: Feriado Nacional - {$fn->descripcion}"
+                    ], 403);
+                }
+
+                $fi = Feriado::where('tipo', 'institucional')
+                    ->where('institucion_id', $validated['institucion_id'])
+                    ->where('dia', $fecha->day)
+                    ->where('mes', $fecha->month)
+                    ->where('activo', true)
+                    ->first();
+
+                if ($fi) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => "No laborable: Feriado Institucional - {$fi->descripcion}"
+                    ], 403);
+                }
+
+                /*
+                |--------------------------------------------------------------------------
+                | 2) Validar horario de la institución
+                |--------------------------------------------------------------------------
+                */
+                $diaMapa = [
+                    'monday' => 'L', 'tuesday' => 'M', 'wednesday' => 'X',
+                    'thursday' => 'J', 'friday' => 'V', 'saturday' => 'S', 'sunday' => 'D'
+                ];
+
+                $diaHoy = $diaMapa[strtolower($fecha->dayName)];
+
+                $horario = DB::table('horarios_institucion')
+                    ->where('institucion_id', $validated['institucion_id'])
+                    ->whereJsonContains('dias_semana', $diaHoy)
+                    ->where('activo', true)
+                    ->first();
+
+                if (!$horario) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => "El día de hoy no es laborable"
+                    ], 403);
+                }
+
+                /*
+                |--------------------------------------------------------------------------
+                | 3) Calcular estado (puntual, tarde, salida_antes, etc.)
+                |--------------------------------------------------------------------------
+                */
+                $horaMarcada = $fecha->format('H:i:s');
+                $horaEntradaMax = Carbon::parse($horario->hora_entrada)
+                    ->addMinutes($horario->tolerancia_minutos)
+                    ->format('H:i:s');
+
+                if ($validated['tipo'] === 'entrada') {
+                    $estado = ($horaMarcada <= $horaEntradaMax) ? 'a_tiempo' : 'tarde';
+                } else {
+                    $estado = ($horaMarcada < $horario->hora_salida) ? 'salida_antes' : 'a_tiempo';
+                }
+
+                /*
+                |--------------------------------------------------------------------------
+                | 4) Guardar selfie si existe
+                |--------------------------------------------------------------------------
+                */
+                $fotoPath = null;
+
+                if (!empty($validated['foto'])) {
+                    $fotoPath = 'selfies/' . uniqid('selfie_') . '.jpg';
+                    Storage::disk('public')->put($fotoPath, base64_decode($validated['foto']));
+                }
+
+                /*
+                |--------------------------------------------------------------------------
+                | 5) Registrar asistencia
+                |--------------------------------------------------------------------------
+                */
+                $asistencia = Asistencia::create([
+                    'usuario_id' => $validated['usuario_id'],
+                    'institucion_id' => $validated['institucion_id'],
+                    'fecha_hora' => $validated['fecha_hora'],
+                    'latitud' => $validated['latitud'],
+                    'longitud' => $validated['longitud'],
+                    'dentro_rango' => $validated['dentro_rango'],
+                    'foto' => $fotoPath,
+                    'tipo' => $validated['tipo'],
+                    'turno' => $validated['turno'] ?? null,
+                    'estado' => $estado,
+                    'sincronizado' => true
+                ]);
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Asistencia registrada correctamente',
+                    'data' => $asistencia
+                ], 201);
+
+            } catch (\Exception $e) {
+                Log::error("Error en store(): " . $e->getMessage());
+
+                return response()->json([
+                    'success' => false,
+                    'message' => "Error al registrar asistencia",
+                    'error' => $e->getMessage()
+                ], 500);
+            }
+        }
 
 
     public function show($id)
