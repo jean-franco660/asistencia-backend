@@ -45,6 +45,10 @@ class UsuarioWeb extends Authenticatable
                 $usuario->estado = 'autorizado';
             }
         });
+
+        static::deleting(function ($usuario) {
+            $usuario->instituciones()->detach();
+        });
     }
 
     /**
@@ -53,13 +57,13 @@ class UsuarioWeb extends Authenticatable
     public function instituciones(): BelongsToMany
     {
         return $this->belongsToMany(
-                    Institucion::class,
-                    'director_institucion',
-                    'usuario_web_id',
-                    'institucion_id'
-                )
-                ->withPivot(['fecha_inicio', 'fecha_fin'])
-                ->withTimestamps();
+            Institucion::class,
+            'director_institucion',
+            'usuario_web_id',
+            'institucion_id'
+        )
+            ->withPivot(['fecha_inicio', 'fecha_fin'])
+            ->withTimestamps();
     }
 
     /**
@@ -73,16 +77,16 @@ class UsuarioWeb extends Authenticatable
     /**
      * Helper: obtener la institución actual del director considerando fechas de inicio y fin.
      */
-        public function institucionActual()
-        {
-            $hoy = now()->toDateString();
+    public function institucionActual()
+    {
+        $hoy = now()->toDateString();
 
-            return $this->instituciones()
-                ->wherePivot('fecha_inicio', '<=', $hoy)
-                ->where(function ($q) use ($hoy) {
-                    $q->whereNull('director_institucion.fecha_fin')
+        return $this->instituciones()
+            ->wherePivot('fecha_inicio', '<=', $hoy)
+            ->where(function ($q) use ($hoy) {
+                $q->whereNull('director_institucion.fecha_fin')
                     ->orWhere('director_institucion.fecha_fin', '>=', $hoy);
-                })
-                ->first();
-        }
+            })
+            ->first();
+    }
 }

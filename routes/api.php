@@ -16,47 +16,47 @@ use App\Http\Controllers\Api\AppInstitucionController;
 use App\Http\Controllers\Api\WebInstitucionController;
 
 
-    /*
-    |--------------------------------------------------------------------------
-    | RUTA DE ESTADO (PRUEBA)
-    |--------------------------------------------------------------------------
-    */
-    Route::get('/status', function () {
-        return response()->json([
-            'ok' => true,
-            'message' => 'API funcionando correctamente'
-        ]);
+/*
+|--------------------------------------------------------------------------
+| RUTA DE ESTADO (PRUEBA)
+|--------------------------------------------------------------------------
+*/
+Route::get('/status', function () {
+    return response()->json([
+        'ok' => true,
+        'message' => 'API funcionando correctamente'
+    ]);
+});
+
+/*
+|--------------------------------------------------------------------------
+| RUTAS PARA LA APP MÓVIL (DOCENTES)
+|--------------------------------------------------------------------------
+*/
+Route::prefix('v1/app')->group(function () {
+    Route::post('/login', [UsuarioAppController::class, 'login']);
+
+    // Rutas protegidas con token para la app
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::get('/instituciones', [AppInstitucionController::class, 'index']);
+        Route::post('/asistencia', [AsistenciaController::class, 'store']);
+        Route::get('/asistencia/{usuarioId}', [AsistenciaController::class, 'historial']);
+        Route::post('/asistencias/sincronizar', [AsistenciaController::class, 'syncMovil']);
+        Route::get('/estado-dia', [AsistenciaController::class, 'estadoDia']);
     });
+});
 
-    /*
-    |--------------------------------------------------------------------------
-    | RUTAS PARA LA APP MÓVIL (DOCENTES)
-    |--------------------------------------------------------------------------
-    */
-    Route::prefix('v1/app')->group(function () {
-        Route::post('/login', [UsuarioAppController::class, 'login']);
+/*
+|--------------------------------------------------------------------------
+| RUTAS PARA LA WEB (ADMIN / DIRECTOR)
+|--------------------------------------------------------------------------
+*/
 
-        // Rutas protegidas con token para la app
-        Route::middleware('auth:sanctum')->group(function () {
-            Route::get('/instituciones', [AppInstitucionController::class, 'index']);
-            Route::post('/asistencia', [AsistenciaController::class, 'store']);
-            Route::get('/asistencia/{usuarioId}', [AsistenciaController::class, 'historial']);
-            Route::post('/asistencias/sincronizar', [AsistenciaController::class, 'syncMovil']);
-            Route::get('/estado-dia', [AsistenciaController::class, 'estadoDia']);
-        });
-    });
+Route::prefix('v1/web')->group(function () {
+    Route::post('/login', [UsuarioWebController::class, 'login']);
+});
 
-    /*
-    |--------------------------------------------------------------------------
-    | RUTAS PARA LA WEB (ADMIN / DIRECTOR)
-    |--------------------------------------------------------------------------
-    */
-
-    Route::prefix('v1/web')->group(function () {
-        Route::post('/login', [UsuarioWebController::class, 'login']);
-    });
-
-    Route::prefix('v1/web')->middleware('auth:sanctum')->group(function () {
+Route::prefix('v1/web')->middleware('auth:sanctum')->group(function () {
 
     /*
     |--------------------------------------------------------------------------
@@ -75,7 +75,7 @@ use App\Http\Controllers\Api\WebInstitucionController;
     Route::post('/usuarios-web/autorizar/{id}', [UsuarioWebController::class, 'autorizar']);
     Route::post('/usuarios-web/rechazar/{id}', [UsuarioWebController::class, 'rechazar']);
     Route::post('/usuarios-web/importar', [ImportDocentesController::class, 'importar']);
-    
+
     /*
     |--------------------------------------------------------------------------
     | Gestión de docentes (usuarios_app)
@@ -93,11 +93,11 @@ use App\Http\Controllers\Api\WebInstitucionController;
     |--------------------------------------------------------------------------
     */
     Route::get('/instituciones', [WebInstitucionController::class, 'index']);
+    Route::get('/instituciones/mias', [WebInstitucionController::class, 'misInstituciones']);
     Route::post('/instituciones', [WebInstitucionController::class, 'store']);
     Route::get('/instituciones/{id}', [WebInstitucionController::class, 'show']);
     Route::put('/instituciones/{id}', [WebInstitucionController::class, 'update']);
     Route::delete('/instituciones/{id}', [WebInstitucionController::class, 'destroy']);
-    Route::get('/instituciones/mias', [WebInstitucionController::class, 'misInstituciones']);
 
     /*--------------------------------------------------------------------------
     | Gestión de horarios de institución
@@ -145,8 +145,6 @@ use App\Http\Controllers\Api\WebInstitucionController;
         return response()->json(['message' => 'Sesión cerrada correctamente']);
     });
 
-    Route::get('/me', function (Request $request) {
-    return response()->json($request->user());
-    });
+    Route::get('/me', [UsuarioWebController::class, 'me']);
 
 });

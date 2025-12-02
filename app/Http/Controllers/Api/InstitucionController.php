@@ -7,19 +7,21 @@ use Illuminate\Http\Request;
 use App\Models\Institucion;
 use App\Http\Requests\StoreInstitucionRequest;
 use App\Http\Requests\UpdateInstitucionRequest;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class InstitucionController extends Controller
 {
+    use AuthorizesRequests;
     public function index(Request $request)
     {
         // admin = ve todas / director = solo las que tiene asignadas
         if ($request->user()->rol === 'director') {
             $instituciones = $request->user()
                 ->instituciones()
-                ->withCount(['docentes','directores'])
+                ->withCount(['docentes', 'directores'])
                 ->get();
         } else {
-            $instituciones = Institucion::withCount(['docentes','directores'])->get();
+            $instituciones = Institucion::withCount(['docentes', 'directores'])->get();
         }
 
         return response()->json(['data' => $instituciones]);
@@ -87,11 +89,11 @@ class InstitucionController extends Controller
 
         // Admin ve todas
         if ($user->rol === 'admin') {
-            $instituciones = Institucion::withCount(['docentes','directores'])->get();
+            $instituciones = Institucion::withCount(['docentes', 'directores'])->get();
         } else {
             // Director solo sus instituciones
             $instituciones = $user->instituciones()
-                ->withCount(['docentes','directores'])
+                ->withCount(['docentes', 'directores'])
                 ->get();
         }
 

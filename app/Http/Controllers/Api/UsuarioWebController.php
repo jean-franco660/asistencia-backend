@@ -51,6 +51,27 @@ class UsuarioWebController extends Controller
     }
 
     /**
+     * Obtener datos del usuario autenticado
+     */
+    public function me(Request $request)
+    {
+        $user = $request->user();
+
+        $instituciones = $user->rol === 'director'
+            ? $user->instituciones()->select('instituciones.id', 'instituciones.nombre')->get()
+            : [];
+
+        return response()->json([
+            'id' => $user->id,
+            'nombre' => $user->nombre,
+            'email' => $user->email,
+            'rol' => $user->rol,
+            'estado' => $user->estado,
+            'instituciones' => $instituciones,
+        ]);
+    }
+
+    /**
      * Listar usuarios web
      */
     public function index(Request $request)
@@ -65,9 +86,18 @@ class UsuarioWebController extends Controller
             $query->where('estado', $request->estado);
         }
 
+        if ($request->has('search') && $request->search) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('nombre', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%");
+            });
+        }
+
         $usuarios = $query->with('instituciones')->latest()->get();
 
-        return response()->json($usuarios);
+        // 🔥 FIX: Agregar wrapper 'data'
+        return response()->json(['data' => $usuarios]);
     }
 
     /**
@@ -81,7 +111,7 @@ class UsuarioWebController extends Controller
             ->latest()
             ->get();
 
-        return response()->json($usuarios);
+        return response()->json(['data' => $usuarios]);
     }
 
     /**
@@ -92,22 +122,33 @@ class UsuarioWebController extends Controller
         $request->validate([
             'nombre' => 'required|string|max:255',
             'email' => 'required|email|unique:usuarios_web,email',
-            'password' => 'required|string|min:6',
+            'password' => 'required|string|min:8',
+            'password_confirmation' => 'required|same:password',
             'rol' => 'required|in:admin,director',
+            // 🔥 FIX: Validar institucion_id si es director
+            'institucion_id' => 'required_if:rol,director|exists:instituciones,id',
         ]);
 
         $usuario = UsuarioWeb::create([
             'nombre' => $request->nombre,
             'email' => strtolower($request->email),
-            'password' => $request->password, // Se hashea automáticamente en el modelo
+            'password' => $request->password,
             'rol' => $request->rol,
-            'estado' => $request->rol === 'admin' ? 'autorizado' : 'pendiente',
+            'estado' => $request->rol === 'admin' ? 'autorizado' : ($request->estado ?? 'pendiente'),
         ]);
+
+        // 🔥 FIX: Asignar institución si es director
+        if ($request->rol === 'director' && $request->institucion_id) {
+            $usuario->instituciones()->sync([$request->institucion_id]);
+        }
+
+        // Recargar con relaciones
+        $usuario->load('instituciones');
 
         return response()->json([
             'success' => true,
             'message' => 'Usuario creado correctamente',
-            'usuario' => $usuario,
+            'data' => $usuario,
         ], 201);
     }
 
@@ -118,7 +159,7 @@ class UsuarioWebController extends Controller
     {
         $usuario = UsuarioWeb::with('instituciones')->findOrFail($id);
 
-        return response()->json($usuario);
+        return response()->json(['data' => $usuario]);
     }
 
     /**
@@ -131,9 +172,12 @@ class UsuarioWebController extends Controller
         $request->validate([
             'nombre' => 'sometimes|string|max:255',
             'email' => 'sometimes|email|unique:usuarios_web,email,' . $id,
-            'password' => 'sometimes|string|min:6',
+            'password' => 'sometimes|string|min:8',
+            'password_confirmation' => 'required_with:password|same:password',
             'rol' => 'sometimes|in:admin,director',
             'estado' => 'sometimes|in:pendiente,autorizado,rechazado',
+            // 🔥 FIX: Validar institucion_id
+            'institucion_id' => 'sometimes|exists:instituciones,id',
         ]);
 
         $data = $request->only(['nombre', 'email', 'rol', 'estado']);
@@ -143,7 +187,7 @@ class UsuarioWebController extends Controller
         }
 
         if ($request->filled('password')) {
-            $data['password'] = $request->password; // Se hashea automáticamente
+            $data['password'] = $request->password;
         }
 
         // Si cambia a admin, autorizar automáticamente
@@ -153,10 +197,18 @@ class UsuarioWebController extends Controller
 
         $usuario->update($data);
 
+        // 🔥 FIX: Actualizar institución si se proporciona
+        if ($request->has('institucion_id')) {
+            $usuario->instituciones()->sync([$request->institucion_id]);
+        }
+
+        // Recargar con relaciones
+        $usuario->load('instituciones');
+
         return response()->json([
             'success' => true,
             'message' => 'Usuario actualizado correctamente',
-            'usuario' => $usuario->fresh(),
+            'data' => $usuario,
         ]);
     }
 
@@ -166,10 +218,13 @@ class UsuarioWebController extends Controller
     public function destroy($id)
     {
         $usuario = UsuarioWeb::findOrFail($id);
-        
+
         // Eliminar tokens antes de borrar
         $usuario->tokens()->delete();
-        
+
+        // Desasociar instituciones
+        $usuario->instituciones()->detach();
+
         $usuario->delete();
 
         return response()->json([
@@ -192,11 +247,12 @@ class UsuarioWebController extends Controller
         }
 
         $usuario->update(['estado' => 'autorizado']);
+        $usuario->load('instituciones');
 
         return response()->json([
             'success' => true,
             'message' => 'Director autorizado correctamente',
-            'usuario' => $usuario,
+            'data' => $usuario,
         ]);
     }
 
@@ -214,11 +270,12 @@ class UsuarioWebController extends Controller
         }
 
         $usuario->update(['estado' => 'rechazado']);
+        $usuario->load('instituciones');
 
         return response()->json([
             'success' => true,
             'message' => 'Director rechazado',
-            'usuario' => $usuario,
+            'data' => $usuario,
         ]);
     }
 }
