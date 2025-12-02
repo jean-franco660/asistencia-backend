@@ -29,12 +29,11 @@ class Asistencia extends Model
         'dentro_rango' => 'boolean',
         'falta' => 'boolean',
         'sincronizado' => 'boolean',
-        'latitud' => 'decimal:8',      // ✅ Cambiado de 7 a 8 para mejor precisión GPS
-        'longitud' => 'decimal:8',     // ✅ Cambiado de 7 a 8 para mejor precisión GPS
+        'latitud' => 'decimal:8',     
+        'longitud' => 'decimal:8',    
         'estado' => 'string',   
     ];
 
-    // ✅ Agregar valores por defecto
     protected $attributes = [
         'sincronizado' => false,
         'falta' => false,
@@ -67,8 +66,6 @@ class Asistencia extends Model
     }
 
     
-
-    // ✅ Agregar scope para asistencias no sincronizadas
     public function scopeNoSincronizadas($query)
     {
         return $query->where('sincronizado', false);
@@ -94,7 +91,6 @@ class Asistencia extends Model
         return $query->whereDate('fecha_hora', $fecha);
     }
 
-    // ✅ Agregar scope para entradas/salidas
     public function scopeEntradas($query)
     {
         return $query->where('tipo', 'entrada');
@@ -105,7 +101,6 @@ class Asistencia extends Model
         return $query->where('tipo', 'salida');
     }
 
-    // ✅ Agregar scope para rango de fechas
     public function scopeEntreFechas($query, $desde, $hasta)
     {
         return $query->whereBetween('fecha_hora', [$desde, $hasta]);
