@@ -13,17 +13,36 @@ class HorariosInstitucionController extends Controller
 
     public function index(Request $request)
     {
-        // Admin ve todo
-        if ($request->user()->rol === 'admin') {
-            return HorarioInstitucion::orderBy('hora_entrada')->get();
+        $query = HorarioInstitucion::query();
+
+        // 🔥 FILTRAR POR INSTITUCIÓN ESPECÍFICA (del selector)
+        if ($request->has('institucion_id') && $request->institucion_id) {
+            $query->where('institucion_id', $request->institucion_id);
+            
+            // Si es director, validar que tenga acceso a esa institución
+            if ($request->user()->rol === 'director') {
+                $instituciones = $request->user()->instituciones->pluck('id');
+                if (!$instituciones->contains($request->institucion_id)) {
+                    return response()->json(['error' => 'No autorizado'], 403);
+                }
+            }
+        } else {
+            // 🎯 SIN institucion_id: comportamiento por rol
+            if ($request->user()->rol === 'director') {
+                $instituciones = $request->user()->instituciones->pluck('id');
+                
+                // Si el director solo tiene UNA institución, filtrar por ella automáticamente
+                if ($instituciones->count() === 1) {
+                    $query->where('institucion_id', $instituciones->first());
+                } else {
+                    // Si tiene varias, mostrar todas sus instituciones
+                    $query->whereIn('institucion_id', $instituciones);
+                }
+            }
+            // Admin ve todo si no hay filtro
         }
 
-        // Director ve horarios de sus instituciones
-        $instituciones = $request->user()->instituciones->pluck('id');
-
-        return HorarioInstitucion::whereIn('institucion_id', $instituciones)
-            ->orderBy('hora_entrada')
-            ->get();
+        return $query->orderBy('hora_entrada')->get();
     }
 
 
