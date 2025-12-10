@@ -25,7 +25,7 @@ class InstitucionPolicy
      */
     public function view(UsuarioWeb $user, Institucion $institucion): bool
     {
-        return $user->instituciones->pluck('id')->contains($institucion->id);
+        return $user->instituciones->contains($institucion);
     }
 
     /**
@@ -33,7 +33,7 @@ class InstitucionPolicy
      */
     public function update(UsuarioWeb $user, Institucion $institucion): bool
     {
-        return $user->instituciones->pluck('id')->contains($institucion->id);
+        return $user->instituciones->contains($institucion);
     }
 
     /**

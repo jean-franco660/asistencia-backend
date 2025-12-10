@@ -13,8 +13,6 @@ use App\Http\Controllers\Api\FeriadoController;
 use App\Http\Controllers\Api\DirectorDashboardController;
 use App\Http\Controllers\Api\StatsController;
 use App\Http\Controllers\Api\AppInstitucionController;
-use App\Http\Controllers\Api\WebInstitucionController;
-
 
 /*
 |--------------------------------------------------------------------------
@@ -43,6 +41,8 @@ Route::prefix('v1/app')->group(function () {
         Route::get('/asistencia/{usuarioId}', [AsistenciaController::class, 'historial']);
         Route::post('/asistencias/sincronizar', [AsistenciaController::class, 'syncMovil']);
         Route::get('/estado-dia', [AsistenciaController::class, 'estadoDia']);
+        Route::get('/horarios-institucion', [HorariosInstitucionController::class, 'index']);
+
     });
 });
 
@@ -92,12 +92,12 @@ Route::prefix('v1/web')->middleware('auth:sanctum')->group(function () {
     | Gestión de instituciones
     |--------------------------------------------------------------------------
     */
-    Route::get('/instituciones', [WebInstitucionController::class, 'index']);
-    Route::get('/instituciones/mias', [WebInstitucionController::class, 'misInstituciones']);
-    Route::post('/instituciones', [WebInstitucionController::class, 'store']);
-    Route::get('/instituciones/{id}', [WebInstitucionController::class, 'show']);
-    Route::put('/instituciones/{id}', [WebInstitucionController::class, 'update']);
-    Route::delete('/instituciones/{id}', [WebInstitucionController::class, 'destroy']);
+    Route::get('/instituciones', [InstitucionController::class, 'index']);
+    Route::get('/instituciones/mias', [InstitucionController::class, 'misInstituciones']);
+    Route::post('/instituciones', [InstitucionController::class, 'store']);
+    Route::get('/instituciones/{id}', [InstitucionController::class, 'show']);
+    Route::post('/instituciones/{id}', [InstitucionController::class, 'update']); // Cambio a POST para soportar archivos
+    Route::delete('/instituciones/{id}', [InstitucionController::class, 'destroy']);
 
     /*--------------------------------------------------------------------------
     | Gestión de horarios de institución
@@ -107,6 +107,7 @@ Route::prefix('v1/web')->middleware('auth:sanctum')->group(function () {
     Route::post('/horarios', [HorariosInstitucionController::class, 'store']);
     Route::put('/horarios/{id}', [HorariosInstitucionController::class, 'update']);
     Route::delete('/horarios/{id}', [HorariosInstitucionController::class, 'destroy']);
+    
 
     /*--------------------------------------------------------------------------
     | Feriados Nacionales + Feriados Institucionales
@@ -129,6 +130,7 @@ Route::prefix('v1/web')->middleware('auth:sanctum')->group(function () {
     Route::get('/asistencias', [AsistenciaController::class, 'index']);
     Route::get('/asistencias/{id}', [AsistenciaController::class, 'show']);
     Route::get('/asistencia/foto/{id}', [AsistenciaController::class, 'foto']);
+    Route::get('/asistencias/exportar', [AsistenciaController::class, 'exportar']);
 
     /*-------------------------------------------------------------------------- 
     | Dashboard Stats (Admin/Director)

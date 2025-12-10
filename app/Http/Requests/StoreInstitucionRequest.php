@@ -15,11 +15,14 @@ class StoreInstitucionRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'nombre'     => 'required|string|max:150',
-            'direccion'  => 'nullable|string|max:255',
-            'latitud'    => 'required|numeric|between:-90,90',
-            'longitud'   => 'required|numeric|between:-180,180',
-            'radio'      => 'required|numeric|min:10|max:500', // metros
+            'nombre' => 'required|string|max:255',
+            'direccion' => 'nullable|string|max:255',
+            'telefono' => 'nullable|string|max:20',
+            'email' => 'nullable|email|max:255',
+            'latitud' => 'nullable|numeric',
+            'longitud' => 'nullable|numeric',
+            'radio' => 'nullable|numeric',
+            'logo' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048', // máx 2MB
         ];
     }
 }

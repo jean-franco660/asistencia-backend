@@ -8,16 +8,19 @@ use App\Models\Institucion;
 use App\Http\Requests\StoreInstitucionRequest;
 use App\Http\Requests\UpdateInstitucionRequest;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Facades\Storage;
 
 class InstitucionController extends Controller
 {
     use AuthorizesRequests;
+
     public function index(Request $request)
     {
+        $user = $request->user();
+
         // admin = ve todas / director = solo las que tiene asignadas
-        if ($request->user()->rol === 'director') {
-            $instituciones = $request->user()
-                ->instituciones()
+        if ($user->rol === 'director') {
+            $instituciones = $user->instituciones()
                 ->withCount(['docentes', 'directores'])
                 ->get();
         } else {
@@ -29,10 +32,17 @@ class InstitucionController extends Controller
 
     public function store(StoreInstitucionRequest $request)
     {
-        // solo admin
+        // solo admin puede crear
         $this->authorize('create', Institucion::class);
 
-        $institucion = Institucion::create($request->validated());
+        $data = $request->validated();
+
+        // Manejar subida de logo
+        if ($request->hasFile('logo')) {
+            $data['logo'] = $request->file('logo')->store('logos', 'public');
+        }
+
+        $institucion = Institucion::create($data);
 
         return response()->json([
             'data' => $institucion,
@@ -42,11 +52,9 @@ class InstitucionController extends Controller
 
     public function show(Request $request, $id)
     {
-        $institucion = Institucion::find($id);
-        if (!$institucion) {
-            return response()->json(['message' => 'Institución no encontrada'], 404);
-        }
+        $institucion = Institucion::findOrFail($id);
 
+        // Verifica si el usuario puede ver esta institución
         $this->authorize('view', $institucion);
 
         return response()->json(['data' => $institucion]);
@@ -54,14 +62,24 @@ class InstitucionController extends Controller
 
     public function update(UpdateInstitucionRequest $request, $id)
     {
-        $institucion = Institucion::find($id);
-        if (!$institucion) {
-            return response()->json(['message' => 'Institución no encontrada'], 404);
-        }
+        $institucion = Institucion::findOrFail($id);
 
+        // Verifica si el usuario puede actualizar esta institución
         $this->authorize('update', $institucion);
 
-        $institucion->update($request->validated());
+        $data = $request->validated();
+
+        // Manejar actualización de logo
+        if ($request->hasFile('logo')) {
+            // Eliminar logo anterior si existe
+            if ($institucion->logo) {
+                Storage::disk('public')->delete($institucion->logo);
+            }
+            
+            $data['logo'] = $request->file('logo')->store('logos', 'public');
+        }
+
+        $institucion->update($data);
 
         return response()->json([
             'data' => $institucion,
@@ -71,12 +89,15 @@ class InstitucionController extends Controller
 
     public function destroy(Request $request, $id)
     {
-        $institucion = Institucion::find($id);
-        if (!$institucion) {
-            return response()->json(['message' => 'Institución no encontrada'], 404);
-        }
+        $institucion = Institucion::findOrFail($id);
 
+        // Verifica si el usuario puede eliminar esta institución
         $this->authorize('delete', $institucion);
+
+        // Eliminar logo si existe
+        if ($institucion->logo) {
+            Storage::disk('public')->delete($institucion->logo);
+        }
 
         $institucion->delete();
 
@@ -99,5 +120,4 @@ class InstitucionController extends Controller
 
         return response()->json(['data' => $instituciones]);
     }
-
 }

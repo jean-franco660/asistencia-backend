@@ -402,6 +402,23 @@ class AsistenciaController extends Controller
         ]);
     }
 
+        public function exportar(Request $request)
+    {
+        $filters = [
+            'fecha_inicio' => $request->fecha_inicio,
+            'fecha_fin' => $request->fecha_fin,
+            'institucion_id' => $request->institucion_id,
+            'tipo' => $request->tipo,
+            'user' => $request->user(), // Para filtrar por director
+        ];
+
+        $filename = 'Reporte_Asistencias_' . date('Y-m-d_His') . '.xlsx';
+
+        return Excel::download(
+            new AsistenciasMultipleExport($filters),
+            $filename
+        );
+    }
 
     public function syncMovil(Request $request)
     {

@@ -20,11 +20,14 @@ class UpdateInstitucionRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'nombre'     => 'sometimes|string|max:150',
-            'direccion'  => 'sometimes|string|max:255',
-            'latitud'    => 'sometimes|numeric|between:-90,90',
-            'longitud'   => 'sometimes|numeric|between:-180,180',
-            'radio'      => 'sometimes|numeric|min:10|max:500',
+            'nombre' => 'sometimes|required|string|max:255',
+            'direccion' => 'nullable|string|max:255',
+            'telefono' => 'nullable|string|max:20',
+            'email' => 'nullable|email|max:255',
+            'latitud' => 'nullable|numeric',
+            'longitud' => 'nullable|numeric',
+            'radio' => 'nullable|numeric',
+            'logo' => 'nullable|image|mimes:jpeg,png,jpg,svg|max:2048',
         ];
     }
 }

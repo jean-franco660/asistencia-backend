@@ -15,6 +15,7 @@ class Institucion extends Model
         'latitud',
         'longitud',
         'radio',
+        'logo',
     ];
 
     protected $casts = [

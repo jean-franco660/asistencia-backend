@@ -15,7 +15,7 @@ class HorariosInstitucionController extends Controller
     {
         $query = HorarioInstitucion::query();
 
-        // 🔥 FILTRAR POR INSTITUCIÓN ESPECÍFICA (del selector)
+        // FILTRAR POR INSTITUCIÓN ESPECÍFICA (del selector)
         if ($request->has('institucion_id') && $request->institucion_id) {
             $query->where('institucion_id', $request->institucion_id);
             
@@ -27,7 +27,7 @@ class HorariosInstitucionController extends Controller
                 }
             }
         } else {
-            // 🎯 SIN institucion_id: comportamiento por rol
+            //  SIN institucion_id: comportamiento por rol
             if ($request->user()->rol === 'director') {
                 $instituciones = $request->user()->instituciones->pluck('id');
                 
