@@ -12,8 +12,8 @@ return [
     'allowed_methods' => ['*'],
 
     'allowed_origins' => [
-        'http://localhost:5173', // ⚠️ tu frontend local
-        'https://tusitio.com'    // ⚠️ tu dominio en producción
+        'http://localhost:5174', // ⚠️ puerto correcto de tu frontend
+        'https://tusitio.com'
     ],
 
     'allowed_origins_patterns' => [],

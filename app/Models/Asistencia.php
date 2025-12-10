@@ -19,26 +19,35 @@ class Asistencia extends Model
         'foto',
         'tipo',
         'turno',
-        'estado',     
+        'estado',
         'falta',
+        'falta_entrada',
+        'falta_salida',
         'sincronizado',
     ];
 
+
     protected $casts = [
-        'fecha_hora' => 'datetime',
-        'dentro_rango' => 'boolean',
-        'falta' => 'boolean',
-        'sincronizado' => 'boolean',
-        'latitud' => 'decimal:8',     
-        'longitud' => 'decimal:8',    
-        'estado' => 'string',   
+        'fecha_hora'     => 'datetime',
+        'dentro_rango'   => 'boolean',
+        'falta'          => 'boolean',
+        'falta_entrada'  => 'boolean',
+        'falta_salida'   => 'boolean',
+        'sincronizado'   => 'boolean',
+        'latitud'        => 'decimal:8',
+        'longitud'       => 'decimal:8',
+        'estado'         => 'string',
     ];
 
+
     protected $attributes = [
-        'sincronizado' => false,
-        'falta' => false,
-        'dentro_rango' => false,
+        'sincronizado'   => false,
+        'falta'          => false,
+        'falta_entrada'  => false,
+        'falta_salida'   => false,
+        'dentro_rango'   => false,
     ];
+
 
     public function usuario(): BelongsTo
     {
@@ -65,7 +74,21 @@ class Asistencia extends Model
         return $this->tipo === 'salida';
     }
 
-    
+    public function esFaltaEntrada(): bool
+    {
+        return $this->falta_entrada === true;
+    }
+
+    public function esFaltaSalida(): bool
+    {
+        return $this->falta_salida === true;
+    }
+
+    public function esFaltaCompleta(): bool
+    {
+        return $this->falta_entrada && $this->falta_salida;
+    }
+
     public function scopeNoSincronizadas($query)
     {
         return $query->where('sincronizado', false);
