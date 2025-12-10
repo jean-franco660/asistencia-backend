@@ -361,32 +361,71 @@ class AsistenciaController extends Controller
         $asistencias = [];
         $faltas = [];
 
-        $diasMes = $finMes->day;
+        // Solo hasta hoy, no todo el mes
+        $diasMes = min($hoy->day, $finMes->day);
 
         for ($dia = 1; $dia <= $diasMes; $dia++) {
-
             $fecha = $inicioMes->copy()->day($dia);
+            
+            // Solo procesar días que ya pasaron
+            if ($fecha->isFuture()) {
+                continue;
+            }
+
             $labels[] = (string)$dia;
 
-            // === Buscar ENTRADA ===
+            // Verificar si es día laborable
+            $diaMapa = [
+                'monday' => 'L', 'tuesday' => 'M', 'wednesday' => 'X',
+                'thursday' => 'J', 'friday' => 'V', 'saturday' => 'S', 'sunday' => 'D'
+            ];
+            $diaHoy = $diaMapa[strtolower($fecha->dayName)];
+
+            // Verificar feriados
+            $esFeriado = Feriado::where('tipo', 'nacional')
+                ->where('dia', $fecha->day)
+                ->where('mes', $fecha->month)
+                ->where('activo', true)
+                ->exists();
+
+            if ($esFeriado) {
+                continue; // No incluir días feriados
+            }
+
+            // Verificar si hay horario para este día
+            $hayHorario = DB::table('horarios_institucion')
+                ->whereJsonContains('dias_semana', $diaHoy)
+                ->where('activo', true)
+                ->exists();
+
+            if (!$hayHorario) {
+                continue; // No incluir días sin horario
+            }
+
+            // Buscar ENTRADA
             $entrada = (clone $query)
                 ->whereDate('fecha_hora', $fecha->toDateString())
                 ->where('tipo', 'entrada')
                 ->first();
 
-            // === Buscar SALIDA ===
+            // Buscar SALIDA
             $salida = (clone $query)
                 ->whereDate('fecha_hora', $fecha->toDateString())
                 ->where('tipo', 'salida')
                 ->first();
 
-            // === LÓGICA DE ASISTENCIA/FALTA ===
+            // LÓGICA DE ASISTENCIA/FALTA
             if ($entrada && $salida) {
                 $asistencias[] = 1;   // presente
                 $faltas[] = 0;
+            } elseif ($entrada || $salida) {
+                // Tiene entrada o salida pero no ambas
+                $asistencias[] = 1;   // cuenta como asistencia parcial
+                $faltas[] = 0;
             } else {
+                // No tiene ni entrada ni salida en un día laborable que ya pasó
                 $asistencias[] = 0;
-                $faltas[] = 1;       // falta
+                $faltas[] = 1;
             }
         }
 
