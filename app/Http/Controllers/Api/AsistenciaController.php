@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Exports\AsistenciasMultipleExport;
+use Maatwebsite\Excel\Facades\Excel;
 use App\Models\Asistencia;
 use App\Models\UsuarioApp;
 use App\Models\Feriado;
@@ -445,14 +446,14 @@ class AsistenciaController extends Controller
     public function exportar(Request $request)
     {
         $filters = [
-            'fecha_inicio' => $request->fecha_inicio,
-            'fecha_fin' => $request->fecha_fin,
-            'institucion_id' => $request->institucion_id,
-            'tipo' => $request->tipo,
-            'user' => $request->user(), // Para filtrar por director
+            'fecha_inicio'   => $request->input('fecha_inicio'),
+            'fecha_fin'      => $request->input('fecha_fin'),
+            'institucion_id' => $request->input('institucion_id'),
+            'tipo'           => $request->input('tipo'),
+            'user'           => $request->user(), // Para filtrar por director
         ];
 
-        $filename = 'Reporte_Asistencias_' . date('Y-m-d_His') . '.xlsx';
+        $filename = 'Reporte_Asistencias_' . now()->format('Y-m-d_His') . '.xlsx';
 
         return Excel::download(
             new AsistenciasMultipleExport($filters),
