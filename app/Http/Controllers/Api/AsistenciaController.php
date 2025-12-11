@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Exports\AsistenciasMultipleExport;
 use Maatwebsite\Excel\Facades\Excel;
+
 use App\Models\Asistencia;
 use App\Models\UsuarioApp;
 use App\Models\Feriado;
@@ -174,41 +175,23 @@ class AsistenciaController extends Controller
                         } else {
                             $fileName = 'selfies/' . uniqid('selfie_') . '.jpg';
 
-                            // 1) Intentar S3
                             try {
+                                // 1) Intentar S3
                                 Storage::disk('s3')->put($fileName, $fotoData, 'public');
-
-                                if (Storage::disk('s3')->exists($fileName)) {
-                                    $fotoPath = $fileName;
-                                    Log::info('✅ Selfie guardada en S3 (store)', [
-                                        'path' => $fotoPath,
-                                        'disk' => 's3',
-                                    ]);
-                                } else {
-                                    throw new \Exception('Archivo no visible en S3 tras put()');
-                                }
+                                Log::info('✅ Selfie guardada en S3 desde store()', ['path' => $fileName]);
                             } catch (\Throwable $e) {
-                                Log::error('⚠️ Falló S3 en store(): ' . $e->getMessage());
-
-                                // 2) Fallback a disco local "public"
+                                // 2) Si S3 falla, guardar en disco local
+                                Log::error('❌ Error guardando selfie en S3 (store): '.$e->getMessage());
                                 Storage::disk('public')->put($fileName, $fotoData);
-
-                                if (Storage::disk('public')->exists($fileName)) {
-                                    $fotoPath = $fileName;
-                                    Log::info('✅ Selfie guardada en disco local (store)', [
-                                        'path' => $fotoPath,
-                                        'disk' => 'public',
-                                    ]);
-                                } else {
-                                    Log::error('❌ No se pudo guardar selfie ni en S3 ni en public (store)');
-                                }
+                                Log::info('✅ Selfie guardada en disco local (public) desde store()', ['path' => $fileName]);
                             }
+
+                            $fotoPath = $fileName;
                         }
-                    } catch (\Throwable $e) {
-                        Log::error('❌ Error general guardando selfie (store): ' . $e->getMessage());
+                    } catch (\Exception $e) {
+                        Log::error('❌ Error procesando selfie en store(): '.$e->getMessage());
                     }
                 }
-
 
                 /*
                 |--------------------------------------------------------------------------
