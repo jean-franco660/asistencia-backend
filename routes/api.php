@@ -93,18 +93,18 @@ Route::prefix('v1/web')->middleware('auth:sanctum')->group(function () {
     | Gestión de instituciones
     |--------------------------------------------------------------------------
     */
+
     Route::get('instituciones', [InstitucionController::class, 'index']);
-    Route::post('instituciones', [InstitucionController::class, 'store']);
-    Route::get('instituciones/{id}', [InstitucionController::class, 'show']);
 
-    // CORRECTO:
-    Route::put('instituciones/{id}', [InstitucionController::class, 'update']);
-    Route::patch('instituciones/{id}', [InstitucionController::class, 'update']);
-
-    Route::delete('instituciones/{id}', [InstitucionController::class, 'destroy']);
-
+    // ✅ RUTAS ESPECÍFICAS PRIMERO
     Route::get('instituciones/mias', [InstitucionController::class, 'misInstituciones']);
 
+    // ✅ RUTAS CON PARÁMETROS DESPUÉS
+    Route::post('instituciones', [InstitucionController::class, 'store']);
+    Route::get('instituciones/{id}', [InstitucionController::class, 'show']);
+    Route::put('instituciones/{id}', [InstitucionController::class, 'update']);
+    Route::patch('instituciones/{id}', [InstitucionController::class, 'update']);
+    Route::delete('instituciones/{id}', [InstitucionController::class, 'destroy']);
     /*--------------------------------------------------------------------------
     | Gestión de horarios de institución
     |---------------------------------------------------------------------------
