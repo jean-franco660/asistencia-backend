@@ -1,11 +1,11 @@
 <?php
+
 namespace App\Services;
 
+use App\Imports\DocentesImport;
 use App\Models\UsuarioApp;
 use App\Models\Institucion;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Str;
 use Maatwebsite\Excel\Facades\Excel;
 
 class ImportDocentesService
@@ -14,57 +14,60 @@ class ImportDocentesService
     {
         // 1. VALIDAR ARCHIVO
         validator(['archivo' => $archivo], [
-            'archivo' => 'required|file|mimes:xlsx,xls,csv|max:5120' // 5MB max
+            'archivo' => 'required|file|mimes:xlsx,xls,csv|max:5120', // 5MB max
         ])->validate();
 
-        // 2. LEER ARCHIVO
-        $coleccion = Excel::toCollection(null, $archivo)->first();
-        
+        // 2. LEER ARCHIVO USANDO HEADING ROW
+        $coleccion = Excel::toCollection(new DocentesImport, $archivo)->first();
+
         if (!$coleccion || $coleccion->isEmpty()) {
             throw new \Exception('El archivo está vacío o no se pudo leer.');
         }
 
-        // 3. LIMITAR FILAS (protección contra archivos enormes)
+        // 3. LIMITAR FILAS
         if ($coleccion->count() > 500) {
             throw new \Exception('El archivo no puede tener más de 500 registros.');
         }
 
-        // 4. PROCESAR CON REPORTE
         $procesados = 0;
         $errores = [];
 
         foreach ($coleccion as $index => $fila) {
             try {
+                // Obtener campos (cabeceras del Excel)
+                $nombre      = $fila['nombre']      ?? null;
+                $codigo      = $fila['codigo']      ?? null;
+                $passwordRaw = $fila['password']    ?? null;
+                $instNombre  = $fila['institucion'] ?? null;
+
                 // Validar campos requeridos
-                if (empty($fila['nombre']) || 
-                    empty($fila['codigo']) || 
-                    empty($fila['password']) || 
-                    empty($fila['institucion'])) {
-                    continue; // Saltar fila vacía
+                if (empty($nombre) || empty($codigo) || empty($passwordRaw) || empty($instNombre)) {
+                    throw new \Exception('Faltan campos requeridos (nombre, código, password o institución).');
                 }
 
-                DB::transaction(function () use ($fila, &$procesados) {
-                    // SANITIZAR DATOS (crítico para datos externos)
-                    $nombre = strip_tags(trim($fila['nombre']));
-                    $codigo = preg_replace('/[^a-zA-Z0-9_-]/', '', trim($fila['codigo']));
-                    $institucionNombre = strip_tags(trim($fila['institucion']));
+                DB::transaction(function () use ($nombre, $codigo, $passwordRaw, $instNombre, &$procesados) {
+                    // Sanitizar datos
+                    $nombreSan  = strip_tags(trim($nombre));
+                    $codigoSan  = preg_replace('/[^a-zA-Z0-9_-]/', '', trim($codigo));
+                    $instSan    = strip_tags(trim($instNombre));
 
                     // Validar longitud mínima
-                    if (strlen($nombre) < 2 || strlen($codigo) < 3) {
-                        throw new \Exception('Datos inválidos');
+                    if (strlen($nombreSan) < 2 || strlen($codigoSan) < 3) {
+                        throw new \Exception('Datos inválidos (nombre o código demasiado cortos).');
                     }
 
                     // Buscar o crear la institución
                     $institucion = Institucion::firstOrCreate([
-                        'nombre' => $institucionNombre,
+                        'nombre' => $instSan,
                     ]);
 
-                    // Buscar o crear el docente
-                    $docente = UsuarioApp::firstOrCreate(
-                        ['codigo' => $codigo],
+                    // Crear o actualizar el docente
+                    $docente = UsuarioApp::updateOrCreate(
+                        ['codigo' => $codigoSan],
                         [
-                            'nombre' => $nombre,
-                            'password' => Hash::make($fila['password']),
+                            'nombre'   => $nombreSan,
+                            'password' => $passwordRaw,
+                            'activo'   => true,
                         ]
                     );
 
@@ -77,18 +80,18 @@ class ImportDocentesService
                 });
 
             } catch (\Exception $e) {
+                // +2 por la fila de encabezado (fila 1) y el index 0-based
                 $errores[] = "Fila " . ($index + 2) . ": " . $e->getMessage();
             }
         }
 
-        // 5. RETORNAR REPORTE
         return [
-            'total' => $coleccion->count(),
+            'total'      => $coleccion->count(),
             'procesados' => $procesados,
-            'errores' => $errores,
-            'mensaje' => $procesados > 0 
-                ? "Se importaron {$procesados} docentes correctamente" 
-                : "No se pudo importar ningún registro"
+            'errores'    => $errores,
+            'mensaje'    => $procesados > 0
+                ? "Se importaron {$procesados} docentes correctamente"
+                : "No se pudo importar ningún registro",
         ];
     }
 }

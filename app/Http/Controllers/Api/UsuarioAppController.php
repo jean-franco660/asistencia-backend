@@ -26,9 +26,10 @@ class UsuarioAppController extends Controller
 
         $codigo = strtolower($request->codigo);
 
-        $usuario = UsuarioApp::whereRaw('LOWER(codigo) = ?', [$codigo])
+        $usuario = UsuarioApp::where('codigo', strtolower($request->codigo))
             ->with('instituciones:id,nombre,latitud,longitud,radio')
             ->first();
+
 
         if (!$usuario || !Hash::check($request->password, $usuario->password)) {
             return response()->json(['error' => 'Credenciales incorrectas'], 422);
@@ -135,14 +136,14 @@ class UsuarioAppController extends Controller
             }
         }
 
-        // Actualizar datos del usuario
         $data = $request->validated();
 
-        if (isset($data['password']) && $data['password']) {
-            $data['password'] = Hash::make($data['password']);
-        } else {
+        // Si no envían password, no lo tocamos
+        if (empty($data['password'])) {
             unset($data['password']);
         }
+        // Si viene password en texto plano, NO usamos Hash::make.
+        // El mutator setPasswordAttribute lo encripta automáticamente.
 
         $usuario->update($data);
 
@@ -155,6 +156,7 @@ class UsuarioAppController extends Controller
 
         return response()->json($usuario);
     }
+
 
     // ELIMINAR DOCENTE
     public function destroy(Request $request, $id)

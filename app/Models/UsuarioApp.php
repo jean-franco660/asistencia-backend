@@ -11,8 +11,7 @@ use Laravel\Sanctum\HasApiTokens;
 
 class UsuarioApp extends Authenticatable 
 {
-    use HasFactory;
-    use HasApiTokens; 
+    use HasFactory, HasApiTokens;
 
     protected $table = 'usuarios_app';
 
@@ -23,16 +22,25 @@ class UsuarioApp extends Authenticatable
         'activo',
     ];
 
-    // Ocultar contraseña y otros datos sensibles
     protected $hidden = ['password'];
 
-    // Mutator para encriptar contraseña automáticamente
+    // Encripta la contraseña automáticamente
     public function setPasswordAttribute($value)
     {
         $this->attributes['password'] = Hash::make($value);
     }
 
-    // Relación: un docente puede estar en muchas instituciones
+    // Normaliza el código del usuario
+    public function setCodigoAttribute($value)
+    {
+        $this->attributes['codigo'] = strtolower(trim($value));
+    }
+
+    // Valor por defecto
+    protected $attributes = [
+        'activo' => true,
+    ];
+
     public function instituciones(): BelongsToMany
     {
         return $this->belongsToMany(
@@ -43,13 +51,11 @@ class UsuarioApp extends Authenticatable
         )->withTimestamps();
     }
 
-    // Relación: un docente tiene muchas asistencias
     public function asistencias(): HasMany
     {
         return $this->hasMany(Asistencia::class, 'usuario_id');
     }
 
-    // Scope para docentes activos
     public function scopeActivos($query)
     {
         return $query->where('activo', true);
