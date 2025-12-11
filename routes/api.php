@@ -127,11 +127,22 @@ Route::prefix('v1/web')->middleware('auth:sanctum')->group(function () {
     Route::post('/asistencias/sincronizar', [AsistenciaController::class, 'sync']);
     Route::get('/asistencias/semana', [AsistenciaController::class, 'resumenSemanal']);
     Route::get('/asistencias/mes-grafico', [AsistenciaController::class, 'resumenMensualGrafico']);
+
+    // RUTA DE EXPORTAR (esto es lo que te faltaba)
+    Route::get('/asistencias/exportar', [AsistenciaController::class, 'exportar'])
+        ->name('asistencias.exportar');
+
+    // Listado
+    Route::get('/asistencias', [AsistenciaController::class, 'index']);
+
+    // Detalle por ID (solo numérico)
     Route::get('/asistencias/{id}', [AsistenciaController::class, 'show'])
         ->whereNumber('id');
-    Route::get('/asistencias', [AsistenciaController::class, 'index']);
-    Route::get('/asistencias/{id}', [AsistenciaController::class, 'show']);
-    Route::get('/asistencia/foto/{id}', [AsistenciaController::class, 'foto']);
+
+    // Foto (solo numérico)
+    Route::get('/asistencia/foto/{id}', [AsistenciaController::class, 'foto'])
+        ->whereNumber('id');
+
 
     /*-------------------------------------------------------------------------- 
     | Dashboard Stats (Admin/Director)

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Exports\AsistenciasMultipleExport;
 use App\Models\Asistencia;
 use App\Models\UsuarioApp;
 use App\Models\Feriado;
