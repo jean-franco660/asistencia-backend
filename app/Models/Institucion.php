@@ -16,6 +16,8 @@ class Institucion extends Model
         'longitud',
         'radio',
         'logo',
+        'remove_logo' => 'nullable|boolean',
+
     ];
 
     protected $casts = [
@@ -75,5 +77,15 @@ class Institucion extends Model
     return $this->hasMany(HorarioInstitucion::class);
     }
 
+    
+    protected $appends = ['logo_url'];
+
+    public function getLogoUrlAttribute()
+    {
+        if (!$this->logo) {
+            return null;
+        }
+        return asset('storage/'.$this->logo);
+    }
 
 }

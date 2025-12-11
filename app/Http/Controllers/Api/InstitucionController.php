@@ -69,13 +69,23 @@ class InstitucionController extends Controller
 
         $data = $request->validated();
 
-        // Manejar actualización de logo
+        // ✅ Flag para eliminar logo sin subir uno nuevo
+        $removeLogo = $request->boolean('remove_logo');
+
+        if ($removeLogo && $institucion->logo) {
+            // Borrar archivo físico
+            Storage::disk('public')->delete($institucion->logo);
+            // Dejar el campo en null
+            $data['logo'] = null;
+        }
+
+        // ✅ Manejar actualización de logo (nuevo archivo)
         if ($request->hasFile('logo')) {
             // Eliminar logo anterior si existe
             if ($institucion->logo) {
                 Storage::disk('public')->delete($institucion->logo);
             }
-            
+
             $data['logo'] = $request->file('logo')->store('logos', 'public');
         }
 
@@ -86,6 +96,7 @@ class InstitucionController extends Controller
             'message' => 'Institución actualizada correctamente'
         ]);
     }
+
 
     public function destroy(Request $request, $id)
     {

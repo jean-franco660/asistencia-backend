@@ -3,6 +3,7 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use App\Http\Middleware\CorsMiddleware; // <--- IMPORTANTE
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -12,6 +13,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // 1) Ejecutar nuestro CORS ANTES que todo lo demás
+        $middleware->prepend(CorsMiddleware::class);
+
+        // 2) Lo que ya tenías
         $middleware->redirectGuestsTo(fn () => null);
 
         // reemplaza el Authenticate de Laravel por nuestro ApiAuthenticate

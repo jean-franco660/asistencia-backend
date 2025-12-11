@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\FeriadoController;
 use App\Http\Controllers\Api\DirectorDashboardController;
 use App\Http\Controllers\Api\StatsController;
 use App\Http\Controllers\Api\AppInstitucionController;
+use Illuminate\Support\Facades\Storage;
 
 /*
 |--------------------------------------------------------------------------
@@ -92,12 +93,17 @@ Route::prefix('v1/web')->middleware('auth:sanctum')->group(function () {
     | Gestión de instituciones
     |--------------------------------------------------------------------------
     */
-    Route::get('/instituciones', [InstitucionController::class, 'index']);
-    Route::get('/instituciones/mias', [InstitucionController::class, 'misInstituciones']);
-    Route::post('/instituciones', [InstitucionController::class, 'store']);
-    Route::get('/instituciones/{id}', [InstitucionController::class, 'show']);
-    Route::post('/instituciones/{id}', [InstitucionController::class, 'update']); // Cambio a POST para soportar archivos
-    Route::delete('/instituciones/{id}', [InstitucionController::class, 'destroy']);
+    Route::get('instituciones', [InstitucionController::class, 'index']);
+    Route::post('instituciones', [InstitucionController::class, 'store']);
+    Route::get('instituciones/{id}', [InstitucionController::class, 'show']);
+
+    // CORRECTO:
+    Route::put('instituciones/{id}', [InstitucionController::class, 'update']);
+    Route::patch('instituciones/{id}', [InstitucionController::class, 'update']);
+
+    Route::delete('instituciones/{id}', [InstitucionController::class, 'destroy']);
+
+    Route::get('instituciones/mias', [InstitucionController::class, 'misInstituciones']);
 
     /*--------------------------------------------------------------------------
     | Gestión de horarios de institución
@@ -162,3 +168,14 @@ Route::prefix('v1/web')->middleware('auth:sanctum')->group(function () {
     Route::get('/me', [UsuarioWebController::class, 'me']);
 
 });
+
+// Ruta PÚBLICA para servir logos
+Route::get('v1/web/logos/{filename}', function ($filename) {
+    $path = 'logos/' . $filename;
+
+    if (!Storage::disk('public')->exists($path)) {
+        abort(404, 'Logo no encontrado');
+    }
+
+    return Storage::disk('public')->response($path);
+})->where('filename', '.*');
