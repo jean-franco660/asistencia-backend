@@ -174,18 +174,38 @@ class AsistenciaController extends Controller
                         } else {
                             $fileName = 'selfies/' . uniqid('selfie_') . '.jpg';
 
-                            // Guardar en S3 con visibilidad pública
-                            Storage::disk('s3')->put($fileName, $fotoData, 'public');
+                            // 1) Intentar S3
+                            try {
+                                Storage::disk('s3')->put($fileName, $fotoData, 'public');
 
-                            $fotoPath = $fileName;
+                                if (Storage::disk('s3')->exists($fileName)) {
+                                    $fotoPath = $fileName;
+                                    Log::info('✅ Selfie guardada en S3 (store)', [
+                                        'path' => $fotoPath,
+                                        'disk' => 's3',
+                                    ]);
+                                } else {
+                                    throw new \Exception('Archivo no visible en S3 tras put()');
+                                }
+                            } catch (\Throwable $e) {
+                                Log::error('⚠️ Falló S3 en store(): ' . $e->getMessage());
 
-                            Log::info('✅ Selfie guardada en S3 desde store()', [
-                                'path' => $fotoPath,
-                                'size' => strlen($fotoData) . ' bytes',
-                            ]);
+                                // 2) Fallback a disco local "public"
+                                Storage::disk('public')->put($fileName, $fotoData);
+
+                                if (Storage::disk('public')->exists($fileName)) {
+                                    $fotoPath = $fileName;
+                                    Log::info('✅ Selfie guardada en disco local (store)', [
+                                        'path' => $fotoPath,
+                                        'disk' => 'public',
+                                    ]);
+                                } else {
+                                    Log::error('❌ No se pudo guardar selfie ni en S3 ni en public (store)');
+                                }
+                            }
                         }
-                    } catch (\Exception $e) {
-                        Log::error('❌ Error guardando selfie en S3 (store): ' . $e->getMessage());
+                    } catch (\Throwable $e) {
+                        Log::error('❌ Error general guardando selfie (store): ' . $e->getMessage());
                     }
                 }
 
@@ -584,7 +604,7 @@ class AsistenciaController extends Controller
                 $estado = ($horaMarcada < $horario->hora_salida) ? 'salida_antes' : 'a_tiempo';
             }
 
-            // ✅ GUARDAR SELFIE EN S3 SI EXISTE
+            // ✅ GUARDAR SELFIE EN S3 CON FALLBACK A DISCO LOCAL
             $fotoPath = null;
             if (!empty($item['foto'])) {
                 try {
@@ -596,21 +616,44 @@ class AsistenciaController extends Controller
                     } else {
                         $fileName = 'selfies/' . uniqid('selfie_') . '.jpg';
 
-                        // Guardar en S3 con visibilidad pública
-                        Storage::disk('s3')->put($fileName, $fotoData, 'public');
-                        $fotoPath = $fileName;
+                        // 1) Intentar S3
+                        try {
+                            Storage::disk('s3')->put($fileName, $fotoData, 'public');
 
-                        Log::info("✅ Foto guardada en S3 desde syncMovil():", [
-                            'path' => $fotoPath,
-                            'size' => strlen($fotoData) . ' bytes'
-                        ]);
+                            if (Storage::disk('s3')->exists($fileName)) {
+                                $fotoPath = $fileName;
+                                Log::info("✅ Foto guardada en S3 (syncMovil)", [
+                                    'path' => $fotoPath,
+                                    'disk' => 's3',
+                                ]);
+                            } else {
+                                throw new \Exception('Archivo no visible en S3 tras put()');
+                            }
+                        } catch (\Throwable $e) {
+                            Log::error("⚠️ Falló S3 en syncMovil(): " . $e->getMessage());
+
+                            // 2) Fallback a disco local
+                            Storage::disk('public')->put($fileName, $fotoData);
+
+                            if (Storage::disk('public')->exists($fileName)) {
+                                $fotoPath = $fileName;
+                                Log::info("✅ Foto guardada en disco local (syncMovil)", [
+                                    'path'   => $fotoPath,
+                                    'disk'   => 'public',
+                                ]);
+                            } else {
+                                Log::error("❌ No se pudo guardar foto ni en S3 ni en public (syncMovil)");
+                            }
+                        }
                     }
-                } catch (\Exception $e) {
-                    Log::error("❌ Error guardando foto en S3 (syncMovil): " . $e->getMessage());
+                } catch (\Throwable $e) {
+                    Log::error("❌ Error general guardando foto (syncMovil): " . $e->getMessage());
                 }
             } else {
                 Log::info("⚠️ No hay foto para guardar");
             }
+
+
 
 
             // Registrar asistencia
