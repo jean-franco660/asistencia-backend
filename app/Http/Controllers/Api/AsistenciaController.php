@@ -157,17 +157,38 @@ class AsistenciaController extends Controller
                     $estado = ($horaMarcada < $horario->hora_salida) ? 'salida_antes' : 'a_tiempo';
                 }
 
+
                 /*
-                |--------------------------------------------------------------------------
-                | 4) Guardar selfie si existe
-                |--------------------------------------------------------------------------
+                |-------------------------------------------------------------------------- 
+                | 4) Guardar selfie en S3 si existe
+                |-------------------------------------------------------------------------- 
                 */
                 $fotoPath = null;
 
                 if (!empty($validated['foto'])) {
-                    $fotoPath = 'selfies/' . uniqid('selfie_') . '.jpg';
-                    Storage::disk('public')->put($fotoPath, base64_decode($validated['foto']));
+                    try {
+                        $fotoData = base64_decode($validated['foto']);
+
+                        if ($fotoData === false) {
+                            Log::error('❌ Error decodificando foto Base64 en store()');
+                        } else {
+                            $fileName = 'selfies/' . uniqid('selfie_') . '.jpg';
+
+                            // Guardar en S3 con visibilidad pública
+                            Storage::disk('s3')->put($fileName, $fotoData, 'public');
+
+                            $fotoPath = $fileName;
+
+                            Log::info('✅ Selfie guardada en S3 desde store()', [
+                                'path' => $fotoPath,
+                                'size' => strlen($fotoData) . ' bytes',
+                            ]);
+                        }
+                    } catch (\Exception $e) {
+                        Log::error('❌ Error guardando selfie en S3 (store): ' . $e->getMessage());
+                    }
                 }
+
 
                 /*
                 |--------------------------------------------------------------------------
@@ -563,33 +584,34 @@ class AsistenciaController extends Controller
                 $estado = ($horaMarcada < $horario->hora_salida) ? 'salida_antes' : 'a_tiempo';
             }
 
-            // ✅ GUARDAR SELFIE SI EXISTE
+            // ✅ GUARDAR SELFIE EN S3 SI EXISTE
             $fotoPath = null;
             if (!empty($item['foto'])) {
                 try {
                     Log::info("📸 Procesando foto Base64...");
                     $fotoData = base64_decode($item['foto']);
-                    
+
                     if ($fotoData === false) {
-                        Log::error("❌ Error decodificando Base64");
+                        Log::error("❌ Error decodificando Base64 en syncMovil()");
                     } else {
                         $fileName = 'selfies/' . uniqid('selfie_') . '.jpg';
-                        
-                        // Guardar en S3 (storage/public)
-                        Storage::disk('public')->put($fileName, $fotoData);
+
+                        // Guardar en S3 con visibilidad pública
+                        Storage::disk('s3')->put($fileName, $fotoData, 'public');
                         $fotoPath = $fileName;
-                        
-                        Log::info("✅ Foto guardada exitosamente:", [
+
+                        Log::info("✅ Foto guardada en S3 desde syncMovil():", [
                             'path' => $fotoPath,
                             'size' => strlen($fotoData) . ' bytes'
                         ]);
                     }
                 } catch (\Exception $e) {
-                    Log::error("❌ Error guardando foto: " . $e->getMessage());
+                    Log::error("❌ Error guardando foto en S3 (syncMovil): " . $e->getMessage());
                 }
             } else {
                 Log::info("⚠️ No hay foto para guardar");
             }
+
 
             // Registrar asistencia
             $registro = Asistencia::create([

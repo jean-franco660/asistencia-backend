@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Storage; // ✅ IMPORTANTE
 
 class Asistencia extends Model
 {
@@ -26,7 +27,6 @@ class Asistencia extends Model
         'sincronizado',
     ];
 
-
     protected $casts = [
         'fecha_hora'     => 'datetime',
         'dentro_rango'   => 'boolean',
@@ -39,7 +39,6 @@ class Asistencia extends Model
         'estado'         => 'string',
     ];
 
-
     protected $attributes = [
         'sincronizado'   => false,
         'falta'          => false,
@@ -48,6 +47,8 @@ class Asistencia extends Model
         'dentro_rango'   => false,
     ];
 
+    // ✅ Para que en el JSON salga "selfie_url"
+    protected $appends = ['selfie_url'];
 
     public function usuario(): BelongsTo
     {
@@ -127,5 +128,27 @@ class Asistencia extends Model
     public function scopeEntreFechas($query, $desde, $hasta)
     {
         return $query->whereBetween('fecha_hora', [$desde, $hasta]);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | URL DE SELFIE (S3)
+    |--------------------------------------------------------------------------
+    | Esto es lo que leerá Flutter como `selfie_url`
+    */
+    public function getSelfieUrlAttribute()
+    {
+        if (!$this->foto) {
+            return null;
+        }
+
+        try {
+            // ✅ Genera la URL pública desde S3
+            return Storage::disk('s3')->url($this->foto);
+        } catch (\Throwable $e) {
+            // Opcional: loguear error si falla S3
+            \Log::error("Error generando URL de S3 para asistencia {$this->id}: " . $e->getMessage());
+            return null;
+        }
     }
 }
