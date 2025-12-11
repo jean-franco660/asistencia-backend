@@ -461,6 +461,18 @@ class AsistenciaController extends Controller
 
     public function syncMovil(Request $request)
     {
+        Log::info('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        Log::info('🔍 RECIBIENDO SINCRONIZACIÓN DE ASISTENCIAS');
+        Log::info('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        
+        // Log del request completo
+        Log::info('📦 Request data:', [
+            'content_length' => $request->header('Content-Length'),
+            'content_type' => $request->header('Content-Type'),
+            'has_asistencias' => $request->has('asistencias'),
+            'asistencias_count' => is_array($request->input('asistencias')) ? count($request->input('asistencias')) : 0,
+        ]);
+
         $validated = $request->validate([
             'asistencias' => 'required|array|min:1',
             'asistencias.*.usuario_id' => 'required|integer|exists:usuarios_app,id',
@@ -469,27 +481,37 @@ class AsistenciaController extends Controller
             'asistencias.*.dentro_rango' => 'required|boolean',
             'asistencias.*.latitud' => 'required|numeric',
             'asistencias.*.longitud' => 'required|numeric',
-            'asistencias.*.foto' => 'required|string',
+            'asistencias.*.foto' => 'nullable|string', // ✅ CAMBIO: De required a nullable
             'asistencias.*.tipo' => 'required|in:entrada,salida',
             'asistencias.*.turno' => 'required|string',
             'asistencias.*.falta' => 'required|boolean',
+            'asistencias.*.horario_id' => 'nullable|integer', // ✅ NUEVO: Agregar horario_id
         ]);
 
         $registradas = [];
         $omitidas = [];
 
-        foreach ($validated['asistencias'] as $item) {
+        foreach ($validated['asistencias'] as $index => $item) {
+            Log::info("🔍 Procesando asistencia #{$index}:", [
+                'usuario_id' => $item['usuario_id'],
+                'tipo' => $item['tipo'],
+                'fecha_hora' => $item['fecha_hora'],
+                'tiene_foto' => !empty($item['foto']),
+                'foto_length' => !empty($item['foto']) ? strlen($item['foto']) : 0,
+                'foto_preview' => !empty($item['foto']) ? substr($item['foto'], 0, 50) . '...' : null,
+            ]);
 
             $fecha = Carbon::parse($item['fecha_hora']);
 
             // Feriado nacional
             $fn = Feriado::where('tipo', 'nacional')
-                         ->where('dia', $fecha->day)
-                         ->where('mes', $fecha->month)
-                         ->where('activo', true)
-                         ->first();
+                        ->where('dia', $fecha->day)
+                        ->where('mes', $fecha->month)
+                        ->where('activo', true)
+                        ->first();
             
             if ($fn) {
+                Log::warning("⚠️ Asistencia omitida: Feriado Nacional");
                 $omitidas[] = array_merge($item, ['motivo' => "Feriado Nacional: {$fn->descripcion}"]);
                 continue;
             }
@@ -503,6 +525,7 @@ class AsistenciaController extends Controller
                         ->first();
             
             if ($fi) {
+                Log::warning("⚠️ Asistencia omitida: Feriado Institucional");
                 $omitidas[] = array_merge($item, ['motivo' => "Feriado Institucional: {$fi->descripcion}"]);
                 continue;
             }
@@ -521,6 +544,7 @@ class AsistenciaController extends Controller
                 ->first();
 
             if (!$horario) {
+                Log::warning("⚠️ Asistencia omitida: Día no laborable");
                 $omitidas[] = array_merge($item, ['motivo' => "Día no laborable"]);
                 continue;
             }
@@ -537,22 +561,69 @@ class AsistenciaController extends Controller
                 $estado = ($horaMarcada < $horario->hora_salida) ? 'salida_antes' : 'a_tiempo';
             }
 
-            // Guardar selfie
-            $fileName = 'selfies/' . uniqid('selfie_') . '.jpg';
-            Storage::disk('public')->put($fileName, base64_decode($item['foto']));
-            $item['foto'] = $fileName;
+            // ✅ GUARDAR SELFIE SI EXISTE
+            $fotoPath = null;
+            if (!empty($item['foto'])) {
+                try {
+                    Log::info("📸 Procesando foto Base64...");
+                    $fotoData = base64_decode($item['foto']);
+                    
+                    if ($fotoData === false) {
+                        Log::error("❌ Error decodificando Base64");
+                    } else {
+                        $fileName = 'selfies/' . uniqid('selfie_') . '.jpg';
+                        
+                        // Guardar en S3 (storage/public)
+                        Storage::disk('public')->put($fileName, $fotoData);
+                        $fotoPath = $fileName;
+                        
+                        Log::info("✅ Foto guardada exitosamente:", [
+                            'path' => $fotoPath,
+                            'size' => strlen($fotoData) . ' bytes'
+                        ]);
+                    }
+                } catch (\Exception $e) {
+                    Log::error("❌ Error guardando foto: " . $e->getMessage());
+                }
+            } else {
+                Log::info("⚠️ No hay foto para guardar");
+            }
 
-            // Registrar
-            $registro = Asistencia::create(array_merge($item, [
+            // Registrar asistencia
+            $registro = Asistencia::create([
+                'usuario_id' => $item['usuario_id'],
+                'institucion_id' => $item['institucion_id'],
+                'fecha_hora' => $item['fecha_hora'],
+                'dentro_rango' => $item['dentro_rango'],
+                'latitud' => $item['latitud'],
+                'longitud' => $item['longitud'],
+                'foto' => $fotoPath, // ✅ Ruta de S3 o null
+                'tipo' => $item['tipo'],
+                'turno' => $item['turno'],
+                'falta' => $item['falta'],
                 'sincronizado' => true,
-                'estado' => $estado
-            ]));
+                'estado' => $estado,
+            ]);
+
+            Log::info("✅ Asistencia registrada:", [
+                'id' => $registro->id,
+                'tipo' => $item['tipo'],
+                'tiene_foto' => $fotoPath !== null,
+            ]);
 
             $registradas[] = array_merge($item, [
                 'id' => $registro->id,
-                'estado' => $estado
+                'estado' => $estado,
+                'foto_guardada' => $fotoPath !== null,
             ]);
         }
+
+        Log::info('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        Log::info("✅ Sincronización completada:", [
+            'registradas' => count($registradas),
+            'omitidas' => count($omitidas),
+        ]);
+        Log::info('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
         return response()->json([
             'message' => 'Sincronización completada',
