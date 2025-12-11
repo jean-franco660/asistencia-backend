@@ -47,7 +47,6 @@ class Asistencia extends Model
         'dentro_rango'   => false,
     ];
 
-    // ✅ Para que en el JSON salga "selfie_url"
     protected $appends = ['selfie_url'];
 
     public function usuario(): BelongsTo

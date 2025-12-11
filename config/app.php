@@ -123,4 +123,6 @@ return [
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
 
+    'images_base_url' => env('IMAGES_BASE_URL', 'https://asistencia-app-uploads.s3.amazonaws.com'),
+
 ];
