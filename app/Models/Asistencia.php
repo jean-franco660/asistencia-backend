@@ -142,13 +142,20 @@ class Asistencia extends Model
             return null;
         }
 
+        // 1) Intentar usar la URL base configurada en config/app.php
+        $base = config('app.images_base_url');
+
+        if (!empty($base)) {
+            return rtrim($base, '/') . '/' . ltrim($this->foto, '/');
+        }
+
+        // 2) Fallback: si no hay ASISTENCIAS_BASE_URL, usar S3 directamente
         try {
-            // ✅ Genera la URL pública desde S3
             return Storage::disk('s3')->url($this->foto);
         } catch (\Throwable $e) {
-            // Opcional: loguear error si falla S3
             \Log::error("Error generando URL de S3 para asistencia {$this->id}: " . $e->getMessage());
             return null;
         }
     }
+
 }
