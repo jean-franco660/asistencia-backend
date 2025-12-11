@@ -441,7 +441,7 @@ class AsistenciaController extends Controller
         ]);
     }
 
-        public function exportar(Request $request)
+    public function exportar(Request $request)
     {
         $filters = [
             'fecha_inicio' => $request->fecha_inicio,

@@ -3,12 +3,16 @@
 namespace App\Exports;
 
 use Maatwebsite\Excel\Concerns\WithMultipleSheets;
+use App\Exports\AsistenciasResumenSheet;
+use App\Exports\AsistenciasDetalleSheet;
+use App\Exports\AsistenciasPorDocenteSheet;
+
 
 class AsistenciasMultipleExport implements WithMultipleSheets
 {
-    protected $filters;
+    protected array $filters;
 
-    public function __construct($filters = [])
+    public function __construct(array $filters = [])
     {
         $this->filters = $filters;
     }

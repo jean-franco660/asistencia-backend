@@ -127,10 +127,11 @@ Route::prefix('v1/web')->middleware('auth:sanctum')->group(function () {
     Route::post('/asistencias/sincronizar', [AsistenciaController::class, 'sync']);
     Route::get('/asistencias/semana', [AsistenciaController::class, 'resumenSemanal']);
     Route::get('/asistencias/mes-grafico', [AsistenciaController::class, 'resumenMensualGrafico']);
+    Route::get('/asistencias/{id}', [AsistenciaController::class, 'show'])
+        ->whereNumber('id');
     Route::get('/asistencias', [AsistenciaController::class, 'index']);
     Route::get('/asistencias/{id}', [AsistenciaController::class, 'show']);
     Route::get('/asistencia/foto/{id}', [AsistenciaController::class, 'foto']);
-    Route::get('/asistencias/exportar', [AsistenciaController::class, 'exportar']);
 
     /*-------------------------------------------------------------------------- 
     | Dashboard Stats (Admin/Director)
