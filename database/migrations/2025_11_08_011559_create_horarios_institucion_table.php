@@ -19,6 +19,9 @@ return new class extends Migration
             $table->time('hora_entrada');
             $table->time('hora_salida');
             $table->unsignedTinyInteger('tolerancia_minutos')->default(5);
+            
+            // Días laborales (L,M,X,J,V,S,D)
+            $table->json('dias_semana')->nullable();
 
             $table->boolean('activo')->default(true);
 

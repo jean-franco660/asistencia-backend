@@ -101,11 +101,11 @@ class FeriadoTest extends TestCase
     /** @test */
     public function test_director_puede_crear_feriado_institucional_en_su_institucion()
     {
-        $director = $this->createUsuarioWeb(['rol' => 'director', 'estado' => 'autorizado']);
+        $supervisor = $this->createUsuarioWeb(['rol' => 'supervisor', 'estado' => 'autorizado']);
         $institucion = $this->createInstitucion();
-        $director->instituciones()->attach($institucion->id);
+        $supervisor->instituciones()->attach($institucion->id);
 
-        $response = $this->actingAs($director, 'sanctum')
+        $response = $this->actingAs($supervisor, 'sanctum')
             ->postJson('/api/v1/web/feriados', [
                 'descripcion' => 'Feriado Institucional',
                 'fecha' => '2025-10-10',
@@ -119,13 +119,13 @@ class FeriadoTest extends TestCase
     /** @test */
     public function test_director_no_puede_crear_feriado_en_institucion_no_asignada()
     {
-        $director = $this->createUsuarioWeb(['rol' => 'director', 'estado' => 'autorizado']);
+        $supervisor = $this->createUsuarioWeb(['rol' => 'supervisor', 'estado' => 'autorizado']);
         $institucionAsignada = $this->createInstitucion();
         $institucionNoAsignada = $this->createInstitucion();
 
-        $director->instituciones()->attach($institucionAsignada->id);
+        $supervisor->instituciones()->attach($institucionAsignada->id);
 
-        $response = $this->actingAs($director, 'sanctum')
+        $response = $this->actingAs($supervisor, 'sanctum')
             ->postJson('/api/v1/web/feriados', [
                 'descripcion' => 'Feriado Test',
                 'fecha' => '2025-11-11',

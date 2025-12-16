@@ -15,7 +15,7 @@ class UsuarioWebAuthTest extends TestCase
             'nombre' => 'Admin Test',
             'email' => 'admin@test.com',
             'password' => 'password123',
-            'rol' => 'admin',
+            'rol' => 'administrador',
             'estado' => 'autorizado',
         ]);
 
@@ -45,18 +45,18 @@ class UsuarioWebAuthTest extends TestCase
     }
 
     /** @test */
-    public function test_director_no_autorizado_no_puede_iniciar_sesion()
+    public function test_supervisor_no_autorizado_no_puede_iniciar_sesion()
     {
         UsuarioWeb::create([
-            'nombre' => 'Director Test',
-            'email' => 'director@test.com',
+            'nombre' => 'Supervisor Test',
+            'email' => 'supervisor@test.com',
             'password' => 'password123',
-            'rol' => 'director',
+            'rol' => 'supervisor',
             'estado' => 'pendiente',
         ]);
 
         $response = $this->postJson('/api/v1/web/login', [
-            'email' => 'director@test.com',
+            'email' => 'supervisor@test.com',
             'password' => 'password123',
         ]);
 
@@ -65,21 +65,21 @@ class UsuarioWebAuthTest extends TestCase
     }
 
     /** @test */
-    public function test_director_autorizado_recibe_sus_instituciones_en_login()
+    public function test_supervisor_autorizado_recibe_sus_instituciones_en_login()
     {
-        $director = UsuarioWeb::create([
-            'nombre' => 'Director Test',
-            'email' => 'director@test.com',
+        $supervisor = UsuarioWeb::create([
+            'nombre' => 'Supervisor Test',
+            'email' => 'supervisor@test.com',
             'password' => 'password123',
-            'rol' => 'director',
+            'rol' => 'supervisor',
             'estado' => 'autorizado',
         ]);
 
         $institucion = $this->createInstitucion(['nombre' => 'Colegio Test']);
-        $director->instituciones()->attach($institucion->id);
+        $supervisor->instituciones()->attach($institucion->id);
 
         $response = $this->postJson('/api/v1/web/login', [
-            'email' => 'director@test.com',
+            'email' => 'supervisor@test.com',
             'password' => 'password123',
         ]);
 
@@ -90,18 +90,18 @@ class UsuarioWebAuthTest extends TestCase
     /** @test */
     public function test_endpoint_me_devuelve_datos_usuario_con_instituciones()
     {
-        $director = UsuarioWeb::create([
-            'nombre' => 'Director Test',
-            'email' => 'director@test.com',
+        $supervisor = UsuarioWeb::create([
+            'nombre' => 'Supervisor Test',
+            'email' => 'supervisor@test.com',
             'password' => 'password123',
-            'rol' => 'director',
+            'rol' => 'supervisor',
             'estado' => 'autorizado',
         ]);
 
         $institucion = $this->createInstitucion();
-        $director->instituciones()->attach($institucion->id);
+        $supervisor->instituciones()->attach($institucion->id);
 
-        $response = $this->actingAs($director, 'sanctum')
+        $response = $this->actingAs($supervisor, 'sanctum')
             ->getJson('/api/v1/web/me');
 
         $response->assertStatus(200)
@@ -113,18 +113,18 @@ class UsuarioWebAuthTest extends TestCase
                 'estado',
                 'instituciones',
             ])
-            ->assertJsonPath('rol', 'director')
+            ->assertJsonPath('rol', 'supervisor')
             ->assertJsonCount(1, 'instituciones');
     }
 
     /** @test */
-    public function test_endpoint_me_admin_no_devuelve_instituciones()
+    public function test_endpoint_me_administrador_no_devuelve_instituciones()
     {
         $admin = UsuarioWeb::create([
             'nombre' => 'Admin Test',
             'email' => 'admin@test.com',
             'password' => 'password123',
-            'rol' => 'admin',
+            'rol' => 'administrador',
             'estado' => 'autorizado',
         ]);
 
@@ -132,7 +132,7 @@ class UsuarioWebAuthTest extends TestCase
             ->getJson('/api/v1/web/me');
 
         $response->assertStatus(200)
-            ->assertJsonPath('rol', 'admin')
+            ->assertJsonPath('rol', 'administrador')
             ->assertJsonPath('instituciones', []);
     }
 }

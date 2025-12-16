@@ -13,11 +13,11 @@ use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 
-class AsistenciasPorDocenteSheet implements 
-    FromCollection, 
-    WithHeadings, 
-    WithMapping, 
-    WithStyles, 
+class AsistenciasPorDocenteSheet implements
+    FromCollection,
+    WithHeadings,
+    WithMapping,
+    WithStyles,
     WithColumnWidths,
     WithTitle
 {
@@ -55,21 +55,21 @@ class AsistenciasPorDocenteSheet implements
 
         $asistencias = $query->get();
 
-        $agrupado = $asistencias->groupBy('usuario_id')->map(function ($group) {
+        $agrupado = $asistencias->groupBy('usuario_app_id')->map(function ($group) {
             $usuario = $group->first()->usuario;
-            $total   = $group->count();
+            $total = $group->count();
             $a_tiempo = $group->where('estado', 'a_tiempo')->count();
-            $tarde    = $group->where('estado', 'tarde')->count();
-            $ausente  = $group->where('falta', true)->count();
+            $tarde = $group->where('estado', 'tarde')->count();
+            $ausente = $group->where('falta', true)->count();
 
-            return (object)[
-                'codigo'      => $usuario->codigo ?? '-',
-                'nombre'      => $usuario->nombre ?? '-',
-                'dni'         => $usuario->dni ?? '-',
-                'total'       => $total,
-                'a_tiempo'    => $a_tiempo,
-                'tarde'       => $tarde,
-                'ausente'     => $ausente,
+            return (object) [
+                'codigo' => $usuario->codigo ?? '-',
+                'nombre' => $usuario->nombre ?? '-',
+                'dni' => $usuario->dni ?? '-',
+                'total' => $total,
+                'a_tiempo' => $a_tiempo,
+                'tarde' => $tarde,
+                'ausente' => $ausente,
                 'puntualidad' => $total > 0 ? round(($a_tiempo / $total) * 100, 1) : 0,
             ];
         });
@@ -111,7 +111,7 @@ class AsistenciasPorDocenteSheet implements
             1 => [
                 'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
                 'fill' => [
-                    'fillType'   => Fill::FILL_SOLID,
+                    'fillType' => Fill::FILL_SOLID,
                     'startColor' => ['rgb' => '4472C4']
                 ],
                 'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],

@@ -8,9 +8,9 @@ class UpdateInstitucionRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        // admin puede editar cualquier institución
-        // director solo instituciones asignadas
-        if ($this->user()->rol === 'admin') {
+        // administrador puede editar cualquier institución
+        // supervisor solo instituciones asignadas
+        if ($this->user()->rol === 'administrador') {
             return true;
         }
 
@@ -19,14 +19,18 @@ class UpdateInstitucionRequest extends FormRequest
 
     public function rules(): array
     {
+        $id = $this->route('id');
+
         return [
+            'codigo_modular_ie' => 'sometimes|required|string|max:20|unique:instituciones,codigo_modular_ie,' . $id,
             'nombre' => 'sometimes|required|string|max:255',
+            'distrito' => 'sometimes|required|string|max:100',
+            'nivel_educativo' => 'nullable|string|max:100',
+            'centro_poblado' => 'nullable|string|max:150',
             'direccion' => 'nullable|string|max:255',
-            'telefono' => 'nullable|string|max:20',
-            'email' => 'nullable|email|max:255',
             'latitud' => 'nullable|numeric',
             'longitud' => 'nullable|numeric',
-            'radio' => 'nullable|numeric',
+            'radio' => 'nullable|numeric|min:1',
             'logo' => 'nullable|image|mimes:jpeg,png,jpg,svg|max:2048',
         ];
     }

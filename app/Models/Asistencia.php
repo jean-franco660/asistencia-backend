@@ -4,14 +4,19 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Facades\Storage; // ✅ IMPORTANTE
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Filesystem\FilesystemAdapter;
+use Illuminate\Support\Facades\Storage;
 
+/**
+ * @property \Illuminate\Support\Carbon $fecha_hora
+ */
 class Asistencia extends Model
 {
     protected $table = 'asistencias';
 
     protected $fillable = [
-        'usuario_id',
+        'usuario_app_id',
         'institucion_id',
         'fecha_hora',
         'dentro_rango',
@@ -28,35 +33,40 @@ class Asistencia extends Model
     ];
 
     protected $casts = [
-        'fecha_hora'     => 'datetime',
-        'dentro_rango'   => 'boolean',
-        'falta'          => 'boolean',
-        'falta_entrada'  => 'boolean',
-        'falta_salida'   => 'boolean',
-        'sincronizado'   => 'boolean',
-        'latitud'        => 'decimal:8',
-        'longitud'       => 'decimal:8',
-        'estado'         => 'string',
+        'fecha_hora' => 'datetime',
+        'dentro_rango' => 'boolean',
+        'falta' => 'boolean',
+        'falta_entrada' => 'boolean',
+        'falta_salida' => 'boolean',
+        'sincronizado' => 'boolean',
+        'latitud' => 'decimal:8',
+        'longitud' => 'decimal:8',
+        'estado' => 'string',
     ];
 
     protected $attributes = [
-        'sincronizado'   => false,
-        'falta'          => false,
-        'falta_entrada'  => false,
-        'falta_salida'   => false,
-        'dentro_rango'   => false,
+        'sincronizado' => false,
+        'falta' => false,
+        'falta_entrada' => false,
+        'falta_salida' => false,
+        'dentro_rango' => false,
     ];
 
     protected $appends = ['selfie_url'];
 
     public function usuario(): BelongsTo
     {
-        return $this->belongsTo(UsuarioApp::class, 'usuario_id');
+        return $this->belongsTo(UsuarioApp::class, 'usuario_app_id');
     }
 
     public function institucion(): BelongsTo
     {
         return $this->belongsTo(Institucion::class, 'institucion_id');
+    }
+
+    public function justificacion(): HasOne
+    {
+        return $this->hasOne(Justificacion::class, 'asistencia_id');
     }
 
     public function getFechaHoraFormateadaAttribute(): string
@@ -106,7 +116,7 @@ class Asistencia extends Model
 
     public function scopePorUsuario($query, $usuarioId)
     {
-        return $query->where('usuario_id', $usuarioId);
+        return $query->where('usuario_app_id', $usuarioId);
     }
 
     public function scopePorFecha($query, $fecha)
@@ -131,9 +141,8 @@ class Asistencia extends Model
 
     /*
     |--------------------------------------------------------------------------
-    | URL DE SELFIE (S3)
+    | URL DE SELFIE
     |--------------------------------------------------------------------------
-    | Esto es lo que leerá Flutter como `selfie_url`
     */
     public function getSelfieUrlAttribute()
     {
@@ -142,12 +151,13 @@ class Asistencia extends Model
         }
 
         try {
-            // URL pública generada por el disco s3
-            return Storage::disk('s3')->url($this->foto);
+            /** @var FilesystemAdapter $disk */
+            $disk = Storage::disk('s3');
+
+            return $disk->url($this->foto);
         } catch (\Throwable $e) {
             \Log::error("Error generando URL de S3 para asistencia {$this->id}: " . $e->getMessage());
             return null;
         }
     }
-
 }

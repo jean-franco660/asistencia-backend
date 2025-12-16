@@ -1,18 +1,18 @@
 <?php
 
+use App\Http\Controllers\Api\SupervisorDashboardController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\UsuarioWebController;
 use App\Http\Controllers\Api\UsuarioAppController;
 use App\Http\Controllers\Api\InstitucionController;
 use App\Http\Controllers\Api\AsistenciaController;
-use App\Http\Controllers\ImportDocentesController;
-use App\Http\Controllers\Api\InstitucionFeriadoController;
+use App\Http\Controllers\Api\DocenteImportController;
 use App\Http\Controllers\Api\HorariosInstitucionController;
 use App\Http\Controllers\Api\FeriadoController;
-use App\Http\Controllers\Api\DirectorDashboardController;
 use App\Http\Controllers\Api\StatsController;
 use App\Http\Controllers\Api\AppInstitucionController;
+use App\Http\Controllers\Api\JustificacionController;
 use Illuminate\Support\Facades\Storage;
 
 /*
@@ -33,143 +33,225 @@ Route::get('/status', function () {
 |--------------------------------------------------------------------------
 */
 Route::prefix('v1/app')->group(function () {
-    Route::post('/login', [UsuarioAppController::class, 'login']);
+    // Login con código modular - THROTTLE: 5 intentos por minuto
+    Route::post('/login', [UsuarioAppController::class, 'login'])->middleware('throttle:login');
 
-    // Rutas protegidas con token para la app
-    Route::middleware('auth:sanctum')->group(function () {
+    // Rutas protegidas con token para la app - THROTTLE: 60 peticiones por minuto
+    Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
+        // Perfil del docente autenticado
+        Route::get('/perfil', [UsuarioAppController::class, 'perfil']);
+
+        // Logout
+        Route::post('/logout', [UsuarioAppController::class, 'logout']);
+
+        // Instituciones
         Route::get('/instituciones', [AppInstitucionController::class, 'index']);
+
+        // Asistencias
         Route::post('/asistencia', [AsistenciaController::class, 'store']);
         Route::get('/asistencia/{usuarioId}', [AsistenciaController::class, 'historial']);
         Route::post('/asistencias/sincronizar', [AsistenciaController::class, 'syncMovil']);
         Route::get('/estado-dia', [AsistenciaController::class, 'estadoDia']);
+
+        // Horarios
         Route::get('/horarios-institucion', [HorariosInstitucionController::class, 'index']);
 
+        // Justificaciones (Docente solo puede crear, ver y eliminar las suyas)
+        Route::get('/justificaciones', [JustificacionController::class, 'index']);
+        Route::post('/justificaciones', [JustificacionController::class, 'store']);
+        Route::get('/justificaciones/{id}', [JustificacionController::class, 'show']);
+        Route::delete('/justificaciones/{id}', [JustificacionController::class, 'destroy']);
     });
 });
 
 /*
 |--------------------------------------------------------------------------
-| RUTAS PARA LA WEB (ADMIN / DIRECTOR)
+| RUTAS PARA LA WEB (ADMINISTRADOR / SUPERVISOR)
 |--------------------------------------------------------------------------
 */
 
 Route::prefix('v1/web')->group(function () {
-    Route::post('/login', [UsuarioWebController::class, 'login']);
+    // Login web - THROTTLE: 5 intentos por minuto
+    Route::post('/login', [UsuarioWebController::class, 'login'])->middleware('throttle:login');
 });
 
-Route::prefix('v1/web')->middleware('auth:sanctum')->group(function () {
+Route::prefix('v1/web')->middleware(['auth:sanctum', 'throttle:api'])->group(function () {
+    // Dashboard
+    Route::get('/supervisor/dashboard', [SupervisorDashboardController::class, 'index']);
 
-    /*
-    |--------------------------------------------------------------------------
-    | Gestión de usuarios web (Admin / Directores)
-    |--------------------------------------------------------------------------
-    */
-    Route::get('/director/dashboard', [DirectorDashboardController::class, 'index']);
-    Route::get('/usuarios-web', [UsuarioWebController::class, 'index']);
-    Route::get('/usuarios-web/pendientes', [UsuarioWebController::class, 'pendientes']);
-    Route::post('/usuarios-web', [UsuarioWebController::class, 'store']);
-    Route::get('/usuarios-web/{id}', [UsuarioWebController::class, 'show']);
-    Route::put('/usuarios-web/{id}', [UsuarioWebController::class, 'update']);
-    Route::delete('/usuarios-web/{id}', [UsuarioWebController::class, 'destroy']);
+    // Perfil
+    Route::get('/me', [UsuarioWebController::class, 'me']);
 
-    // Autorización y rechazo de usuarios
-    Route::post('/usuarios-web/autorizar/{id}', [UsuarioWebController::class, 'autorizar']);
-    Route::post('/usuarios-web/rechazar/{id}', [UsuarioWebController::class, 'rechazar']);
-    Route::post('/usuarios-web/importar', [ImportDocentesController::class, 'importar']);
-
-    /*
-    |--------------------------------------------------------------------------
-    | Gestión de docentes (usuarios_app)
-    |--------------------------------------------------------------------------
-    */
-    Route::get('/usuarios-app', [UsuarioAppController::class, 'index']);
-    Route::post('/usuarios-app', [UsuarioAppController::class, 'store']);
-    Route::get('/usuarios-app/{id}', [UsuarioAppController::class, 'show']);
-    Route::put('/usuarios-app/{id}', [UsuarioAppController::class, 'update']);
-    Route::delete('/usuarios-app/{id}', [UsuarioAppController::class, 'destroy']);
-
-    /*
-    |--------------------------------------------------------------------------
-    | Gestión de instituciones
-    |--------------------------------------------------------------------------
-    */
-
-    Route::get('instituciones', [InstitucionController::class, 'index']);
-
-    // ✅ RUTAS ESPECÍFICAS PRIMERO
-    Route::get('instituciones/mias', [InstitucionController::class, 'misInstituciones']);
-
-    // ✅ RUTAS CON PARÁMETROS DESPUÉS
-    Route::post('instituciones', [InstitucionController::class, 'store']);
-    Route::get('instituciones/{id}', [InstitucionController::class, 'show']);
-    Route::put('instituciones/{id}', [InstitucionController::class, 'update']);
-    Route::patch('instituciones/{id}', [InstitucionController::class, 'update']);
-    Route::delete('instituciones/{id}', [InstitucionController::class, 'destroy']);
-    /*--------------------------------------------------------------------------
-    | Gestión de horarios de institución
-    |---------------------------------------------------------------------------
-    */
-    Route::get('/horarios', [HorariosInstitucionController::class, 'index']);
-    Route::post('/horarios', [HorariosInstitucionController::class, 'store']);
-    Route::put('/horarios/{id}', [HorariosInstitucionController::class, 'update']);
-    Route::delete('/horarios/{id}', [HorariosInstitucionController::class, 'destroy']);
-    
-
-    /*--------------------------------------------------------------------------
-    | Feriados Nacionales + Feriados Institucionales
-    |--------------------------------------------------------------------------
-    */
-
-    Route::get('/feriados', [FeriadoController::class, 'index']);
-    Route::post('/feriados', [FeriadoController::class, 'store']);
-    Route::put('/feriados/{id}', [FeriadoController::class, 'update']);
-    Route::delete('/feriados/{id}', [FeriadoController::class, 'destroy']);
-    Route::post('/feriados/actualizar-automatico', [FeriadoController::class, 'actualizarAutomatico']);
-
-
-    /*--------------------------------------------------------------------------
-    | Gestión de asistencias
-    |--------------------------------------------------------------------------*/
-    Route::post('/asistencias/sincronizar', [AsistenciaController::class, 'sync']);
-    Route::get('/asistencias/semana', [AsistenciaController::class, 'resumenSemanal']);
-    Route::get('/asistencias/mes-grafico', [AsistenciaController::class, 'resumenMensualGrafico']);
-
-    // RUTA DE EXPORTAR (esto es lo que te faltaba)
-    Route::get('/asistencias/exportar', [AsistenciaController::class, 'exportar'])
-        ->name('asistencias.exportar');
-
-    // Listado
-    Route::get('/asistencias', [AsistenciaController::class, 'index']);
-
-    // Detalle por ID (solo numérico)
-    Route::get('/asistencias/{id}', [AsistenciaController::class, 'show'])
-        ->whereNumber('id');
-
-    // Foto (solo numérico)
-    Route::get('/asistencia/foto/{id}', [AsistenciaController::class, 'foto'])
-        ->whereNumber('id');
-
-
-    /*-------------------------------------------------------------------------- 
-    | Dashboard Stats (Admin/Director)
-    |--------------------------------------------------------------------------*/
-    Route::get('/stats', [StatsController::class, 'index']);
-
-    /*
-    |--------------------------------------------------------------------------
-    | Cierre de sesión
-    |--------------------------------------------------------------------------
-    */
+    // Logout
     Route::post('/logout', function (Request $request) {
         $request->user()->currentAccessToken()->delete();
         return response()->json(['message' => 'Sesión cerrada correctamente']);
     });
 
-    Route::get('/me', [UsuarioWebController::class, 'me']);
+    /*
+    |--------------------------------------------------------------------------
+    | USUARIOS WEB (Supervisores/Administradores)
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('usuarios-web')->group(function () {
+        Route::get('/', [UsuarioWebController::class, 'index']);
+        Route::get('/pendientes', [UsuarioWebController::class, 'pendientes']);
+        Route::post('/', [UsuarioWebController::class, 'store']);
+        Route::get('/{id}', [UsuarioWebController::class, 'show']);
+        Route::put('/{id}', [UsuarioWebController::class, 'update']);
+        Route::delete('/{id}', [UsuarioWebController::class, 'destroy']);
 
+        // ACCIONES CRÍTICAS - THROTTLE: 30 por minuto
+        Route::middleware('throttle:acciones-criticas')->group(function () {
+            Route::post('/autorizar/{id}', [UsuarioWebController::class, 'autorizar']);
+            Route::post('/rechazar/{id}', [UsuarioWebController::class, 'rechazar']);
+        });
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | USUARIOS APP (Docentes)
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('usuarios-app')->group(function () {
+        // Plantilla de importación
+        Route::get('/template', [DocenteImportController::class, 'downloadTemplate']);
+
+        // Rutas específicas ANTES de las rutas con parámetros
+        Route::delete('/delete-multiple', [UsuarioAppController::class, 'destroyMultiple']);
+
+        Route::get('/', [UsuarioAppController::class, 'index']);
+        Route::post('/', [UsuarioAppController::class, 'store']);
+        Route::get('/{id}', [UsuarioAppController::class, 'show'])->whereNumber('id');
+        Route::put('/{id}', [UsuarioAppController::class, 'update'])->whereNumber('id');
+        Route::patch('/{id}', [UsuarioAppController::class, 'update'])->whereNumber('id');
+        Route::delete('/{id}', [UsuarioAppController::class, 'destroy'])->whereNumber('id');
+        Route::patch('/{id}/estado', [UsuarioAppController::class, 'cambiarEstado'])->whereNumber('id');
+
+        // IMPORTACIÓN - THROTTLE: 3 por minuto
+        Route::middleware('throttle:importaciones')->group(function () {
+            Route::post('/importar', [DocenteImportController::class, 'import']);
+            Route::get('/importacion/{id}', [DocenteImportController::class, 'estadoImportacion'])->whereNumber('id');
+            Route::get('/importacion/{id}/errores.xlsx', [DocenteImportController::class, 'erroresExcel'])->whereNumber('id');
+        });
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | INSTITUCIONES
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('instituciones')->group(function () {
+        // Plantilla de importación
+        Route::get('/template', [\App\Http\Controllers\Api\InstitucionImportController::class, 'downloadTemplate']);
+
+        // Rutas específicas ANTES de las rutas con parámetros
+        Route::get('/mias', [InstitucionController::class, 'misInstituciones']);
+        Route::delete('/delete-multiple', [InstitucionController::class, 'destroyMultiple']);
+
+        // IMPORTACIÓN - THROTTLE: 3 por minuto
+        Route::middleware('throttle:importaciones')->group(function () {
+            Route::post('/importar', [\App\Http\Controllers\Api\InstitucionImportController::class, 'import']);
+            Route::get('/importacion/{id}', [\App\Http\Controllers\Api\InstitucionImportController::class, 'estadoImportacion'])->whereNumber('id');
+            Route::get('/importacion/{id}/errores.xlsx', [\App\Http\Controllers\Api\InstitucionImportController::class, 'erroresExcel'])->whereNumber('id');
+
+        });
+
+        // CRUD básico
+        Route::get('/', [InstitucionController::class, 'index']);
+        Route::post('/', [InstitucionController::class, 'store']);
+        Route::get('/{id}', [InstitucionController::class, 'show']);
+        Route::put('/{id}', [InstitucionController::class, 'update']);
+        Route::patch('/{id}', [InstitucionController::class, 'update']);
+        Route::delete('/{id}', [InstitucionController::class, 'destroy']);
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | HORARIOS
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('horarios')->group(function () {
+        Route::get('/', [HorariosInstitucionController::class, 'index']);
+        Route::post('/', [HorariosInstitucionController::class, 'store']);
+        Route::put('/{id}', [HorariosInstitucionController::class, 'update']);
+        Route::delete('/{id}', [HorariosInstitucionController::class, 'destroy']);
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | FERIADOS
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('feriados')->group(function () {
+        Route::get('/', [FeriadoController::class, 'index']);
+        Route::post('/', [FeriadoController::class, 'store']);
+        Route::put('/{id}', [FeriadoController::class, 'update']);
+        Route::delete('/{id}', [FeriadoController::class, 'destroy']);
+        Route::post('/actualizar-automatico', [FeriadoController::class, 'actualizarAutomatico']);
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | ASISTENCIAS
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('asistencias')->group(function () {
+        // Rutas específicas primero
+        Route::get('/semana', [AsistenciaController::class, 'resumenSemanal']);
+        Route::get('/mes-grafico', [AsistenciaController::class, 'resumenMensualGrafico']);
+        Route::get('/exportar', [AsistenciaController::class, 'exportar'])->name('asistencias.exportar');
+
+        // CRUD básico
+        Route::get('/', [AsistenciaController::class, 'index']);
+        Route::get('/{id}', [AsistenciaController::class, 'show'])->whereNumber('id');
+    });
+
+    // Foto de asistencia (fuera del prefix para mantener la ruta original)
+    Route::get('/asistencia/foto/{id}', [AsistenciaController::class, 'foto'])->whereNumber('id');
+
+    /*
+    |--------------------------------------------------------------------------
+    | JUSTIFICACIONES
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('justificaciones')->group(function () {
+        Route::get('/', [JustificacionController::class, 'index']);
+        Route::get('/{id}', [JustificacionController::class, 'show']);
+        Route::delete('/{id}', [JustificacionController::class, 'destroy']);
+
+        // ACCIONES CRÍTICAS - THROTTLE: 30 por minuto
+        Route::middleware('throttle:acciones-criticas')->group(function () {
+            Route::post('/{id}/aprobar', [JustificacionController::class, 'aprobar']);
+            Route::post('/{id}/rechazar', [JustificacionController::class, 'rechazar']);
+        });
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | ESTADÍSTICAS
+    |--------------------------------------------------------------------------
+    */
+    Route::get('/stats', [StatsController::class, 'index']);
+
+    /*
+    |--------------------------------------------------------------------------
+    | AUDITORÍA (Solo Super Admin)
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('audit-logs')->middleware('can:viewAny,App\Models\AuditLog')->group(function () {
+        Route::get('/', [\App\Http\Controllers\Api\AuditLogController::class, 'index']);
+        Route::get('/stats', [\App\Http\Controllers\Api\AuditLogController::class, 'stats']);
+        Route::get('/modelo/{modelo}/{id}', [\App\Http\Controllers\Api\AuditLogController::class, 'historialModelo']);
+        Route::get('/{id}', [\App\Http\Controllers\Api\AuditLogController::class, 'show']);
+    });
 });
 
-// Ruta PÚBLICA para servir logos
+/*
+|--------------------------------------------------------------------------
+| RUTA PÚBLICA PARA SERVIR LOGOS
+|--------------------------------------------------------------------------
+*/
 Route::get('v1/web/logos/{filename}', function ($filename) {
     $path = 'logos/' . $filename;
 
@@ -177,5 +259,5 @@ Route::get('v1/web/logos/{filename}', function ($filename) {
         abort(404, 'Logo no encontrado');
     }
 
-    return Storage::disk('public')->response($path);
+    return response()->file(storage_path('app/public/' . $path));
 })->where('filename', '.*');

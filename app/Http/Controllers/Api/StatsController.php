@@ -20,7 +20,7 @@ class StatsController extends Controller
         $dia = $today->day;
         $mes = $today->month;
 
-        $isAdmin = $user->rol === 'admin';
+        $isAdmin = $user->rol === 'administrador';
 
         /* ============================================================
            📌 INSTITUCIONES DEL ÁMBITO
@@ -34,7 +34,9 @@ class StatsController extends Controller
         ============================================================ */
         $docentesCount = $isAdmin
             ? UsuarioApp::count()
-            : UsuarioApp::whereHas('instituciones', fn($q) =>
+            : UsuarioApp::whereHas(
+                'instituciones',
+                fn($q) =>
                 $q->whereIn('instituciones.id', $institucionIds)
             )->count();
 
@@ -65,7 +67,7 @@ class StatsController extends Controller
         $motivoNoLaborable = optional($feriado)->descripcion;
 
         /* ============================================================
-           📌 VALIDACIÓN DE HORARIO (solo director)
+           📌 VALIDACIÓN DE HORARIO (solo supervisor)
         ============================================================ */
 
         if (!$hoyNoLaborable && !$isAdmin) {
@@ -101,13 +103,15 @@ class StatsController extends Controller
         $registrosHoy = Asistencia::whereIn('institucion_id', $institucionIds)
             ->whereDate('fecha_hora', $today)
             ->get()
-            ->groupBy('usuario_id');
+            ->groupBy('usuario_app_id');
 
         $asistenciasHoy = 0;
         $faltasHoy = 0;
 
         // Docentes vinculados a estas instituciones
-        $docentesDelAmbito = UsuarioApp::whereHas('instituciones', fn($q) =>
+        $docentesDelAmbito = UsuarioApp::whereHas(
+            'instituciones',
+            fn($q) =>
             $q->whereIn('instituciones.id', $institucionIds)
         )->pluck('id');
 
@@ -116,7 +120,7 @@ class StatsController extends Controller
             $registros = $registrosHoy->get($docenteId, collect());
 
             $entrada = $registros->firstWhere('tipo', 'entrada');
-            $salida  = $registros->firstWhere('tipo', 'salida');
+            $salida = $registros->firstWhere('tipo', 'salida');
 
             // Asistencia válida: entrada y salida
             if ($entrada && $salida) {
@@ -127,18 +131,84 @@ class StatsController extends Controller
         }
 
         /* ============================================================
-           📌 RESPUESTA FINAL
+           📌 ESTADÍSTICAS ADICIONALES
+        ============================================================ */
+
+        // Instituciones activas (con al menos un docente o actividad reciente)
+        $institucionesActivas = Institucion::whereHas('docentes')
+            ->whereIn('id', $institucionIds)
+            ->count();
+
+        // Docentes activos (que han marcado asistencia en los últimos 30 días)
+        $docentesActivos = UsuarioApp::whereHas('asistencias', function ($q) {
+            $q->where('fecha_hora', '>=', Carbon::now()->subDays(30));
+        })
+            ->whereHas('instituciones', fn($q) => $q->whereIn('instituciones.id', $institucionIds))
+            ->count();
+
+        // Asistencias del mes actual
+        $asistenciasMesActual = Asistencia::whereIn('institucion_id', $institucionIds)
+            ->whereYear('fecha_hora', $today->year)
+            ->whereMonth('fecha_hora', $today->month)
+            ->where('tipo', 'entrada')
+            ->count();
+
+        // Promedio de asistencia (basado en últimos 30 días)
+        $diasLaborables = 22; // Promedio de días laborables por mes
+        $docentesTotal = max($docentesCount, 1); // Evitar división por cero
+        $promedioAsistencia = $asistenciasMesActual > 0
+            ? round(($asistenciasMesActual / ($docentesTotal * $diasLaborables)) * 100, 1)
+            : 0;
+
+        // Estadísticas de justificaciones
+        $justificacionesPendientes = \App\Models\Justificacion::where('estado', 'PENDIENTE')
+            ->whereIn('institucion_id', $institucionIds)
+            ->count();
+
+        $justificacionesAprobadas = \App\Models\Justificacion::where('estado', 'APROBADO')
+            ->whereIn('institucion_id', $institucionIds)
+            ->count();
+
+        $justificacionesRechazadas = \App\Models\Justificacion::where('estado', 'RECHAZADO')
+            ->whereIn('institucion_id', $institucionIds)
+            ->count();
+
+        /* ============================================================
+           📌 RESPUESTA FINAL (ESTRUCTURA EXPANDIDA)
         ============================================================ */
 
         return response()->json([
-            'docentes_count'        => $docentesCount,
-            'total_instituciones'   => $instCount,
-            'asistencias_hoy'       => $asistenciasHoy,
-            'ausencias_hoy'         => $faltasHoy,
-            'feriados_nacionales'   => Feriado::where('tipo', 'nacional')->count(),
+            // ✨ NUEVA ESTRUCTURA ANIDADA
+            'instituciones' => [
+                'total' => $instCount,
+                'activas' => $institucionesActivas,
+            ],
+            'docentes' => [
+                'total' => $docentesCount,
+                'activos' => $docentesActivos,
+                'docentes_count' => $docentesCount, // Alias para compatibilidad
+            ],
+            'asistencias' => [
+                'hoy' => $asistenciasHoy,
+                'mes_actual' => $asistenciasMesActual,
+                'promedio_asistencia' => $promedioAsistencia,
+                'asistencias_hoy' => $asistenciasHoy, // Alias para compatibilidad
+            ],
+            'justificaciones' => [
+                'pendientes' => $justificacionesPendientes,
+                'aprobadas' => $justificacionesAprobadas,
+                'rechazadas' => $justificacionesRechazadas,
+            ],
+
+            // ✅ CAMPOS LEGACY (RETROCOMPATIBILIDAD)
+            'docentes_count' => $docentesCount,
+            'total_instituciones' => $instCount,
+            'asistencias_hoy' => $asistenciasHoy,
+            'ausencias_hoy' => $faltasHoy,
+            'feriados_nacionales' => Feriado::where('tipo', 'nacional')->count(),
             'feriados_institucionales' => Feriado::where('tipo', 'institucional')->count(),
-            'hoy_no_laborable'      => $hoyNoLaborable,
-            'motivo_no_laborable'   => $motivoNoLaborable,
+            'hoy_no_laborable' => $hoyNoLaborable,
+            'motivo_no_laborable' => $motivoNoLaborable,
         ]);
     }
 }

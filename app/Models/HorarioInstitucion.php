@@ -4,10 +4,12 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Traits\Auditable;
 
 class HorarioInstitucion extends Model
 {
-    use HasFactory;
+    
+    use HasFactory, Auditable;
 
     protected $table = 'horarios_institucion';
 
@@ -31,5 +33,10 @@ class HorarioInstitucion extends Model
     public function institucion()
     {
         return $this->belongsTo(Institucion::class);
+    }
+
+    protected function getNombreAuditable(): string
+    {
+    return "{$this->nombre_turno} - {$this->hora_entrada} a {$this->hora_salida}";
     }
 }

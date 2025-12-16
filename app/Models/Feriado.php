@@ -4,10 +4,16 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Traits\Auditable;
+use Carbon\Carbon;
 
+/**
+ * @property Carbon|null $fecha
+ */
 class Feriado extends Model
 {
-    use HasFactory;
+
+    use HasFactory, Auditable;
 
     protected $table = 'feriados';
 
@@ -46,4 +52,10 @@ class Feriado extends Model
     {
         return $this->belongsTo(Institucion::class);
     }
+
+    protected function getNombreAuditable(): string
+    {
+        return "{$this->descripcion} ({$this->fecha?->format('d/m/Y')})";
+    }
+
 }

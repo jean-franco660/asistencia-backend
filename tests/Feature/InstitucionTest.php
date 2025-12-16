@@ -24,15 +24,15 @@ class InstitucionTest extends TestCase
     }
 
     /** @test */
-    public function test_director_solo_ve_sus_instituciones()
+    public function test_supervisor_solo_ve_sus_instituciones()
     {
-        $director = $this->createUsuarioWeb(['rol' => 'director', 'estado' => 'autorizado']);
+        $supervisor = $this->createUsuarioWeb(['rol' => 'supervisor', 'estado' => 'autorizado']);
         $institucionAsignada = $this->createInstitucion(['nombre' => 'Mi Institución']);
         $this->createInstitucion(['nombre' => 'Otra Institución']);
 
-        $director->instituciones()->attach($institucionAsignada->id);
+        $supervisor->instituciones()->attach($institucionAsignada->id);
 
-        $response = $this->actingAs($director, 'sanctum')
+        $response = $this->actingAs($supervisor, 'sanctum')
             ->getJson('/api/v1/web/instituciones');
 
         $response->assertStatus(200)
@@ -41,15 +41,15 @@ class InstitucionTest extends TestCase
     }
 
     /** @test */
-    public function test_endpoint_instituciones_mias_devuelve_instituciones_director()
+    public function test_endpoint_instituciones_mias_devuelve_instituciones_supervisor()
     {
-        $director = $this->createUsuarioWeb(['rol' => 'director', 'estado' => 'autorizado']);
+        $supervisor = $this->createUsuarioWeb(['rol' => 'supervisor', 'estado' => 'autorizado']);
         $institucion1 = $this->createInstitucion();
         $institucion2 = $this->createInstitucion();
 
-        $director->instituciones()->attach([$institucion1->id, $institucion2->id]);
+        $supervisor->instituciones()->attach([$institucion1->id, $institucion2->id]);
 
-        $response = $this->actingAs($director, 'sanctum')
+        $response = $this->actingAs($supervisor, 'sanctum')
             ->getJson('/api/v1/web/instituciones/mias');
 
         $response->assertStatus(200)
@@ -59,11 +59,11 @@ class InstitucionTest extends TestCase
     /** @test */
     public function test_endpoint_instituciones_mias_no_devuelve_404()
     {
-        $director = $this->createUsuarioWeb(['rol' => 'director', 'estado' => 'autorizado']);
+        $supervisor = $this->createUsuarioWeb(['rol' => 'supervisor', 'estado' => 'autorizado']);
         $institucion = $this->createInstitucion();
-        $director->instituciones()->attach($institucion->id);
+        $supervisor->instituciones()->attach($institucion->id);
 
-        $response = $this->actingAs($director, 'sanctum')
+        $response = $this->actingAs($supervisor, 'sanctum')
             ->getJson('/api/v1/web/instituciones/mias');
 
         $response->assertStatus(200)
@@ -76,10 +76,10 @@ class InstitucionTest extends TestCase
         $this->actingAsAdmin();
 
         $response = $this->postJson('/api/v1/web/instituciones', [
+            'codigo_modular_ie' => 'CM123456',
             'nombre' => 'Nueva Institución',
+            'distrito' => 'Lima',
             'direccion' => 'Calle 123',
-            'telefono' => '123456789',
-            'email' => 'institucion@test.com',
             'latitud' => -12.0464,
             'longitud' => -77.0428,
             'radio' => 100,

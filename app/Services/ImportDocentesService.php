@@ -3,95 +3,335 @@
 namespace App\Services;
 
 use App\Imports\DocentesImport;
-use App\Models\UsuarioApp;
+use App\Models\ImportacionLog;
 use App\Models\Institucion;
+use App\Models\UsuarioApp;
+use DomainException;
+use Exception;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
 use Maatwebsite\Excel\Facades\Excel;
 
 class ImportDocentesService
 {
-    public function procesarArchivo($archivo)
+    /**
+     * Validación y disparo de importación (si lo usas desde controller con UploadedFile).
+     * Importante: Este método NO debería hacer trabajo pesado; idealmente aquí solo guardas
+     * el archivo y despachas el Job. Pero lo dejo funcional para tu caso.
+     */
+    public function procesarArchivo(UploadedFile $archivo, ImportacionLog $importLog): array
     {
-        // 1. VALIDAR ARCHIVO
-        validator(['archivo' => $archivo], [
-            'archivo' => 'required|file|mimes:xlsx,xls,csv|max:5120', // 5MB max
-        ])->validate();
+        $validator = Validator::make(['archivo' => $archivo], [
+            'archivo' => 'required|file|mimes:xlsx,xls,csv|max:10240',
+        ]);
 
-        // 2. LEER ARCHIVO USANDO HEADING ROW
-        $coleccion = Excel::toCollection(new DocentesImport, $archivo)->first();
-
-        if (!$coleccion || $coleccion->isEmpty()) {
-            throw new \Exception('El archivo está vacío o no se pudo leer.');
+        if ($validator->fails()) {
+            throw new DomainException($validator->errors()->first());
         }
 
-        // 3. LIMITAR FILAS
-        if ($coleccion->count() > 500) {
-            throw new \Exception('El archivo no puede tener más de 500 registros.');
+        // Solo marcar metadata. El Job debería marcar processing/iniciado_en
+        $importLog->update([
+            'archivo_original' => $archivo->getClientOriginalName() ?? $importLog->archivo_original,
+        ]);
+
+        // Si insistes en ejecutar aquí (no recomendado para producción), funciona:
+        Excel::import(new DocentesImport($importLog, $this), $archivo);
+
+        return [
+            'message' => 'Importación ejecutada (recomendado: usar Job + worker).',
+            'import_log_id' => $importLog->id,
+        ];
+    }
+
+    /**
+     * Método pensado para tus Jobs (recibe path relativo en storage y el ImportacionLog).
+     * Recomendado: el Job llama a este método.
+     */
+    public function procesarConProgreso(string $archivoPath, ImportacionLog $importLog): array
+    {
+        $absolutePath = Storage::path($archivoPath);
+
+        if (!is_file($absolutePath)) {
+            throw new Exception("Archivo no encontrado en storage: {$archivoPath}");
         }
 
-        $procesados = 0;
-        $errores = [];
+        // Job debería marcar iniciado, pero si lo llamas directo, lo dejamos seguro:
+        if ($importLog->estado !== 'processing') {
+            $importLog->update([
+                'estado' => 'processing',
+                'iniciado_en' => now(),
+            ]);
+        }
 
-        foreach ($coleccion as $index => $fila) {
+        $importLog->update([
+            'archivo_temp' => $archivoPath,
+        ]);
+
+        // Import con ruta absoluta (más estable que recrear UploadedFile)
+        Excel::import(new DocentesImport($importLog, $this), $absolutePath);
+
+        return [
+            'message' => 'Importación ejecutada por chunks.',
+            'import_log_id' => $importLog->id,
+        ];
+    }
+
+    /**
+     * Procesar un chunk de docentes (lo llama DocentesImport::collection()).
+     * - Actualiza counters en import_log
+     * - Acumula errores_detalle (merge sin pisar)
+     */
+    public function procesarChunk(Collection $rows, ?ImportacionLog $importLog = null, int $offset = 0): array
+    {
+        $resultados = [
+            'procesados' => 0,
+            'creados' => 0,
+            'actualizados' => 0,
+            'errores' => 0,
+            'errores_detalle' => [],
+        ];
+
+        // Cache de instituciones por chunk (evita N+1 contra instituciones)
+        $instCache = $this->buildInstitucionesCacheFromRows($rows);
+
+        foreach ($rows as $index => $row) {
+            $numeroFila = $offset + $index + 2; // +2 por encabezado
+
+            $rowArray = is_array($row) ? $row : $row->toArray();
+
             try {
-                // Obtener campos (cabeceras del Excel)
-                $nombre      = $fila['nombre']      ?? null;
-                $codigo      = $fila['codigo']      ?? null;
-                $passwordRaw = $fila['password']    ?? null;
-                $instNombre  = $fila['institucion'] ?? null;
+                $accion = $this->procesarFila($rowArray, $instCache);
 
-                // Validar campos requeridos
-                if (empty($nombre) || empty($codigo) || empty($passwordRaw) || empty($instNombre)) {
-                    throw new \Exception('Faltan campos requeridos (nombre, código, password o institución).');
+                if ($accion === 'creado') {
+                    $resultados['creados']++;
+                } else {
+                    $resultados['actualizados']++;
                 }
 
-                DB::transaction(function () use ($nombre, $codigo, $passwordRaw, $instNombre, &$procesados) {
-                    // Sanitizar datos
-                    $nombreSan  = strip_tags(trim($nombre));
-                    $codigoSan  = preg_replace('/[^a-zA-Z0-9_-]/', '', trim($codigo));
-                    $instSan    = strip_tags(trim($instNombre));
+                $resultados['procesados']++;
+            } catch (Exception $e) {
+                $resultados['errores']++;
 
-                    // Validar longitud mínima
-                    if (strlen($nombreSan) < 2 || strlen($codigoSan) < 3) {
-                        throw new \Exception('Datos inválidos (nombre o código demasiado cortos).');
+                $requeridos = [
+                    'codigo_modular_docente',
+                    'apellido_paterno',
+                    'apellido_materno',
+                    'nombres',
+                    'sexo',
+                    'codigo_modular_ie'
+                ];
+
+                $faltantes = [];
+                foreach ($requeridos as $k) {
+                    if (empty($rowArray[$k] ?? null)) {
+                        $faltantes[] = $k;
                     }
+                }
 
-                    // Buscar o crear la institución
-                    $institucion = Institucion::firstOrCreate([
-                        'nombre' => $instSan,
-                    ]);
+                $resultados['errores_detalle'][] = [
+                    'fila' => $numeroFila,
+                    'codigo_docente' => $rowArray['codigo_modular_docente'] ?? ($rowArray['codigo'] ?? null),
+                    'docente' => trim(
+                        ($rowArray['apellido_paterno'] ?? '') . ' ' .
+                        ($rowArray['apellido_materno'] ?? '') . ', ' .
+                        ($rowArray['nombres'] ?? '')
+                    ),
+                    'codigo_modular_ie' => $rowArray['codigo_modular_ie'] ?? null,
+                    'motivo' => $e->getMessage(),
+                    'faltantes' => $faltantes,
+                    // Si necesitas auditoría completa, puedes guardar la fila:
+                    // 'fila_original' => $rowArray,
+                ];
 
-                    // Crear o actualizar el docente
-                    $docente = UsuarioApp::updateOrCreate(
-                        ['codigo' => $codigoSan],
-                        [
-                            'nombre'   => $nombreSan,
-                            'password' => $passwordRaw,
-                            'activo'   => true,
-                        ]
-                    );
-
-                    // Asociar docente con institución
-                    if (!$institucion->docentes()->where('usuario_app_id', $docente->id)->exists()) {
-                        $institucion->docentes()->attach($docente->id);
-                    }
-
-                    $procesados++;
-                });
-
-            } catch (\Exception $e) {
-                // +2 por la fila de encabezado (fila 1) y el index 0-based
-                $errores[] = "Fila " . ($index + 2) . ": " . $e->getMessage();
+                Log::warning("Error al importar docente (chunk)", [
+                    'fila' => $numeroFila,
+                    'error' => $e->getMessage(),
+                ]);
             }
         }
 
-        return [
-            'total'      => $coleccion->count(),
-            'procesados' => $procesados,
-            'errores'    => $errores,
-            'mensaje'    => $procesados > 0
-                ? "Se importaron {$procesados} docentes correctamente"
-                : "No se pudo importar ningún registro",
+        if ($importLog) {
+            $this->actualizarProgresoChunk($importLog, $resultados);
+        }
+
+        return $resultados;
+    }
+
+    /**
+     * Procesar una fila individual.
+     * Retorna: 'creado' | 'actualizado'
+     */
+    protected function procesarFila(array $row, Collection $instCache): string
+    {
+        $codigoModular = $row['codigo_modular_docente'] ?? $row['codigo'] ?? null;
+        $apellidoPaterno = $row['apellido_paterno'] ?? null;
+        $apellidoMaterno = $row['apellido_materno'] ?? null;
+        $nombres = $row['nombres'] ?? null;
+        $sexo = $row['sexo'] ?? null;
+        $cargo = $row['cargo'] ?? 'DOCENTE';
+        $passwordRaw = $row['password'] ?? null;
+        $codigoModularIE = $row['codigo_modular_ie'] ?? null;
+
+        if (empty($codigoModular))
+            throw new Exception('Falta campo obligatorio: codigo_modular_docente');
+        if (empty($apellidoPaterno))
+            throw new Exception('Falta campo obligatorio: apellido_paterno');
+        if (empty($apellidoMaterno))
+            throw new Exception('Falta campo obligatorio: apellido_materno');
+        if (empty($nombres))
+            throw new Exception('Falta campo obligatorio: nombres');
+        if (empty($sexo))
+            throw new Exception('Falta campo obligatorio: sexo');
+        if (empty($codigoModularIE))
+            throw new Exception('Falta campo obligatorio: codigo_modular_ie');
+
+        $codigoDoc = strtolower(trim((string) $codigoModular));
+        $sexoSan = $this->normalizarSexo((string) $sexo);
+        $cargoSan = strtoupper(trim((string) $cargo));
+        $codigoIE = $this->normalizarCodigoInstitucion(trim((string) $codigoModularIE));
+
+        /** @var Institucion|null $institucion */
+        $institucion = $instCache->get($codigoIE);
+        if (!$institucion) {
+            throw new Exception("Institución con código '{$codigoIE}' no encontrada");
+        }
+
+        return DB::transaction(function () use ($codigoDoc, $apellidoPaterno, $apellidoMaterno, $nombres, $sexoSan, $cargoSan, $passwordRaw, $institucion) {
+            $usuario = UsuarioApp::whereRaw('LOWER(codigo_modular_docente) = ?', [$codigoDoc])->first();
+
+            $accion = 'actualizado';
+
+            if (!$usuario) {
+                $usuario = new UsuarioApp();
+                $usuario->codigo_modular_docente = $codigoDoc;
+
+                $usuario->password = Hash::make(
+                    !empty($passwordRaw) ? (string) $passwordRaw : '12345678',
+                    ['rounds' => 10]
+                );
+
+                $accion = 'creado';
+            }
+
+            $usuario->apellido_paterno = trim((string) $apellidoPaterno);
+            $usuario->apellido_materno = trim((string) $apellidoMaterno);
+            $usuario->nombres = trim((string) $nombres);
+            $usuario->sexo = $sexoSan;
+            $usuario->cargo = $cargoSan;
+            $usuario->estado = 'ACTIVO';
+            $usuario->activo = true;
+
+            // Asignar institución principal (la del Excel)
+            $usuario->institucion_id = $institucion->id;
+
+            $usuario->save();
+
+            // Pivot docente_institucion: evitar duplicados
+            $yaExistePivot = $usuario->instituciones()
+                ->where('institucion_id', $institucion->id)
+                ->exists();
+
+            if (!$yaExistePivot) {
+                $usuario->instituciones()->attach($institucion->id, [
+                    'estado' => 'ACTIVO',
+                    'fecha_inicio' => now(),
+                    'fecha_fin' => null,
+                ]);
+            }
+
+            return $accion;
+        });
+    }
+
+    protected function actualizarProgresoChunk(ImportacionLog $importLog, array $resultados): void
+    {
+        $procesados = (int) ($resultados['procesados'] ?? 0);
+        $errores = (int) ($resultados['errores'] ?? 0);
+
+        $importLog->increment('procesados', $procesados);
+        $importLog->increment('errores_count', $errores);
+
+        $exitosDelChunk = max(0, $procesados - $errores);
+        $importLog->increment('exitosos', $exitosDelChunk);
+
+        if (!empty($resultados['errores_detalle'])) {
+            $actual = $importLog->errores_detalle ?? [];
+            $actual = is_array($actual) ? $actual : [];
+
+            $importLog->update([
+                'errores_detalle' => array_merge($actual, $resultados['errores_detalle']),
+            ]);
+        }
+
+        Log::info("Chunk docentes procesado", [
+            'import_log_id' => $importLog->id,
+            'procesados_chunk' => $procesados,
+            'errores_chunk' => $errores,
+            'procesados_total' => $importLog->procesados,
+            'errores_total' => $importLog->errores_count,
+        ]);
+    }
+
+    private function buildInstitucionesCacheFromRows(Collection $rows): Collection
+    {
+        $codigosIE = $rows->pluck('codigo_modular_ie')
+            ->filter()
+            ->map(fn($v) => $this->normalizarCodigoInstitucion(trim((string) $v)))
+            ->unique()
+            ->values()
+            ->toArray();
+
+        return Institucion::whereIn('codigo_modular_ie', $codigosIE)
+            ->get()
+            ->keyBy(fn($i) => $this->normalizarCodigoInstitucion(trim((string) $i->codigo_modular_ie)));
+    }
+
+    /**
+     * Normaliza el código de institución:
+     * - Si es numérico y tiene menos de 7 dígitos, rellena con ceros a la izquierda
+     * - Si es alfanumérico, lo deja como está (en mayúsculas)
+     * 
+     * Ejemplos:
+     * - "238931" -> "0238931" (6 dígitos numéricos -> 7 dígitos)
+     * - "0238931" -> "0238931" (ya tiene 7 dígitos)
+     * - "P210002" -> "P210002" (alfanumérico, sin cambios)
+     */
+    private function normalizarCodigoInstitucion(string $codigo): string
+    {
+        $codigo = strtoupper(trim($codigo));
+
+        // Si es numérico y tiene menos de 7 dígitos, rellenar con ceros
+        if (ctype_digit($codigo) && strlen($codigo) < 7) {
+            return str_pad($codigo, 7, '0', STR_PAD_LEFT);
+        }
+
+        return $codigo;
+    }
+
+    private function normalizarSexo(string $sexoRaw): string
+    {
+        $s = trim($sexoRaw);
+        $key = mb_strtolower($s, 'UTF-8');
+        $key = str_replace(['á', 'é', 'í', 'ó', 'ú', 'ñ'], ['a', 'e', 'i', 'o', 'u', 'n'], $key);
+
+        $map = [
+            'masculino' => 'M',
+            'm' => 'M',
+            'hombre' => 'M',
+            'femenino' => 'F',
+            'f' => 'F',
+            'mujer' => 'F',
         ];
+
+        if (!isset($map[$key])) {
+            throw new Exception("Sexo inválido: '{$s}'. Use Masculino/Femenino (o M/F)");
+        }
+
+        return $map[$key];
     }
 }

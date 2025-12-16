@@ -19,7 +19,7 @@ class AuthController extends Controller
             return response()->json(['message' => 'Credenciales inválidas'], 401);
         }
 
-        if ($user->rol === 'director' && $user->estado !== 'autorizado') {
+        if ($user->rol === 'supervisor' && $user->estado !== 'autorizado') {
             return response()->json(['message' => 'Tu cuenta aún no ha sido autorizada'], 403);
         }
 
@@ -28,8 +28,8 @@ class AuthController extends Controller
 
         $token = $user->createToken('web-token')->plainTextToken;
 
-        $instituciones = $user->rol === 'director'
-            ? $user->instituciones()->select('instituciones.id','instituciones.nombre')->get()
+        $instituciones = $user->rol === 'supervisor'
+            ? $user->instituciones()->select('instituciones.id', 'instituciones.nombre')->get()
             : [];
 
         return response()->json([
@@ -49,7 +49,8 @@ class AuthController extends Controller
     public function logout()
     {
         $token = request()->user()?->currentAccessToken();
-        if ($token) $token->delete();
+        if ($token)
+            $token->delete();
 
         return response()->json([
             'success' => true,

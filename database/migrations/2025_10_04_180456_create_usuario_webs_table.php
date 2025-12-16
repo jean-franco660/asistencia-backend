@@ -4,7 +4,8 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration {
+return new class extends Migration
+{
     /**
      * Ejecuta la migración.
      */
@@ -15,12 +16,15 @@ return new class extends Migration {
             $table->string('nombre'); // Nombre completo
             $table->string('email')->unique(); // Correo de acceso
             $table->string('password'); // Contraseña cifrada
-            $table->enum('rol', ['admin', 'director'])->default('director'); // Rol del usuario
+
+            // Roles: super_admin, administrador, supervisor
+            $table->enum('rol', ['super_admin', 'administrador', 'supervisor'])->default('supervisor');
             
-            // Solo aplica a directores, pero se guarda aquí
+            // Estado del usuario en el sistema
             $table->enum('estado', ['pendiente', 'autorizado', 'rechazado'])->default('pendiente');
             
             $table->timestamps(); // created_at y updated_at
+            $table->softDeletes(); // deleted_at para soft delete
         });
     }
 

@@ -5,13 +5,13 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Exports\AsistenciasMultipleExport;
 use Maatwebsite\Excel\Facades\Excel;
-
 use App\Models\Asistencia;
-use App\Models\UsuarioApp;
-use App\Models\Feriado;
+use App\Models\AuditLog;
+use App\Models\UsuarioWeb;
+use App\Services\AsistenciaService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
@@ -20,10 +20,32 @@ class AsistenciaController extends Controller
 {
     use AuthorizesRequests;
 
+    protected AsistenciaService $asistenciaService;
+
+    public function __construct(AsistenciaService $asistenciaService)
+    {
+        $this->asistenciaService = $asistenciaService;
+    }
+
+    /**
+     * Helper: Verifica si el usuario es super_admin o administrador
+     */
+    private function esAdministrador(UsuarioWeb $user): bool
+    {
+        return in_array($user->rol, [
+            UsuarioWeb::ROL_SUPER_ADMIN,
+            UsuarioWeb::ROL_ADMIN,
+        ]);
+    }
+
+    /**
+     * Listar asistencias con filtros y paginación
+     */
     public function index(Request $request)
     {
         try {
-            $query = Asistencia::with(['usuario', 'institucion'])
+            $query = Asistencia::with(['usuario:id,codigo_modular_docente,apellido_paterno,apellido_materno,nombres', 
+                                      'institucion:id,nombre,codigo_modular_ie'])
                 ->orderBy('fecha_hora', 'desc');
 
             // Filtros
@@ -43,23 +65,19 @@ class AsistenciaController extends Controller
                 $query->where('tipo', $request->tipo);
             }
 
-            // Restricción: Director solo ve sus instituciones
+            // Restricción: Supervisor solo ve asistencias de sus instituciones
+            // Super admin y administrador ven todas
             $user = $request->user();
-            if ($user->rol === 'director') {
+            if (!$this->esAdministrador($user)) {
                 $institucionesIds = $user->instituciones->pluck('id');
                 $query->whereIn('institucion_id', $institucionesIds);
             }
 
-            $asistencias = $query->get();
+            $asistencias = $query->paginate(20);
 
-            return response()->json([
-                'success' => true,
-                'data' => $asistencias,
-                'total' => $asistencias->count()
-            ]);
+            return response()->json($asistencias);
 
         } catch (\Exception $e) {
-
             return response()->json([
                 'success' => false,
                 'error' => "Error al obtener asistencias",
@@ -68,185 +86,84 @@ class AsistenciaController extends Controller
         }
     }
 
-        public function store(Request $request)
-        {
-            try {
-                $validated = $request->validate([
-                    'usuario_id' => 'required|integer|exists:usuarios_app,id',
-                    'institucion_id' => 'required|integer|exists:instituciones,id',
-                    'fecha_hora' => 'required|date',
-                    'latitud' => 'required|numeric',
-                    'longitud' => 'required|numeric',
-                    'dentro_rango' => 'required|boolean',
-                    'tipo' => 'required|in:entrada,salida',
-                    'turno' => 'nullable|string',
-                    'foto' => 'nullable|string' // base64
-                ]);
+    /**
+     * Registrar asistencia (desde la app)
+     */
+    public function store(Request $request)
+    {
+        try {
+            $validated = $request->validate([
+                'usuario_app_id' => 'required|integer|exists:usuarios_app,id',
+                'institucion_id' => 'required|integer|exists:instituciones,id',
+                'fecha_hora' => 'required|date',
+                'latitud' => 'required|numeric',
+                'longitud' => 'required|numeric',
+                'dentro_rango' => 'required|boolean',
+                'tipo' => 'required|in:entrada,salida',
+                'turno' => 'nullable|string',
+                'foto' => 'nullable|string' // base64
+            ]);
 
-                $fecha = Carbon::parse($validated['fecha_hora']);
+            $fecha = Carbon::parse($validated['fecha_hora']);
 
-                /*
-                |--------------------------------------------------------------------------
-                | 1) Validar feriados nacionales e institucionales
-                |--------------------------------------------------------------------------
-                */
-                $fn = Feriado::where('tipo', 'nacional')
-                    ->where('dia', $fecha->day)
-                    ->where('mes', $fecha->month)
-                    ->where('activo', true)
-                    ->first();
+            // Validar día laborable
+            $validacion = $this->asistenciaService->esDiaLaborable($fecha, $validated['institucion_id']);
 
-                if ($fn) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => "No laborable: Feriado Nacional - {$fn->descripcion}"
-                    ], 403);
-                }
-
-                $fi = Feriado::where('tipo', 'institucional')
-                    ->where('institucion_id', $validated['institucion_id'])
-                    ->where('dia', $fecha->day)
-                    ->where('mes', $fecha->month)
-                    ->where('activo', true)
-                    ->first();
-
-                if ($fi) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => "No laborable: Feriado Institucional - {$fi->descripcion}"
-                    ], 403);
-                }
-
-                /*
-                |--------------------------------------------------------------------------
-                | 2) Validar horario de la institución
-                |--------------------------------------------------------------------------
-                */
-                $diaMapa = [
-                    'monday' => 'L', 'tuesday' => 'M', 'wednesday' => 'X',
-                    'thursday' => 'J', 'friday' => 'V', 'saturday' => 'S', 'sunday' => 'D'
-                ];
-
-                $diaHoy = $diaMapa[strtolower($fecha->dayName)];
-
-                $horario = DB::table('horarios_institucion')
-                    ->where('institucion_id', $validated['institucion_id'])
-                    ->whereJsonContains('dias_semana', $diaHoy)
-                    ->where('activo', true)
-                    ->first();
-
-                if (!$horario) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => "El día de hoy no es laborable"
-                    ], 403);
-                }
-
-                /*
-                |--------------------------------------------------------------------------
-                | 3) Calcular estado (puntual, tarde, salida_antes, etc.)
-                |--------------------------------------------------------------------------
-                */
-                $horaMarcada = $fecha->format('H:i:s');
-                $horaEntradaMax = Carbon::parse($horario->hora_entrada)
-                    ->addMinutes($horario->tolerancia_minutos)
-                    ->format('H:i:s');
-
-                if ($validated['tipo'] === 'entrada') {
-                    $estado = ($horaMarcada <= $horaEntradaMax) ? 'a_tiempo' : 'tarde';
-                } else {
-                    $estado = ($horaMarcada < $horario->hora_salida) ? 'salida_antes' : 'a_tiempo';
-                }
-
-                /*
-                |--------------------------------------------------------------------------
-                | 4) Guardar selfie en S3 o en disco local según entorno
-                |--------------------------------------------------------------------------
-                */
-                $fotoPath = null;
-
-                if (!empty($validated['foto'])) {
-                    try {
-                        $fotoData = base64_decode($validated['foto']);
-
-                        if ($fotoData === false) {
-                            Log::error('❌ Error decodificando foto Base64 en store()');
-                        } else {
-                            $fileName = 'selfies/' . uniqid('selfie_') . '.jpg';
-
-                            // Elegir disco según entorno
-                            $useS3 = env('USE_S3', false); // false en local, true en prod
-
-                            if ($useS3) {
-                                // Guardar en S3
-                                Storage::disk('s3')->put($fileName, $fotoData, 'public');
-                                Log::info('✅ Selfie guardada en S3 desde store()', [
-                                    'path' => $fileName,
-                                    'disk' => 's3',
-                                ]);
-                            } else {
-                                // Guardar en disco local (public)
-                                Storage::disk('public')->put($fileName, $fotoData);
-                                Log::info('✅ Selfie guardada en disco local (public) desde store()', [
-                                    'path' => $fileName,
-                                    'disk' => 'public',
-                                ]);
-                            }
-
-                            $fotoPath = $fileName;
-                        }
-                    } catch (\Throwable $e) {
-                        Log::error('❌ Error procesando selfie en store(): ' . $e->getMessage());
-                    }
-                }
-
-
-                /*
-                |--------------------------------------------------------------------------
-                | 5) Registrar asistencia
-                |--------------------------------------------------------------------------
-                */
-                $asistencia = Asistencia::create([
-                    'usuario_id' => $validated['usuario_id'],
-                    'institucion_id' => $validated['institucion_id'],
-                    'fecha_hora' => $validated['fecha_hora'],
-                    'latitud' => $validated['latitud'],
-                    'longitud' => $validated['longitud'],
-                    'dentro_rango' => $validated['dentro_rango'],
-                    'foto' => $fotoPath,
-                    'tipo' => $validated['tipo'],
-                    'turno' => $validated['turno'] ?? null,
-                    'estado' => $estado,
-                    'sincronizado' => true
-                ]);
-
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Asistencia registrada correctamente',
-                    'data' => $asistencia
-                ], 201);
-
-            } catch (\Exception $e) {
-                Log::error("Error en store(): " . $e->getMessage());
-
+            if (!$validacion['laborable']) {
                 return response()->json([
                     'success' => false,
-                    'message' => "Error al registrar asistencia",
-                    'error' => $e->getMessage()
-                ], 500);
+                    'message' => $validacion['motivo']
+                ], 403);
             }
+
+            // Calcular estado
+            $estado = $this->asistenciaService->calcularEstado(
+                $fecha,
+                $validated['tipo'],
+                $validacion['horario']
+            );
+
+            // Guardar foto
+            $fotoPath = $this->asistenciaService->guardarFoto($validated['foto'] ?? null, 'store');
+
+            // Registrar asistencia
+            $asistencia = Asistencia::create([
+                'usuario_app_id' => $validated['usuario_app_id'],
+                'institucion_id' => $validated['institucion_id'],
+                'fecha_hora' => $validated['fecha_hora'],
+                'latitud' => $validated['latitud'],
+                'longitud' => $validated['longitud'],
+                'dentro_rango' => $validated['dentro_rango'],
+                'foto' => $fotoPath,
+                'tipo' => $validated['tipo'],
+                'turno' => $validated['turno'] ?? null,
+                'estado' => $estado,
+                'sincronizado' => true
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Asistencia registrada correctamente',
+                'data' => $asistencia
+            ], 201);
+
+        } catch (\Exception $e) {
+            Log::error("Error en store(): " . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => "Error al registrar asistencia",
+                'error' => $e->getMessage()
+            ], 500);
         }
+    }
 
-
+    /**
+     * Ver detalle de asistencia
+     */
     public function show($id)
     {
         try {
-            $asistencia = Asistencia::with(['usuario', 'institucion'])->find($id);
-
-            if (!$asistencia) {
-                return response()->json(['message' => 'No encontrado'], 404);
-            }
-
+            $asistencia = Asistencia::with(['usuario', 'institucion'])->findOrFail($id);
             return response()->json($asistencia);
         } catch (\Exception $e) {
             Log::error("Error en show(): " . $e->getMessage());
@@ -254,63 +171,71 @@ class AsistenciaController extends Controller
         }
     }
 
+    /**
+     * Obtener foto de asistencia
+     */
+    public function foto($id)
+    {
+        try {
+            $asistencia = Asistencia::findOrFail($id);
+
+            if (!$asistencia->foto) {
+                abort(404, 'Sin foto');
+            }
+
+            $useS3 = env('USE_S3', false);
+
+            if ($useS3) {
+                // Generar URL temporal firmada (válida 5 minutos)
+                /** @var \Illuminate\Filesystem\AwsS3V3Adapter $disk */
+                $disk = Storage::disk('s3');
+                $url = $disk->temporaryUrl($asistencia->foto, now()->addMinutes(5));
+                return response()->json(['url' => $url]);
+            } else {
+                // Devolver archivo desde disco local
+                $path = storage_path("app/public/{$asistencia->foto}");
+                
+                if (!file_exists($path)) {
+                    abort(404, 'Foto no encontrada');
+                }
+
+                return response()->file($path);
+            }
+
+        } catch (\Exception $e) {
+            Log::error("Error en foto(): " . $e->getMessage());
+            return response()->json(['error' => 'Error al obtener foto'], 500);
+        }
+    }
+
+    /**
+     * Estado del día (para la app)
+     */
     public function estadoDia(Request $request)
     {
         $user = $request->user();
         $today = now();
 
-        // Feriado nacional
-        $fn = Feriado::where('tipo', 'nacional')
-                     ->where('dia', $today->day)
-                     ->where('mes', $today->month)
-                     ->where('activo', true)
-                     ->first();
-
-        if ($fn) {
-            return response()->json([
-                'laborable' => false,
-                'motivo' => "Feriado Nacional: {$fn->descripcion}",
-                'puede_marcar' => false,
-                'horario' => null,
-            ]);
-        }
-
-        // Feriado institucional
         $instituciones = $user->instituciones->pluck('id');
-        $fi = Feriado::where('tipo', 'institucional')
-                    ->whereIn('institucion_id', $instituciones)
-                    ->where('dia', $today->day)
-                    ->where('mes', $today->month)
-                    ->where('activo', true)
-                    ->first();
 
-        if ($fi) {
+        if ($instituciones->isEmpty()) {
             return response()->json([
                 'laborable' => false,
-                'motivo' => "Feriado Institucional: {$fi->descripcion}",
+                'motivo' => 'Sin instituciones asignadas',
                 'puede_marcar' => false,
                 'horario' => null,
             ]);
         }
 
-        // Buscar horario para hoy
-        $diaMapa = [
-            'monday' => 'L','tuesday' => 'M','wednesday' => 'X',
-            'thursday' => 'J','friday' => 'V','saturday' => 'S','sunday' => 'D'
-        ];
+        // Tomar la primera institución del usuario
+        $institucionId = $instituciones->first();
 
-        $diaHoy = $diaMapa[strtolower($today->dayName)] ?? null;
+        $validacion = $this->asistenciaService->esDiaLaborable($today, $institucionId);
 
-        $horario = DB::table('horarios_institucion')
-            ->whereIn('institucion_id', $instituciones)
-            ->whereJsonContains('dias_semana', $diaHoy)
-            ->where('activo', true)
-            ->first();
-
-        if (!$horario) {
+        if (!$validacion['laborable']) {
             return response()->json([
                 'laborable' => false,
-                'motivo' => "Día no laborable",
+                'motivo' => $validacion['motivo'],
                 'puede_marcar' => false,
                 'horario' => null,
             ]);
@@ -321,22 +246,26 @@ class AsistenciaController extends Controller
             'motivo' => null,
             'puede_marcar' => true,
             'horario' => [
-                'turno' => $horario->nombre_turno,
-                'hora_entrada' => $horario->hora_entrada,
-                'hora_salida' => $horario->hora_salida,
-                'tolerancia_minutos' => $horario->tolerancia_minutos,
+                'turno' => $validacion['horario']->nombre_turno,
+                'hora_entrada' => $validacion['horario']->hora_entrada,
+                'hora_salida' => $validacion['horario']->hora_salida,
+                'tolerancia_minutos' => $validacion['horario']->tolerancia_minutos,
             ]
         ]);
     }
 
+    /**
+     * Resumen semanal (para la app)
+     */
     public function resumenSemanal()
     {
-        $user = auth()->user();
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
         $hoy = Carbon::now();
         $inicioSemana = $hoy->copy()->startOfWeek();
         $finSemana = $hoy->copy()->endOfWeek();
 
-        $asistencias = Asistencia::where('usuario_id', $user->id)
+        $asistencias = Asistencia::where('usuario_app_id', $user->id)
             ->whereBetween('fecha_hora', [$inicioSemana, $finSemana])
             ->orderBy('fecha_hora')
             ->get();
@@ -376,88 +305,66 @@ class AsistenciaController extends Controller
         ]);
     }
 
+    /**
+     * Resumen mensual para gráfico (optimizado)
+     */
     public function resumenMensualGrafico()
     {
-        $user = auth()->user();
+        /** @var \App\Models\UsuarioWeb|null $user */
+        $user = Auth::user();
         $hoy = Carbon::now('America/Lima');
         $inicioMes = $hoy->copy()->startOfMonth();
         $finMes = $hoy->copy()->endOfMonth();
 
-        $isAdmin = $user->rol === 'administrador';
+        // Super admin y administrador ven todos los datos
+        $isAdmin = $this->esAdministrador($user);
 
+        // UNA SOLA QUERY para todo el mes
         $query = Asistencia::query();
 
         if (!$isAdmin) {
-            $query->where('usuario_id', $user->id);
+            $query->where('usuario_app_id', $user->id);
         }
+
+        $asistenciasMes = $query->whereBetween('fecha_hora', [$inicioMes, $finMes])
+            ->get()
+            ->groupBy(function($item) {
+                return $item->fecha_hora->format('Y-m-d');
+            });
 
         $labels = [];
         $asistencias = [];
         $faltas = [];
 
-        // Solo hasta hoy, no todo el mes
         $diasMes = min($hoy->day, $finMes->day);
 
         for ($dia = 1; $dia <= $diasMes; $dia++) {
             $fecha = $inicioMes->copy()->day($dia);
-            
-            // Solo procesar días que ya pasaron
+
             if ($fecha->isFuture()) {
                 continue;
             }
 
-            $labels[] = (string)$dia;
+            $labels[] = (string) $dia;
 
-            // Verificar si es día laborable
-            $diaMapa = [
-                'monday' => 'L', 'tuesday' => 'M', 'wednesday' => 'X',
-                'thursday' => 'J', 'friday' => 'V', 'saturday' => 'S', 'sunday' => 'D'
-            ];
-            $diaHoy = $diaMapa[strtolower($fecha->dayName)];
+            // Verificar si es laborable usando el service
+            $institucionId = $user->instituciones->first()->id ?? 1;
+            $validacion = $this->asistenciaService->esDiaLaborable($fecha, $institucionId);
 
-            // Verificar feriados
-            $esFeriado = Feriado::where('tipo', 'nacional')
-                ->where('dia', $fecha->day)
-                ->where('mes', $fecha->month)
-                ->where('activo', true)
-                ->exists();
-
-            if ($esFeriado) {
-                continue; // No incluir días feriados
+            if (!$validacion['laborable']) {
+                continue;
             }
 
-            // Verificar si hay horario para este día
-            $hayHorario = DB::table('horarios_institucion')
-                ->whereJsonContains('dias_semana', $diaHoy)
-                ->where('activo', true)
-                ->exists();
+            $fechaStr = $fecha->format('Y-m-d');
+            $registrosDia = $asistenciasMes->get($fechaStr, collect());
 
-            if (!$hayHorario) {
-                continue; // No incluir días sin horario
-            }
+            $tieneEntrada = $registrosDia->where('tipo', 'entrada')->isNotEmpty();
+            $tieneSalida = $registrosDia->where('tipo', 'salida')->isNotEmpty();
 
-            // Buscar ENTRADA
-            $entrada = (clone $query)
-                ->whereDate('fecha_hora', $fecha->toDateString())
-                ->where('tipo', 'entrada')
-                ->first();
-
-            // Buscar SALIDA
-            $salida = (clone $query)
-                ->whereDate('fecha_hora', $fecha->toDateString())
-                ->where('tipo', 'salida')
-                ->first();
-
-            // LÓGICA DE ASISTENCIA/FALTA
-            if ($entrada && $salida) {
-                $asistencias[] = 1;   // presente
-                $faltas[] = 0;
-            } elseif ($entrada || $salida) {
-                // Tiene entrada o salida pero no ambas
-                $asistencias[] = 1;   // cuenta como asistencia parcial
+            if ($tieneEntrada || $tieneSalida) {
+                $asistencias[] = 1;
                 $faltas[] = 0;
             } else {
-                // No tiene ni entrada ni salida en un día laborable que ya pasó
                 $asistencias[] = 0;
                 $faltas[] = 1;
             }
@@ -475,17 +382,71 @@ class AsistenciaController extends Controller
         ]);
     }
 
+    /**
+     * Exportar asistencias (CON AUDITORÍA)
+     */
     public function exportar(Request $request)
     {
         $filters = [
-            'fecha_inicio'   => $request->input('fecha_inicio'),
-            'fecha_fin'      => $request->input('fecha_fin'),
+            'fecha_inicio' => $request->input('fecha_inicio'),
+            'fecha_fin' => $request->input('fecha_fin'),
             'institucion_id' => $request->input('institucion_id'),
-            'tipo'           => $request->input('tipo'),
-            'user'           => $request->user(), // Para filtrar por director
+            'tipo' => $request->input('tipo'),
+            'user' => $request->user(),
         ];
 
+        // Contar registros a exportar
+        $query = Asistencia::query();
+        
+        if ($filters['fecha_inicio']) {
+            $query->whereDate('fecha_hora', '>=', $filters['fecha_inicio']);
+        }
+        if ($filters['fecha_fin']) {
+            $query->whereDate('fecha_hora', '<=', $filters['fecha_fin']);
+        }
+        if ($filters['institucion_id']) {
+            $query->where('institucion_id', $filters['institucion_id']);
+        }
+        if ($filters['tipo']) {
+            $query->where('tipo', $filters['tipo']);
+        }
+        
+        // Supervisor solo exporta asistencias de sus instituciones
+        // Super admin y administrador exportan todas
+        if (!$this->esAdministrador($filters['user'])) {
+            $query->whereIn('institucion_id', $filters['user']->instituciones->pluck('id'));
+        }
+
+        $totalRegistros = $query->count();
+
         $filename = 'Reporte_Asistencias_' . now()->format('Y-m-d_His') . '.xlsx';
+
+        // AUDITORÍA DE EXPORTACIÓN
+        AuditLog::create([
+            'actor_id' => $request->user()->id,
+            'actor_type' => get_class($request->user()),
+            'actor_nombre' => $request->user()->nombre,
+            'actor_rol' => $request->user()->rol,
+            'accion' => 'exportado',
+            'descripcion' => "Exportación de reporte de asistencias",
+            'modelo' => Asistencia::class,
+            'modelo_id' => null,
+            'modelo_nombre' => 'Reporte de asistencias',
+            'metadata' => [
+                'total_registros' => $totalRegistros,
+                'filtros' => [
+                    'fecha_inicio' => $filters['fecha_inicio'],
+                    'fecha_fin' => $filters['fecha_fin'],
+                    'institucion_id' => $filters['institucion_id'],
+                    'tipo' => $filters['tipo'],
+                ],
+                'archivo' => $filename,
+            ],
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+            'url' => $request->fullUrl(),
+            'metodo_http' => $request->method(),
+        ]);
 
         return Excel::download(
             new AsistenciasMultipleExport($filters),
@@ -493,156 +454,65 @@ class AsistenciaController extends Controller
         );
     }
 
+    /**
+     * Sincronización desde la app móvil (REFACTORIZADO)
+     */
     public function syncMovil(Request $request)
     {
         Log::info('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         Log::info('🔍 RECIBIENDO SINCRONIZACIÓN DE ASISTENCIAS');
         Log::info('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-        
-        // Log del request completo
-        Log::info('📦 Request data:', [
-            'content_length' => $request->header('Content-Length'),
-            'content_type' => $request->header('Content-Type'),
-            'has_asistencias' => $request->has('asistencias'),
-            'asistencias_count' => is_array($request->input('asistencias')) ? count($request->input('asistencias')) : 0,
-        ]);
 
         $validated = $request->validate([
             'asistencias' => 'required|array|min:1',
-            'asistencias.*.usuario_id' => 'required|integer|exists:usuarios_app,id',
+            'asistencias.*.usuario_app_id' => 'required|integer|exists:usuarios_app,id',
             'asistencias.*.institucion_id' => 'required|integer|exists:instituciones,id',
             'asistencias.*.fecha_hora' => 'required|date',
             'asistencias.*.dentro_rango' => 'required|boolean',
             'asistencias.*.latitud' => 'required|numeric',
             'asistencias.*.longitud' => 'required|numeric',
-            'asistencias.*.foto' => 'nullable|string', // ✅ CAMBIO: De required a nullable
+            'asistencias.*.foto' => 'nullable|string',
             'asistencias.*.tipo' => 'required|in:entrada,salida',
             'asistencias.*.turno' => 'required|string',
             'asistencias.*.falta' => 'required|boolean',
-            'asistencias.*.horario_id' => 'nullable|integer', // ✅ NUEVO: Agregar horario_id
         ]);
 
         $registradas = [];
         $omitidas = [];
 
         foreach ($validated['asistencias'] as $index => $item) {
-            Log::info("🔍 Procesando asistencia #{$index}:", [
-                'usuario_id' => $item['usuario_id'],
-                'tipo' => $item['tipo'],
-                'fecha_hora' => $item['fecha_hora'],
-                'tiene_foto' => !empty($item['foto']),
-                'foto_length' => !empty($item['foto']) ? strlen($item['foto']) : 0,
-                'foto_preview' => !empty($item['foto']) ? substr($item['foto'], 0, 50) . '...' : null,
-            ]);
+            Log::info("🔍 Procesando asistencia #{$index}");
 
             $fecha = Carbon::parse($item['fecha_hora']);
 
-            // Feriado nacional
-            $fn = Feriado::where('tipo', 'nacional')
-                        ->where('dia', $fecha->day)
-                        ->where('mes', $fecha->month)
-                        ->where('activo', true)
-                        ->first();
-            
-            if ($fn) {
-                Log::warning("⚠️ Asistencia omitida: Feriado Nacional");
-                $omitidas[] = array_merge($item, ['motivo' => "Feriado Nacional: {$fn->descripcion}"]);
-                continue;
-            }
+            // Validar día laborable usando el service
+            $validacion = $this->asistenciaService->esDiaLaborable($fecha, $item['institucion_id']);
 
-            // Feriado institucional
-            $fi = Feriado::where('tipo', 'institucional')
-                        ->where('institucion_id', $item['institucion_id'])
-                        ->where('dia', $fecha->day)
-                        ->where('mes', $fecha->month)
-                        ->where('activo', true)
-                        ->first();
-            
-            if ($fi) {
-                Log::warning("⚠️ Asistencia omitida: Feriado Institucional");
-                $omitidas[] = array_merge($item, ['motivo' => "Feriado Institucional: {$fi->descripcion}"]);
-                continue;
-            }
-
-            // Horario válido hoy
-            $diaMapa = [
-                'monday' => 'L','tuesday' => 'M','wednesday' => 'X',
-                'thursday' => 'J','friday' => 'V','saturday' => 'S','sunday' => 'D'
-            ];
-            $diaHoy = $diaMapa[strtolower($fecha->dayName)];
-
-            $horario = DB::table('horarios_institucion')
-                ->where('institucion_id', $item['institucion_id'])
-                ->whereJsonContains('dias_semana', $diaHoy)
-                ->where('activo', true)
-                ->first();
-
-            if (!$horario) {
-                Log::warning("⚠️ Asistencia omitida: Día no laborable");
-                $omitidas[] = array_merge($item, ['motivo' => "Día no laborable"]);
+            if (!$validacion['laborable']) {
+                Log::warning("⚠️ Omitida: {$validacion['motivo']}");
+                $omitidas[] = array_merge($item, ['motivo' => $validacion['motivo']]);
                 continue;
             }
 
             // Calcular estado
-            $horaMarcada = $fecha->format('H:i:s');
-            $horaEntradaMax = Carbon::parse($horario->hora_entrada)
-                ->addMinutes($horario->tolerancia_minutos)
-                ->format('H:i:s');
+            $estado = $this->asistenciaService->calcularEstado(
+                $fecha,
+                $item['tipo'],
+                $validacion['horario']
+            );
 
-            if ($item['tipo'] === 'entrada') {
-                $estado = ($horaMarcada <= $horaEntradaMax) ? 'a_tiempo' : 'tarde';
-            } else {
-                $estado = ($horaMarcada < $horario->hora_salida) ? 'salida_antes' : 'a_tiempo';
-            }
-
-            // ✅ GUARDAR SELFIE EN S3 O LOCAL SEGÚN ENTORNO
-            $fotoPath = null;
-
-            if (!empty($item['foto'])) {
-                try {
-                    Log::info("📸 Procesando foto Base64 (syncMovil)...");
-                    $fotoData = base64_decode($item['foto']);
-
-                    if ($fotoData === false) {
-                        Log::error("❌ Error decodificando Base64 en syncMovil()");
-                    } else {
-                        $fileName = 'selfies/' . uniqid('selfie_') . '.jpg';
-                        $useS3 = env('USE_S3', false);
-
-                        if ($useS3) {
-                            // Producción: S3
-                            Storage::disk('s3')->put($fileName, $fotoData, 'public');
-                            $fotoPath = $fileName;
-                            Log::info("✅ Foto guardada en S3 (syncMovil)", [
-                                'path' => $fotoPath,
-                                'disk' => 's3',
-                            ]);
-                        } else {
-                            // Local: disco public
-                            Storage::disk('public')->put($fileName, $fotoData);
-                            $fotoPath = $fileName;
-                            Log::info("✅ Foto guardada en disco local (syncMovil)", [
-                                'path' => $fotoPath,
-                                'disk' => 'public',
-                            ]);
-                        }
-                    }
-                } catch (\Throwable $e) {
-                    Log::error("❌ Error general guardando foto (syncMovil): " . $e->getMessage());
-                }
-            } else {
-                Log::info("⚠️ No hay foto para guardar");
-            }
+            // Guardar foto
+            $fotoPath = $this->asistenciaService->guardarFoto($item['foto'] ?? null, 'syncMovil');
 
             // Registrar asistencia
             $registro = Asistencia::create([
-                'usuario_id' => $item['usuario_id'],
+                'usuario_app_id' => $item['usuario_app_id'],
                 'institucion_id' => $item['institucion_id'],
                 'fecha_hora' => $item['fecha_hora'],
                 'dentro_rango' => $item['dentro_rango'],
                 'latitud' => $item['latitud'],
                 'longitud' => $item['longitud'],
-                'foto' => $fotoPath, // ✅ Ruta de S3 o null
+                'foto' => $fotoPath,
                 'tipo' => $item['tipo'],
                 'turno' => $item['turno'],
                 'falta' => $item['falta'],
@@ -650,11 +520,7 @@ class AsistenciaController extends Controller
                 'estado' => $estado,
             ]);
 
-            Log::info("✅ Asistencia registrada:", [
-                'id' => $registro->id,
-                'tipo' => $item['tipo'],
-                'tiene_foto' => $fotoPath !== null,
-            ]);
+            Log::info("✅ Asistencia registrada: ID {$registro->id}");
 
             $registradas[] = array_merge($item, [
                 'id' => $registro->id,
@@ -664,10 +530,7 @@ class AsistenciaController extends Controller
         }
 
         Log::info('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-        Log::info("✅ Sincronización completada:", [
-            'registradas' => count($registradas),
-            'omitidas' => count($omitidas),
-        ]);
+        Log::info("✅ Sincronización completada: " . count($registradas) . " registradas, " . count($omitidas) . " omitidas");
         Log::info('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
         return response()->json([
@@ -675,7 +538,7 @@ class AsistenciaController extends Controller
             'sincronizadas' => count($registradas),
             'omitidas' => count($omitidas),
             'detalles_omitidas' => $omitidas,
-            'detalles_registradas'=> $registradas,
+            'detalles_registradas' => $registradas,
         ]);
     }
 }

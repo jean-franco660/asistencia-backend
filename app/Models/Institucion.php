@@ -4,20 +4,25 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use App\Traits\Auditable;
 
 class Institucion extends Model
 {
+    use Auditable;
+
     protected $table = 'instituciones';
 
     protected $fillable = [
+        'codigo_modular_ie',
         'nombre',
+        'distrito',
+        'nivel_educativo',
+        'centro_poblado',
         'direccion',
         'latitud',
         'longitud',
         'radio',
         'logo',
-        'remove_logo' => 'nullable|boolean',
-
     ];
 
     protected $casts = [
@@ -27,17 +32,18 @@ class Institucion extends Model
     ];
 
     /**
-     * Relación N:M → una institución puede tener varios docentes.
-     * Usa la tabla pivote "docente_institucion".
+     * Relación N:M → una institución puede tener varios usuarios_app (docentes/directores).
      */
     public function docentes(): BelongsToMany
     {
         return $this->belongsToMany(
             UsuarioApp::class,
             'docente_institucion',
-            'institucion_id',
-            'usuario_app_id'
-        )->withTimestamps();
+            'institucion_id',   // FK en pivote hacia instituciones.id
+            'usuario_app_id'    // FK en pivote hacia usuarios_app.id
+        )
+            ->withPivot(['estado', 'fecha_inicio', 'fecha_fin'])
+            ->withTimestamps();
     }
 
     public function asistencias()
@@ -45,47 +51,53 @@ class Institucion extends Model
         return $this->hasMany(\App\Models\Asistencia::class, 'institucion_id');
     }
 
-
     /**
-     * Relación N:M → una institución puede tener varios directores.
-     * Usa la tabla pivote "director_institucion".
+     * Supervisores (usuarios_web) asignados a la institución
      */
-    public function directores(): BelongsToMany
+    public function supervisores(): BelongsToMany
     {
         return $this->belongsToMany(
             UsuarioWeb::class,
-            'director_institucion',
+            'supervisor_institucion',
             'institucion_id',
             'usuario_web_id'
         )
-        ->withPivot(['fecha_inicio', 'fecha_fin'])
-        ->withTimestamps();
-    }
-
-    /**
-     * Devuelve el ID del director actual (sin fecha_fin).
-     */
-    public function getDirectorActualIdAttribute()
-    {
-        return $this->directores()
-            ->wherePivotNull('fecha_fin')
-            ->value('usuario_web_id');
+            ->where('usuarios_web.rol', 'supervisor')
+            ->withPivot(['fecha_inicio', 'fecha_fin'])
+            ->withTimestamps();
     }
 
     public function horarios()
     {
-    return $this->hasMany(HorarioInstitucion::class);
+        return $this->hasMany(HorarioInstitucion::class);
     }
 
-    
-    protected $appends = ['logo_url'];
+    protected $appends = ['logo_url', 'nombre_display'];
 
     public function getLogoUrlAttribute()
     {
-        if (!$this->logo) {
+        if (!$this->logo)
             return null;
+        return asset('storage/' . $this->logo);
+    }
+
+    /**
+     * Retorna un nombre más descriptivo para mostrar en la interfaz.
+     * Si el nombre es solo numérico (nomenclatura UGEL), retorna "IE {codigo_modular_ie}".
+     * De lo contrario, retorna el nombre original.
+     */
+    public function getNombreDisplayAttribute(): string
+    {
+        // Si el nombre es solo numérico, mostrar con prefijo IE y código modular
+        if (preg_match('/^\d+$/', $this->nombre)) {
+            return "IE {$this->codigo_modular_ie}";
         }
-        return asset('storage/'.$this->logo);
+        return $this->nombre;
+    }
+
+    protected function getNombreAuditable(): string
+    {
+        return "{$this->nombre} ({$this->codigo_modular_ie})";
     }
 
 }

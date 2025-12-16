@@ -51,11 +51,11 @@ class HorarioInstitucionTest extends TestCase
     /** @test */
     public function test_director_puede_crear_horario_en_su_institucion()
     {
-        $director = $this->createUsuarioWeb(['rol' => 'director', 'estado' => 'autorizado']);
+        $supervisor = $this->createUsuarioWeb(['rol' => 'supervisor', 'estado' => 'autorizado']);
         $institucion = $this->createInstitucion();
-        $director->instituciones()->attach($institucion->id);
+        $supervisor->instituciones()->attach($institucion->id);
 
-        $response = $this->actingAs($director, 'sanctum')
+        $response = $this->actingAs($supervisor, 'sanctum')
             ->postJson('/api/v1/web/horarios', [
                 'institucion_id' => $institucion->id,
                 'nombre_turno' => 'Tarde',
@@ -71,13 +71,13 @@ class HorarioInstitucionTest extends TestCase
     /** @test */
     public function test_director_no_puede_crear_horario_en_institucion_no_asignada()
     {
-        $director = $this->createUsuarioWeb(['rol' => 'director', 'estado' => 'autorizado']);
+        $supervisor = $this->createUsuarioWeb(['rol' => 'supervisor', 'estado' => 'autorizado']);
         $institucionAsignada = $this->createInstitucion();
         $institucionNoAsignada = $this->createInstitucion();
 
-        $director->instituciones()->attach($institucionAsignada->id);
+        $supervisor->instituciones()->attach($institucionAsignada->id);
 
-        $response = $this->actingAs($director, 'sanctum')
+        $response = $this->actingAs($supervisor, 'sanctum')
             ->postJson('/api/v1/web/horarios', [
                 'institucion_id' => $institucionNoAsignada->id,
                 'nombre_turno' => 'Noche',
@@ -113,16 +113,16 @@ class HorarioInstitucionTest extends TestCase
     /** @test */
     public function test_director_solo_ve_horarios_de_sus_instituciones()
     {
-        $director = $this->createUsuarioWeb(['rol' => 'director', 'estado' => 'autorizado']);
+        $supervisor = $this->createUsuarioWeb(['rol' => 'supervisor', 'estado' => 'autorizado']);
         $institucionAsignada = $this->createInstitucion();
         $institucionNoAsignada = $this->createInstitucion();
 
-        $director->instituciones()->attach($institucionAsignada->id);
+        $supervisor->instituciones()->attach($institucionAsignada->id);
 
         $this->createHorario(['institucion_id' => $institucionAsignada->id]);
         $this->createHorario(['institucion_id' => $institucionNoAsignada->id]);
 
-        $response = $this->actingAs($director, 'sanctum')
+        $response = $this->actingAs($supervisor, 'sanctum')
             ->getJson('/api/v1/web/horarios');
 
         $response->assertStatus(200);

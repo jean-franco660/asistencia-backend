@@ -8,7 +8,17 @@ use Illuminate\Support\Facades\Hash;
 
 class DatabaseSeeder extends Seeder
 {
-    /**
-     * Seed the application's database.
-     */
+    public function run(): void
+    {
+        $this->call([
+            SuperAdminSeeder::class,
+        ]);
+
+        if (app()->environment('local')) {
+            $this->call([
+                DevDatosSeeder::class,
+            ]);
+        }
+    }
+
 }

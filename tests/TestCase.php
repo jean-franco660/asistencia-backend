@@ -12,7 +12,7 @@ abstract class TestCase extends BaseTestCase
     use RefreshDatabase;
 
     /**
-     * Actuar como un usuario admin autenticado
+     * Actuar como un usuario administrador autenticado
      */
     protected function actingAsAdmin()
     {
@@ -20,7 +20,7 @@ abstract class TestCase extends BaseTestCase
             'nombre' => 'Admin Test',
             'email' => 'admin' . uniqid() . '@test.com',
             'password' => 'password123',
-            'rol' => 'admin',
+            'rol' => 'administrador',
             'estado' => 'autorizado',
         ]);
 
@@ -28,24 +28,32 @@ abstract class TestCase extends BaseTestCase
     }
 
     /**
-     * Actuar como un director autenticado con institución
+     * Actuar como un supervisor autenticado con institución
      */
     protected function actingAsDirector($withInstitution = true)
     {
-        $director = UsuarioWeb::create([
-            'nombre' => 'Director Test',
-            'email' => 'director' . uniqid() . '@test.com',
+        return $this->actingAsSupervisor($withInstitution);
+    }
+
+    /**
+     * Actuar como un supervisor autenticado con institución (nombre actualizado)
+     */
+    protected function actingAsSupervisor($withInstitution = true)
+    {
+        $supervisor = UsuarioWeb::create([
+            'nombre' => 'Supervisor Test',
+            'email' => 'supervisor' . uniqid() . '@test.com',
             'password' => 'password123',
-            'rol' => 'director',
+            'rol' => 'supervisor',
             'estado' => 'autorizado',
         ]);
 
         if ($withInstitution) {
             $institucion = $this->createInstitucion();
-            $director->instituciones()->attach($institucion->id);
+            $supervisor->instituciones()->attach($institucion->id);
         }
 
-        return $this->actingAs($director, 'sanctum');
+        return $this->actingAs($supervisor, 'sanctum');
     }
 
     /**
@@ -54,10 +62,11 @@ abstract class TestCase extends BaseTestCase
     protected function createInstitucion($attributes = [])
     {
         return Institucion::create(array_merge([
+            'codigo_modular_ie' => 'CM' . rand(100000, 999999),
             'nombre' => 'Institución ' . uniqid(),
+            'distrito' => 'Lima',
+            'nivel_educativo' => 'Secundaria',
             'direccion' => 'Dirección Test',
-            'telefono' => '123456789',
-            'email' => 'inst' . uniqid() . '@test.com',
             'latitud' => -12.0464,
             'longitud' => -77.0428,
             'radio' => 100,
@@ -73,7 +82,7 @@ abstract class TestCase extends BaseTestCase
             'nombre' => 'Usuario ' . uniqid(),
             'email' => 'user' . uniqid() . '@test.com',
             'password' => 'password123',
-            'rol' => 'director',
+            'rol' => 'supervisor',
             'estado' => 'pendiente',
         ], $attributes));
     }
@@ -102,10 +111,14 @@ abstract class TestCase extends BaseTestCase
     protected function createUsuarioApp($attributes = [])
     {
         return \App\Models\UsuarioApp::create(array_merge([
-            'nombre' => 'Docente ' . uniqid(),
-            'email' => 'docente' . uniqid() . '@test.com',
+            'codigo_modular_docente' => 'DOC' . rand(100000, 999999),
+            'apellido_paterno' => 'APELLIDO',
+            'apellido_materno' => 'MATERNO',
+            'nombres' => 'DOCENTE',
+            'sexo' => 'M',
+            'estado' => 'ACTIVO',
+            'cargo' => 'DOCENTE',
             'password' => 'password123',
-            'codigo' => 'DOC' . rand(1000, 9999),
             'activo' => true,
         ], $attributes));
     }

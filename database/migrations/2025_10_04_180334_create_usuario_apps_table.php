@@ -1,5 +1,4 @@
 <?php
-
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -8,23 +7,48 @@ return new class extends Migration {
     public function up(): void
     {
         Schema::create('usuarios_app', function (Blueprint $table) {
-            $table->id();
+            $table->id(); // PK: BIGINT UNSIGNED AUTO_INCREMENT
+            
+            // 🔹 CÓDIGO MODULAR DEL DOCENTE (puede cambiar, SOLO para login)
+            $table->string('codigo_modular_docente', 20)
+                  ->unique();
 
-            // 🔹 Datos principales
-            $table->string('nombre')->comment('Nombre completo del docente');
-            $table->string('codigo')->unique()->comment('Código de acceso para login');
-            $table->string('password')->comment('Contraseña hasheada');
+            // 🔹 FK: Relación con institución usando ID
+            $table->foreignId('institucion_id')
+                  ->nullable()
+                  ->constrained('instituciones')
+                  ->onUpdate('cascade')
+                  ->onDelete('restrict');
 
-            // 🔹 Estado del usuario
+            // 🔹 DATOS PERSONALES
+            $table->string('apellido_paterno', 100);
+
+            $table->string('apellido_materno', 100);
+
+            $table->string('nombres', 100);
+
+            $table->char('sexo', 1);
+
+            // 🔹 DATOS LABORALES
+            $table->enum('estado', ['ACTIVO', 'INACTIVO'])
+                  ->default('ACTIVO');
+
+            $table->string('cargo', 50);
+
+            // 🔹 CREDENCIALES DE ACCESO
+            $table->string('password');
+            
             $table->boolean('activo')
-                ->default(true)
-                ->comment('Indica si el docente puede iniciar sesión');
+                  ->default(true);
 
-            // 🔹 Timestamp
             $table->timestamps();
-
-            // 🔹 Índices opcionales
-            $table->index('activo'); // facilita búsquedas de docentes activos
+            
+            // 🔹 ÍNDICES
+            $table->index('institucion_id');
+            $table->index('estado');
+            $table->index(['cargo', 'estado']);
+            $table->index('apellido_paterno');
+            $table->index('activo');
         });
     }
 

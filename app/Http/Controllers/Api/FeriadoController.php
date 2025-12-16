@@ -4,11 +4,24 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Feriado;
+use App\Models\UsuarioWeb;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class FeriadoController extends Controller
 {
+    /**
+     * Verifica si el usuario tiene permisos de administrador
+     */
+    private function isAdmin($user): bool
+    {
+        return in_array($user->rol, [
+            UsuarioWeb::ROL_SUPER_ADMIN,
+            UsuarioWeb::ROL_ADMIN,
+        ]);
+    }
+
     /**
      * LISTAR FERIADOS
      */
@@ -16,7 +29,12 @@ class FeriadoController extends Controller
     {
         $user = $request->user();
 
-        if (!in_array($user->rol, ['admin', 'director'])) {
+        // Validar que tenga permisos
+        if (!in_array($user->rol, [
+            UsuarioWeb::ROL_SUPER_ADMIN,
+            UsuarioWeb::ROL_ADMIN,
+            UsuarioWeb::ROL_SUPERVISOR
+        ])) {
             return response()->json(['message' => 'No autorizado'], 403);
         }
 
@@ -25,15 +43,21 @@ class FeriadoController extends Controller
             ->orderBy('mes')
             ->orderBy('dia');
 
-        if ($user->rol === 'director') {
+        // Super admin y administrador ven todo
+        if ($this->isAdmin($user)) {
+            return $query->get();
+        }
+
+        // Supervisor solo ve feriados nacionales + de sus instituciones
+        if ($user->rol === UsuarioWeb::ROL_SUPERVISOR) {
             $ids = $user->instituciones->pluck('id');
 
             $query->where(function ($q) use ($ids) {
                 $q->where('tipo', 'nacional')
-                  ->orWhere(function ($q2) use ($ids) {
-                      $q2->where('tipo', 'institucional')
-                         ->whereIn('institucion_id', $ids);
-                  });
+                    ->orWhere(function ($q2) use ($ids) {
+                        $q2->where('tipo', 'institucional')
+                            ->whereIn('institucion_id', $ids);
+                    });
             });
         }
 
@@ -47,7 +71,12 @@ class FeriadoController extends Controller
     {
         $user = $request->user();
 
-        if (!in_array($user->rol, ['admin', 'director'])) {
+        // Validar que tenga permisos
+        if (!in_array($user->rol, [
+            UsuarioWeb::ROL_SUPER_ADMIN,
+            UsuarioWeb::ROL_ADMIN,
+            UsuarioWeb::ROL_SUPERVISOR
+        ])) {
             return response()->json(['message' => 'No autorizado'], 403);
         }
 
@@ -55,25 +84,28 @@ class FeriadoController extends Controller
             'tipo' => 'required|in:nacional,institucional',
             'institucion_id' => 'required_if:tipo,institucional|nullable|exists:instituciones,id',
             'descripcion' => 'required|string|max:255',
-
-            // Si envía fecha → no necesita día/mes
             'fecha' => 'nullable|date',
             'dia' => 'required_without:fecha|integer|min:1|max:31',
             'mes' => 'required_without:fecha|integer|min:1|max:12',
         ]);
 
-        // Director solo puede crear feriados de su institución
-        if ($request->tipo === 'institucional' && $user->rol === 'director') {
+        // Supervisor solo puede crear feriados institucionales de sus instituciones
+        if ($request->tipo === 'institucional' && $user->rol === UsuarioWeb::ROL_SUPERVISOR) {
             if (!$user->instituciones->pluck('id')->contains($request->institucion_id)) {
-                return response()->json(['message' => 'No autorizado'], 403);
+                return response()->json(['message' => 'No autorizado para esta institución'], 403);
             }
         }
 
-        // Convertimos fecha si viene día/mes
-        $fecha = $request->fecha ??
+        // Supervisor NO puede crear feriados nacionales
+        if ($request->tipo === 'nacional' && $user->rol === UsuarioWeb::ROL_SUPERVISOR) {
+            return response()->json(['message' => 'Solo administradores pueden crear feriados nacionales'], 403);
+        }
+
+        // Convertir fecha si viene día/mes
+        $fecha = $request->fecha ?? 
             now()->year . '-' . str_pad($request->mes, 2, '0', STR_PAD_LEFT) . '-' . str_pad($request->dia, 2, '0', STR_PAD_LEFT);
 
-        // Validación de duplicado
+        // Validar duplicado
         $existe = Feriado::where('tipo', $request->tipo)
             ->where('institucion_id', $request->institucion_id)
             ->where('dia', $request->dia)
@@ -84,7 +116,7 @@ class FeriadoController extends Controller
             return response()->json(['message' => 'Feriado ya existe'], 422);
         }
 
-        return Feriado::create([
+        $feriado = Feriado::create([
             'tipo' => $request->tipo,
             'institucion_id' => $request->institucion_id,
             'descripcion' => $request->descripcion,
@@ -93,24 +125,36 @@ class FeriadoController extends Controller
             'fecha' => $fecha,
             'activo' => true,
         ]);
+
+        return response()->json($feriado, 201);
     }
 
     /**
-     * ACTUALIZAR
+     * ACTUALIZAR FERIADO
      */
     public function update(Request $request, $id)
     {
         $user = $request->user();
 
-        if (!in_array($user->rol, ['admin', 'director'])) {
+        // Validar que tenga permisos
+        if (!in_array($user->rol, [
+            UsuarioWeb::ROL_SUPER_ADMIN,
+            UsuarioWeb::ROL_ADMIN,
+            UsuarioWeb::ROL_SUPERVISOR
+        ])) {
             return response()->json(['message' => 'No autorizado'], 403);
         }
 
         $feriado = Feriado::findOrFail($id);
 
-        if ($feriado->tipo === 'institucional' && $user->rol === 'director') {
+        // Supervisor solo puede actualizar feriados institucionales de sus instituciones
+        if ($user->rol === UsuarioWeb::ROL_SUPERVISOR) {
+            if ($feriado->tipo === 'nacional') {
+                return response()->json(['message' => 'No puede modificar feriados nacionales'], 403);
+            }
+
             if (!$user->instituciones->pluck('id')->contains($feriado->institucion_id)) {
-                return response()->json(['message' => 'No autorizado'], 403);
+                return response()->json(['message' => 'No autorizado para esta institución'], 403);
             }
         }
 
@@ -121,7 +165,7 @@ class FeriadoController extends Controller
             'activo' => 'sometimes|boolean',
         ]);
 
-        // Si cambia día/mes, validamos duplicado
+        // Si cambia día/mes, validar duplicado
         if ($request->has('dia') || $request->has('mes')) {
             $dia = $request->dia ?? $feriado->dia;
             $mes = $request->mes ?? $feriado->mes;
@@ -134,31 +178,41 @@ class FeriadoController extends Controller
                 ->exists();
 
             if ($dup) {
-                return response()->json(['message' => 'Feriado ya existe'], 422);
+                return response()->json(['message' => 'Feriado ya existe con esa fecha'], 422);
             }
         }
 
-        $feriado->update($request->all());
+        $feriado->update($request->only(['dia', 'mes', 'descripcion', 'activo']));
 
-        return $feriado;
+        return response()->json($feriado);
     }
 
     /**
-     * ELIMINAR
+     * ELIMINAR FERIADO
      */
     public function destroy(Request $request, $id)
     {
         $user = $request->user();
 
-        if (!in_array($user->rol, ['admin', 'director'])) {
+        // Validar que tenga permisos
+        if (!in_array($user->rol, [
+            UsuarioWeb::ROL_SUPER_ADMIN,
+            UsuarioWeb::ROL_ADMIN,
+            UsuarioWeb::ROL_SUPERVISOR
+        ])) {
             return response()->json(['message' => 'No autorizado'], 403);
         }
 
         $feriado = Feriado::findOrFail($id);
 
-        if ($feriado->tipo === 'institucional' && $user->rol === 'director') {
+        // Supervisor solo puede eliminar feriados institucionales de sus instituciones
+        if ($user->rol === UsuarioWeb::ROL_SUPERVISOR) {
+            if ($feriado->tipo === 'nacional') {
+                return response()->json(['message' => 'No puede eliminar feriados nacionales'], 403);
+            }
+
             if (!$user->instituciones->pluck('id')->contains($feriado->institucion_id)) {
-                return response()->json(['message' => 'No autorizado'], 403);
+                return response()->json(['message' => 'No autorizado para esta institución'], 403);
             }
         }
 
@@ -169,27 +223,30 @@ class FeriadoController extends Controller
 
     /**
      * IMPORTAR AUTOMÁTICAMENTE LOS FERIADOS NACIONALES
+     * Solo super_admin y administrador
      */
     public function actualizarAutomatico(Request $request)
     {
-        \Log::info("=== ACTUALIZAR AUTOMATICO: INICIO ===");
+        Log::info("=== ACTUALIZAR AUTOMATICO: INICIO ===");
 
-        // 1. Verificar rol
-        if ($request->user()->rol !== 'admin') {
-            \Log::warning("Intento no autorizado por usuario ID {$request->user()->id}");
-            return response()->json(['message' => 'No autorizado'], 403);
+        $user = $request->user();
+
+        // Solo super admin y administrador pueden actualizar automáticamente
+        if (!$this->isAdmin($user)) {
+            Log::warning("Intento no autorizado por usuario ID {$user->id} con rol {$user->rol}");
+            return response()->json(['message' => 'No autorizado. Solo administradores pueden actualizar feriados nacionales.'], 403);
         }
 
         try {
             $year = now()->year;
             $url = "https://date.nager.at/api/v3/PublicHolidays/{$year}/PE";
 
-            \Log::info("Consultando API de feriados: {$url}");
+            Log::info("Consultando API de feriados: {$url}");
 
             // Crear base de la petición
             $requestHttp = Http::timeout(30);
 
-            // Si estamos en LOCAL (Windows) desactivar SSL
+            // Si estamos en LOCAL desactivar SSL
             if (app()->environment('local')) {
                 $requestHttp = $requestHttp->withoutVerifying();
             }
@@ -197,28 +254,30 @@ class FeriadoController extends Controller
             // Ejecutar la petición
             $response = $requestHttp->get($url);
 
-            \Log::info("Respuesta API Nager: Status " . $response->status());
+            Log::info("Respuesta API Nager: Status " . $response->status());
 
             if (!$response->successful()) {
-                \Log::error("API externa falló", [
+                Log::error("API externa falló", [
                     'status' => $response->status(),
                     'body' => $response->body()
                 ]);
-                return response()->json(['message' => 'Error API externa'], 500);
+                return response()->json(['message' => 'Error al consultar API externa'], 500);
             }
 
             $json = $response->json();
 
-            \Log::info("Cantidad de feriados recibidos: " . count($json));
+            Log::info("Cantidad de feriados recibidos: " . count($json));
+
+            $procesados = 0;
+            $errores = 0;
 
             foreach ($json as $f) {
-
-                \Log::info("Procesando feriado:", $f);
+                Log::info("Procesando feriado:", $f);
 
                 $dia = intval(date('d', strtotime($f['date'])));
                 $mes = intval(date('m', strtotime($f['date'])));
 
-                \Log::info("Insertando/Actualizando:", [
+                Log::info("Insertando/Actualizando:", [
                     'dia' => $dia,
                     'mes' => $mes,
                     'descripcion' => $f['localName'],
@@ -239,38 +298,41 @@ class FeriadoController extends Controller
                             'activo' => true,
                         ]
                     );
+                    $procesados++;
                 } catch (\Exception $sqlError) {
-                    \Log::error("Error SQL durante updateOrCreate", [
+                    $errores++;
+                    Log::error("Error SQL durante updateOrCreate", [
                         'error' => $sqlError->getMessage(),
                         'line' => $sqlError->getLine(),
                         'file' => $sqlError->getFile(),
                         'feriado' => $f
                     ]);
-
-                    return response()->json([
-                        'message' => 'Error SQL al guardar feriado',
-                        'error' => $sqlError->getMessage()
-                    ], 500);
                 }
             }
 
-            \Log::info("=== ACTUALIZAR AUTOMATICO: COMPLETADO ===");
+            Log::info("=== ACTUALIZAR AUTOMATICO: COMPLETADO ===", [
+                'procesados' => $procesados,
+                'errores' => $errores
+            ]);
 
-            return response()->json(['message' => 'Feriados actualizados']);
+            return response()->json([
+                'message' => 'Feriados actualizados',
+                'procesados' => $procesados,
+                'errores' => $errores,
+                'total' => count($json)
+            ]);
 
         } catch (\Exception $e) {
-
-            \Log::error("ERROR GENERAL en actualizarAutomatico", [
+            Log::error("ERROR GENERAL en actualizarAutomatico", [
                 'error' => $e->getMessage(),
                 'line' => $e->getLine(),
                 'file' => $e->getFile()
             ]);
 
             return response()->json([
-                'message' => 'Error al actualizar',
+                'message' => 'Error al actualizar feriados',
                 'error' => $e->getMessage()
             ], 500);
         }
     }
-
 }

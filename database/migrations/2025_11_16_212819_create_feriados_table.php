@@ -14,23 +14,31 @@ return new class extends Migration
         Schema::create('feriados', function (Blueprint $table) {
             $table->id();
 
-            // Día y mes (rápido para consultas)
-            $table->unsignedTinyInteger('dia');
-            $table->unsignedTinyInteger('mes'); 
-
-            // Fecha completa (para reportes e históricos)
-            $table->date('fecha');
-
-            // Nacional | Institucional
+            // Tipo: Nacional o Institucional
             $table->enum('tipo', ['nacional', 'institucional']);
 
             // Solo si es institucional
-            $table->unsignedBigInteger('institucion_id')->nullable();
+            $table->foreignId('institucion_id')->nullable()
+                  ->constrained('instituciones')
+                  ->onDelete('cascade');
+
+            // Día y mes (rápido para consultas)
+            $table->unsignedTinyInteger('dia');
+            $table->unsignedTinyInteger('mes');
+            
+            // Descripción del feriado
+            $table->string('descripcion');
+
+            // Fecha completa (para reportes e históricos)
+            $table->date('fecha');
 
             // Activo / Inactivo
             $table->boolean('activo')->default(true);
 
             $table->timestamps();
+            
+            // Índice para consultas rápidas
+            $table->index(['tipo', 'dia', 'mes']);
         });
     }
 
@@ -38,5 +46,4 @@ return new class extends Migration
     {
         Schema::dropIfExists('feriados');
     }
-
 };

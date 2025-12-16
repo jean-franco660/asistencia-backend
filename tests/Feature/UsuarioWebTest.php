@@ -9,16 +9,16 @@ use App\Models\Institucion;
 class UsuarioWebTest extends TestCase
 {
     /** @test */
-    public function test_crear_director_requiere_institucion_id()
+    public function test_crear_supervisor_requiere_institucion_id()
     {
         $this->actingAsAdmin();
 
         $response = $this->postJson('/api/v1/web/usuarios-web', [
-            'nombre' => 'Director Test',
-            'email' => 'director@test.com',
+            'nombre' => 'Supervisor Test',
+            'email' => 'supervisor@test.com',
             'password' => 'password123',
             'password_confirmation' => 'password123',
-            'rol' => 'director',
+            'rol' => 'supervisor',
         ]);
 
         $response->assertStatus(422)
@@ -26,40 +26,40 @@ class UsuarioWebTest extends TestCase
     }
 
     /** @test */
-    public function test_crear_director_con_institucion_exitoso()
+    public function test_crear_supervisor_con_institucion_exitoso()
     {
         $this->actingAsAdmin();
         $institucion = $this->createInstitucion();
 
         $response = $this->postJson('/api/v1/web/usuarios-web', [
-            'nombre' => 'Director Test',
-            'email' => 'director@test.com',
+            'nombre' => 'Supervisor Test',
+            'email' => 'supervisor@test.com',
             'password' => 'password123',
             'password_confirmation' => 'password123',
-            'rol' => 'director',
+            'rol' => 'supervisor',
             'institucion_id' => $institucion->id,
         ]);
 
         $response->assertStatus(201)
             ->assertJsonPath('success', true)
-            ->assertJsonPath('data.rol', 'director');
+            ->assertJsonPath('data.rol', 'supervisor');
 
-        $director = UsuarioWeb::where('email', 'director@test.com')->first();
-        $this->assertTrue($director->instituciones->contains($institucion));
+        $supervisor = UsuarioWeb::where('email', 'supervisor@test.com')->first();
+        $this->assertTrue($supervisor->instituciones->contains($institucion));
     }
 
     /** @test */
-    public function test_director_creado_tiene_estado_pendiente()
+    public function test_supervisor_creado_tiene_estado_pendiente()
     {
         $this->actingAsAdmin();
         $institucion = $this->createInstitucion();
 
         $response = $this->postJson('/api/v1/web/usuarios-web', [
-            'nombre' => 'Director Test',
-            'email' => 'director@test.com',
+            'nombre' => 'Supervisor Test',
+            'email' => 'supervisor@test.com',
             'password' => 'password123',
             'password_confirmation' => 'password123',
-            'rol' => 'director',
+            'rol' => 'supervisor',
             'institucion_id' => $institucion->id,
         ]);
 
@@ -68,7 +68,7 @@ class UsuarioWebTest extends TestCase
     }
 
     /** @test */
-    public function test_admin_creado_tiene_estado_autorizado()
+    public function test_administrador_creado_tiene_estado_autorizado()
     {
         $this->actingAsAdmin();
 
@@ -77,7 +77,7 @@ class UsuarioWebTest extends TestCase
             'email' => 'newadmin@test.com',
             'password' => 'password123',
             'password_confirmation' => 'password123',
-            'rol' => 'admin',
+            'rol' => 'administrador',
         ]);
 
         $response->assertStatus(201)
@@ -85,18 +85,18 @@ class UsuarioWebTest extends TestCase
     }
 
     /** @test */
-    public function test_autorizar_director_cambia_estado()
+    public function test_autorizar_supervisor_cambia_estado()
     {
         $this->actingAsAdmin();
-        $director = $this->createUsuarioWeb(['rol' => 'director', 'estado' => 'pendiente']);
+        $supervisor = $this->createUsuarioWeb(['rol' => 'supervisor', 'estado' => 'pendiente']);
 
-        $response = $this->postJson("/api/v1/web/usuarios-web/autorizar/{$director->id}");
+        $response = $this->postJson("/api/v1/web/usuarios-web/autorizar/{$supervisor->id}");
 
         $response->assertStatus(200)
             ->assertJsonPath('data.estado', 'autorizado');
 
         $this->assertDatabaseHas('usuarios_web', [
-            'id' => $director->id,
+            'id' => $supervisor->id,
             'estado' => 'autorizado',
         ]);
     }
@@ -111,12 +111,59 @@ class UsuarioWebTest extends TestCase
             'email' => 'testadmin@test.com',
             'password' => 'password123',
             'password_confirmation' => 'password123',
-            'rol' => 'admin',
+            'rol' => 'administrador',
         ]);
 
         $usuario = UsuarioWeb::where('email', 'testadmin@test.com')->first();
 
         $this->assertNotEquals('password123', $usuario->password);
         $this->assertTrue(\Hash::check('password123', $usuario->password));
+    }
+    /** @test */
+    public function test_supervisor_no_puede_crear_usuarios()
+    {
+        $this->createSupervisorUser();
+
+        $response = $this->postJson('/api/v1/web/usuarios-web', [
+            'nombre' => 'Intruder Supervisor',
+            'email' => 'intruder@test.com',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+            'rol' => 'supervisor',
+        ]);
+
+        $response->assertStatus(403);
+    }
+
+    /** @test */
+    public function test_supervisor_no_puede_autorizar_usuarios()
+    {
+        $this->createSupervisorUser();
+        $targetUser = $this->createUsuarioWeb(['rol' => 'supervisor', 'estado' => 'pendiente']);
+
+        $response = $this->postJson("/api/v1/web/usuarios-web/autorizar/{$targetUser->id}");
+
+        $response->assertStatus(403);
+    }
+
+    /** @test */
+    public function test_supervisor_no_puede_eliminar_usuarios()
+    {
+        $this->createSupervisorUser();
+        $targetUser = $this->createUsuarioWeb(['rol' => 'supervisor']);
+
+        $response = $this->deleteJson("/api/v1/web/usuarios-web/{$targetUser->id}");
+
+        $response->assertStatus(403);
+    }
+
+    /**
+     * Helper to act as supervisor
+     */
+    protected function createSupervisorUser()
+    {
+        $user = UsuarioWeb::factory()->create(['rol' => 'supervisor', 'estado' => 'autorizado']);
+        $this->actingAs($user);
+        return $user;
     }
 }

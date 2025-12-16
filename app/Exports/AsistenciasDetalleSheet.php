@@ -13,7 +13,7 @@ use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 
-class AsistenciasDetalleSheet implements 
+class AsistenciasDetalleSheet implements
     FromCollection, 
     WithHeadings, 
     WithMapping, 
