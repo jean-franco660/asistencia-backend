@@ -10,46 +10,39 @@ return new class extends Migration
     {
         Schema::create('importaciones_log', function (Blueprint $table) {
             $table->id();
-            
-            // Usuario que inició la importación
+
+            // 🔧 CORRECCIÓN: Agregar onDelete para manejar soft deletes
             $table->foreignId('usuario_id')
                 ->nullable()
                 ->constrained('usuarios_web')
-                ->nullOnDelete();
-            
-            // Tipo de importación
-            $table->enum('tipo', ['instituciones', 'docentes', 'asistencias'])
-                ->index();
-            
-            // Información del archivo
+                ->nullOnDelete(); // Si se elimina el usuario, mantener el log
+
+            $table->enum('tipo', ['instituciones', 'usuarios_app', 'asignaciones', 'asistencias'])->index();
+
             $table->string('archivo_original');
-            $table->string('archivo_temp');
-            
-            // Estado de la importación
+            $table->string('archivo_temp', 500);
+
             $table->enum('estado', ['pending', 'processing', 'completed', 'failed'])
                 ->default('pending')
                 ->index();
-            
-            // Estadísticas
-            $table->integer('total')->default(0);
-            $table->integer('procesados')->default(0);
-            $table->integer('exitosos')->default(0);
-            $table->integer('errores_count')->default(0);
-            $table->integer('porcentaje')->default(0);
-            
-            // Errores detallados (JSON)
+
+            $table->unsignedInteger('total')->default(0);
+            $table->unsignedInteger('procesados')->default(0);
+            $table->unsignedInteger('exitosos')->default(0);
+            $table->unsignedInteger('errores_count')->default(0);
+
             $table->json('errores_detalle')->nullable();
-            
-            // Timestamps de proceso
+            $table->string('errores_archivo', 500)->nullable();
+
             $table->timestamp('iniciado_en')->nullable();
             $table->timestamp('completado_en')->nullable();
-            
+
             $table->timestamps();
-            
-            // Índices para consultas frecuentes
+
             $table->index(['usuario_id', 'tipo']);
             $table->index(['estado', 'created_at']);
-            $table->index('created_at');
+            $table->index(['usuario_id', 'created_at'], 'idx_import_usuario_fecha');
+            $table->index(['usuario_id', 'estado'], 'idx_import_usuario_estado');
         });
     }
 

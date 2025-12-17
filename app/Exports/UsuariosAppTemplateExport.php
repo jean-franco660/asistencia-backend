@@ -10,7 +10,7 @@ use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 
-class DocentesTemplateExport implements FromArray, WithHeadings, WithStyles, WithColumnWidths
+class UsuariosAppTemplateExport implements FromArray, WithHeadings, WithStyles, WithColumnWidths
 {
     public function array(): array
     {

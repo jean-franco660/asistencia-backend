@@ -26,7 +26,7 @@ class InstitucionImportController extends Controller
     {
         return $user && in_array($user->rol ?? null, [
             UsuarioWeb::ROL_SUPER_ADMIN,
-            UsuarioWeb::ROL_ADMIN,
+            UsuarioWeb::ROL_ADMINISTRADOR,
         ], true);
     }
 

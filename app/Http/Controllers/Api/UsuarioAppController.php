@@ -3,472 +3,495 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\LoginAppRequest;
 use App\Http\Requests\StoreUsuarioAppRequest;
 use App\Http\Requests\UpdateUsuarioAppRequest;
-use App\Models\Institucion;
 use App\Models\UsuarioApp;
+use App\Models\UsuarioAppInstitucion;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\DB;
 
 class UsuarioAppController extends Controller
 {
     use AuthorizesRequests;
 
-    // =========================================================
-    // LOGIN (UsuarioApp)
-    // =========================================================
-    public function login(Request $request)
+    /**
+     * Login de usuarios de la app móvil
+     */
+    public function login(LoginAppRequest $request): JsonResponse
     {
-        $request->validate([
-            'codigo' => 'required_without:codigo_modular_docente|string',
-            'codigo_modular_docente' => 'required_without:codigo|string',
-            'password' => 'required|string',
-        ]);
+        // Normalizar código modular
+        $codigo = strtoupper(trim($request->codigo_modular ?? $request->codigo));
 
-        // Aceptar 'codigo' como alias de 'codigo_modular_docente'
-        $codigo = $request->codigo_modular_docente ?? $request->codigo;
-        $codigo = strtolower(trim((string) $codigo));
-
-        $usuario = UsuarioApp::whereRaw('LOWER(codigo_modular_docente) = ?', [$codigo])
-            ->with([
-                'institucionesActivas:id,codigo_modular_ie,nombre,latitud,longitud,radio',
-            ])
+        $usuario = UsuarioApp::where('codigo_modular', $codigo)
+            ->with(['asignacionesActivas.institucion', 'asignacionesActivas.horario'])
             ->first();
 
-        if (!$usuario || !Hash::check((string) $request->password, (string) $usuario->password)) {
-            return response()->json(['error' => 'Código modular o contraseña incorrectos'], 422);
+        if (!$usuario || !Hash::check($request->password, $usuario->password)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Código modular o contraseña incorrectos'
+            ], 401);
         }
 
-        if (!$usuario->activo || $usuario->estado !== 'ACTIVO') {
-            return response()->json(['error' => 'Su cuenta está inactiva. Contacte al administrador.'], 403);
+        if (!$usuario->tieneAccesoHabilitado()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Su cuenta está deshabilitada. Contacte al administrador.'
+            ], 403);
         }
 
-        $token = $usuario->createToken('app-movil')->plainTextToken;
+        if (!$usuario->tieneAsignacionVigente()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No tiene asignaciones activas a ninguna institución'
+            ], 403);
+        }
+
+        // Revocar tokens anteriores
+        $usuario->tokens()->delete();
+
+        // Crear nuevo token
+        $token = $usuario->createToken('app-movil', ['app'])->plainTextToken();
 
         return response()->json([
+            'success' => true,
+            'message' => 'Inicio de sesión exitoso',
             'token' => $token,
             'usuario' => [
                 'id' => $usuario->id,
-                'codigo_modular_docente' => $usuario->codigo_modular_docente,
+                'codigo_modular' => $usuario->codigo_modular,
                 'nombre_completo' => $usuario->nombre_completo,
-                'apellido_paterno' => $usuario->apellido_paterno,
-                'apellido_materno' => $usuario->apellido_materno,
-                'nombres' => $usuario->nombres,
+                'iniciales' => $usuario->iniciales,
                 'sexo' => $usuario->sexo,
-                'cargo' => $usuario->cargo,
-                'estado' => $usuario->estado,
-                'instituciones' => $usuario->institucionesActivas->map(function ($i) {
+                'sexo_formateado' => $usuario->sexo_formateado,
+                'asignaciones' => $usuario->asignacionesActivas->map(function ($asig) {
                     return [
-                        'id' => $i->id,
-                        'codigo_modular_ie' => $i->codigo_modular_ie,
-                        'nombre' => $i->nombre,
-                        'nombre_display' => $i->nombre_display,
-                        'latitud' => $i->latitud,
-                        'longitud' => $i->longitud,
-                        'radio' => $i->radio ?? 30,
-                        'estado_asignacion' => $i->pivot->estado ?? null,
-                        'fecha_inicio' => $i->pivot->fecha_inicio ?? null,
-                        'fecha_fin' => $i->pivot->fecha_fin ?? null,
+                        'id' => $asig->id,
+                        'cargo' => $asig->cargo,
+                        'institucion' => [
+                            'id' => $asig->institucion->id,
+                            'codigo_modular_ie' => $asig->institucion->codigo_modular_ie,
+                            'nombre' => $asig->institucion->nombre,
+                            'nombre_display' => $asig->institucion->nombre_display,
+                            'latitud' => $asig->institucion->latitud,
+                            'longitud' => $asig->institucion->longitud,
+                            'radio' => $asig->institucion->radio,
+                        ],
+                        'horario' => [
+                            'id' => $asig->horario->id,
+                            'nombre_turno' => $asig->horario->nombre_turno,
+                            'hora_entrada' => $asig->horario->hora_entrada_formateada,
+                            'hora_salida' => $asig->horario->hora_salida_formateada,
+                            'tolerancia_minutos' => $asig->horario->tolerancia_minutos,
+                            'dias_laborales' => $asig->horario->dias_laborales,
+                        ],
                     ];
-                })->values(),
+                }),
             ],
         ]);
     }
 
-    // =========================================================
-    // LISTAR USUARIOS APP (paginado)
-    // =========================================================
-    public function index(Request $request)
+    /**
+     * Lista usuarios de la app
+     */
+    public function index(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', UsuarioApp::class);
+
         $user = $request->user();
+        $query = UsuarioApp::with(['asignacionesActivas.institucion']);
 
-        $query = UsuarioApp::with(['institucionesActivas:id,codigo_modular_ie,nombre']);
-
-        // Si el usuario autenticado (web) es supervisor, filtrar por sus instituciones
-        // Nota: asume que $user->instituciones devuelve Institucion (id) por pivote supervisor_institucion.
-        if ($user && ($user->rol ?? null) === 'supervisor' && method_exists($user, 'instituciones')) {
-            $institucionIds = $user->instituciones->pluck('id')->toArray();
-
-            $query->whereHas('instituciones', function ($q) use ($institucionIds) {
-                $q->whereIn('instituciones.id', $institucionIds);
+        // Si es supervisor, solo ver usuarios de sus instituciones
+        if ($user->esSupervisor()) {
+            $institucionIds = $user->getInstitucionesVigentesIds();
+            $query->whereHas('asignaciones', function ($q) use ($institucionIds) {
+                $q->whereIn('institucion_id', $institucionIds)
+                  ->where('estado', UsuarioAppInstitucion::ESTADO_ACTIVO);
             });
         }
 
-        // Filtros opcionales
-        if ($request->filled('estado')) {
-            $query->where('estado', $request->estado);
+        // Filtros
+        if ($request->filled('acceso_habilitado')) {
+            $query->where('acceso_habilitado', $request->boolean('acceso_habilitado'));
         }
 
         if ($request->filled('cargo')) {
-            $query->where('cargo', $request->cargo);
+            $query->whereHas('asignaciones', function ($q) use ($request) {
+                $q->where('cargo', mb_strtoupper($request->cargo))
+                  ->where('estado', UsuarioAppInstitucion::ESTADO_ACTIVO);
+            });
         }
 
-        // Filtrar por institución (N:M) usando pivote
         if ($request->filled('institucion_id')) {
-            $institucionId = (int) $request->institucion_id;
-            $query->whereHas('instituciones', function ($q) use ($institucionId) {
-                $q->where('instituciones.id', $institucionId);
-            });
+            $query->porInstitucion($request->institucion_id);
         }
 
-        if ($request->has('activo')) {
-            $query->where('activo', (bool) $request->activo);
+        if ($request->filled('sexo')) {
+            $query->porSexo($request->sexo);
         }
 
-        // Búsqueda
-        if ($request->filled('buscar')) {
-            $buscar = $request->buscar;
-            $query->where(function ($q) use ($buscar) {
-                $q->where('nombres', 'like', "%{$buscar}%")
-                    ->orWhere('apellido_paterno', 'like', "%{$buscar}%")
-                    ->orWhere('apellido_materno', 'like', "%{$buscar}%")
-                    ->orWhere('codigo_modular_docente', 'like', "%{$buscar}%");
-            });
+        if ($request->filled('search')) {
+            $query->buscar($request->search);
         }
 
-        $usuarios = $query->paginate(20);
+        // Ordenamiento
+        $sortBy = $request->input('sort_by', 'apellido_paterno');
+        $sortOrder = $request->input('sort_order', 'asc');
+        $query->orderBy($sortBy, $sortOrder);
 
+        $perPage = $request->input('per_page', 20);
+        $usuarios = $query->paginate($perPage);
+
+        // Transformar datos
         $usuarios->getCollection()->transform(function ($u) {
             return [
                 'id' => $u->id,
-                'codigo_modular_docente' => $u->codigo_modular_docente,
+                'codigo_modular' => $u->codigo_modular,
                 'nombre_completo' => $u->nombre_completo,
+                'iniciales' => $u->iniciales,
                 'sexo' => $u->sexo,
-                'cargo' => $u->cargo,
-                'estado' => $u->estado,
-                'activo' => $u->activo,
-                'instituciones' => $u->institucionesActivas->map(function ($i) {
-                    return [
-                        'id' => $i->id,
-                        'codigo_modular_ie' => $i->codigo_modular_ie,
-                        'nombre' => $i->nombre,
-                        'nombre_display' => $i->nombre_display,  // Para mostrar en UI
-                        'estado_asignacion' => $i->pivot->estado ?? null,
-                        'fecha_inicio' => $i->pivot->fecha_inicio ?? null,
-                        'fecha_fin' => $i->pivot->fecha_fin ?? null,
-                    ];
-                })->values(),
+                'sexo_formateado' => $u->sexo_formateado,
+                'acceso_habilitado' => $u->acceso_habilitado,
+                'cargo_principal' => $u->getCargoPrincipal(),
+                'institucion_principal' => $u->getInstitucionPrincipal()?->nombre_display,
+                'total_asignaciones' => $u->asignacionesActivas->count(),
             ];
         });
 
-        return response()->json($usuarios);
+        return response()->json([
+            'success' => true,
+            'data' => $usuarios
+        ]);
     }
 
-    // =========================================================
-    // CREAR USUARIO APP
-    // =========================================================
-    public function store(StoreUsuarioAppRequest $request)
+    /**
+     * Crea un nuevo usuario de la app
+     */
+    public function store(StoreUsuarioAppRequest $request): JsonResponse
     {
-        $data = $request->validated();
+        $this->authorize('create', UsuarioApp::class);
 
-        // Crear usuario app (password se hashea por mutator en el modelo)
-        $usuario = UsuarioApp::create($data);
+        DB::beginTransaction();
+        
+        try {
+            // Crear usuario
+            $usuario = UsuarioApp::create($request->validated());
 
-        // Asociar instituciones (N:M) por institucion_id
-        // Soporta:
-        // - instituciones: [{institucion_id, estado?, fecha_inicio?, fecha_fin?}]
-        // - institucion_ids: [1,2,3] (legacy)
-        if ($request->filled('instituciones')) {
-            foreach ((array) $request->instituciones as $inst) {
-                $institucionId = (int) ($inst['institucion_id'] ?? 0);
-                if ($institucionId <= 0)
-                    continue;
-
-                $institucion = Institucion::find($institucionId);
-                if (!$institucion)
-                    continue;
-
-                $usuario->instituciones()->syncWithoutDetaching([
-                    $institucion->id => [
-                        'estado' => $inst['estado'] ?? 'ACTIVO',
-                        'fecha_inicio' => $inst['fecha_inicio'] ?? now(),
-                        'fecha_fin' => $inst['fecha_fin'] ?? null,
-                    ],
-                ]);
+            // Crear asignaciones
+            if ($request->filled('asignaciones')) {
+                foreach ($request->asignaciones as $asig) {
+                    UsuarioAppInstitucion::create([
+                        'usuario_app_id' => $usuario->id,
+                        'institucion_id' => $asig['institucion_id'],
+                        'horario_institucion_id' => $asig['horario_institucion_id'],
+                        'cargo' => $asig['cargo'] ?? null,
+                        'estado' => $asig['estado'] ?? UsuarioAppInstitucion::ESTADO_ACTIVO,
+                        'fecha_inicio' => $asig['fecha_inicio'] ?? now(),
+                        'fecha_fin' => $asig['fecha_fin'] ?? null,
+                    ]);
+                }
             }
-        } elseif ($request->filled('institucion_ids')) {
-            foreach ((array) $request->institucion_ids as $institucionId) {
-                $institucion = Institucion::find((int) $institucionId);
-                if (!$institucion)
-                    continue;
 
-                $usuario->instituciones()->syncWithoutDetaching([
-                    $institucion->id => [
-                        'estado' => 'ACTIVO',
-                        'fecha_inicio' => now(),
-                        'fecha_fin' => null,
-                    ],
-                ]);
-            }
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Usuario creado correctamente',
+                'data' => $usuario->load('asignacionesActivas.institucion'),
+            ], 201);
+            
+        } catch (\Exception $e) {
+            DB::rollBack();
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al crear usuario: ' . $e->getMessage()
+            ], 500);
         }
-
-        $usuario->load(['institucionesActivas:id,codigo_modular_ie,nombre']);
-
-        return response()->json([
-            'message' => 'Usuario creado correctamente',
-            'data' => [
-                'id' => $usuario->id,
-                'codigo_modular_docente' => $usuario->codigo_modular_docente,
-                'nombre_completo' => $usuario->nombre_completo,
-                'cargo' => $usuario->cargo,
-                'instituciones' => $usuario->institucionesActivas->map(function ($i) {
-                    return [
-                        'id' => $i->id,
-                        'codigo_modular_ie' => $i->codigo_modular_ie,
-                        'nombre' => $i->nombre,
-                        'nombre_display' => $i->nombre_display,
-                        'estado_asignacion' => $i->pivot->estado ?? null,
-                        'fecha_inicio' => $i->pivot->fecha_inicio ?? null,
-                        'fecha_fin' => $i->pivot->fecha_fin ?? null,
-                    ];
-                })->values(),
-            ],
-        ], 201);
     }
 
-    // =========================================================
-    // MOSTRAR USUARIO APP
-    // =========================================================
-    public function show($id)
+    /**
+     * Muestra un usuario específico
+     */
+    public function show($id): JsonResponse
     {
-        $usuario = UsuarioApp::with(['institucionesActivas:id,codigo_modular_ie,nombre,distrito'])
-            ->find($id);
-
-        if (!$usuario) {
-            return response()->json(['message' => 'Usuario no encontrado'], 404);
-        }
+        $usuario = UsuarioApp::with(['asignacionesActivas.institucion', 'asignacionesActivas.horario'])
+                             ->findOrFail($id);
+        
+        $this->authorize('view', $usuario);
 
         return response()->json([
+            'success' => true,
             'data' => [
                 'id' => $usuario->id,
-                'codigo_modular_docente' => $usuario->codigo_modular_docente,
+                'codigo_modular' => $usuario->codigo_modular,
                 'apellido_paterno' => $usuario->apellido_paterno,
                 'apellido_materno' => $usuario->apellido_materno,
                 'nombres' => $usuario->nombres,
                 'nombre_completo' => $usuario->nombre_completo,
+                'iniciales' => $usuario->iniciales,
                 'sexo' => $usuario->sexo,
-                'cargo' => $usuario->cargo,
-                'estado' => $usuario->estado,
-                'activo' => $usuario->activo,
+                'sexo_formateado' => $usuario->sexo_formateado,
+                'acceso_habilitado' => $usuario->acceso_habilitado,
                 'created_at' => $usuario->created_at,
-                'instituciones' => $usuario->institucionesActivas->map(function ($i) {
+                'asignaciones' => $usuario->asignacionesActivas->map(function ($asig) {
                     return [
-                        'id' => $i->id,
-                        'codigo_modular_ie' => $i->codigo_modular_ie,
-                        'nombre' => $i->nombre,
-                        'nombre_display' => $i->nombre_display,
-                        'distrito' => $i->distrito,
-                        'estado_asignacion' => $i->pivot->estado ?? null,
-                        'fecha_inicio' => $i->pivot->fecha_inicio ?? null,
-                        'fecha_fin' => $i->pivot->fecha_fin ?? null,
+                        'id' => $asig->id,
+                        'cargo' => $asig->cargo,
+                        'estado' => $asig->estado,
+                        'fecha_inicio' => $asig->fecha_inicio,
+                        'fecha_fin' => $asig->fecha_fin,
+                        'vigente' => $asig->estaVigente(),
+                        'institucion' => [
+                            'id' => $asig->institucion->id,
+                            'codigo_modular_ie' => $asig->institucion->codigo_modular_ie,
+                            'nombre' => $asig->institucion->nombre,
+                            'nombre_display' => $asig->institucion->nombre_display,
+                            'distrito' => $asig->institucion->distrito,
+                        ],
+                        'horario' => [
+                            'id' => $asig->horario->id,
+                            'nombre_turno' => $asig->horario->nombre_turno,
+                            'turno_formateado' => $asig->horario->turno_formateado,
+                            'hora_entrada' => $asig->horario->hora_entrada_formateada,
+                            'hora_salida' => $asig->horario->hora_salida_formateada,
+                            'dias_laborales' => $asig->horario->dias_laborales_text,
+                        ],
                     ];
-                })->values(),
-            ],
+                }),
+            ]
         ]);
     }
 
-    // =========================================================
-    // ACTUALIZAR USUARIO APP
-    // =========================================================
-    public function update(UpdateUsuarioAppRequest $request, $id)
+    /**
+     * Actualiza un usuario
+     */
+    public function update(UpdateUsuarioAppRequest $request, $id): JsonResponse
     {
-        $usuario = UsuarioApp::find($id);
+        $usuario = UsuarioApp::findOrFail($id);
+        $this->authorize('update', $usuario);
 
-        if (!$usuario) {
-            return response()->json(['message' => 'Usuario no encontrado'], 404);
-        }
-
-        $data = $request->validated();
-
-        // Si no envían password, NO se actualiza
-        if (array_key_exists('password', $data) && empty($data['password'])) {
-            unset($data['password']);
-        }
-
-        $usuario->update($data);
-
-        // Actualizar instituciones si se envían (por institucion_id)
-        if ($request->filled('instituciones')) {
-            $sync = [];
-
-            foreach ((array) $request->instituciones as $inst) {
-                $institucionId = (int) ($inst['institucion_id'] ?? 0);
-                if ($institucionId <= 0)
-                    continue;
-
-                $sync[$institucionId] = [
-                    'estado' => $inst['estado'] ?? 'ACTIVO',
-                    'fecha_inicio' => $inst['fecha_inicio'] ?? now(),
-                    'fecha_fin' => $inst['fecha_fin'] ?? null,
-                ];
+        DB::beginTransaction();
+        
+        try {
+            $data = $request->validated();
+            
+            // No actualizar password si está vacío
+            if (isset($data['password']) && empty($data['password'])) {
+                unset($data['password']);
             }
 
-            // Reemplaza la lista de instituciones asociadas por la enviada
-            $usuario->instituciones()->sync($sync);
+            $usuario->update($data);
+
+            // Actualizar asignaciones si se envían
+            if ($request->has('asignaciones')) {
+                // Desactivar asignaciones actuales
+                $usuario->asignaciones()->update(['estado' => UsuarioAppInstitucion::ESTADO_INACTIVO]);
+                
+                // Crear/actualizar nuevas asignaciones
+                foreach ($request->asignaciones as $asig) {
+                    UsuarioAppInstitucion::updateOrCreate(
+                        [
+                            'usuario_app_id' => $usuario->id,
+                            'institucion_id' => $asig['institucion_id'],
+                            'horario_institucion_id' => $asig['horario_institucion_id'],
+                        ],
+                        [
+                            'cargo' => $asig['cargo'] ?? null,
+                            'estado' => $asig['estado'] ?? UsuarioAppInstitucion::ESTADO_ACTIVO,
+                            'fecha_inicio' => $asig['fecha_inicio'] ?? now(),
+                            'fecha_fin' => $asig['fecha_fin'] ?? null,
+                        ]
+                    );
+                }
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Usuario actualizado correctamente',
+                'data' => $usuario->fresh()->load('asignacionesActivas.institucion'),
+            ]);
+            
+        } catch (\Exception $e) {
+            DB::rollBack();
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al actualizar usuario: ' . $e->getMessage()
+            ], 500);
         }
-
-        $usuario->load(['institucionesActivas:id,codigo_modular_ie,nombre']);
-
-        return response()->json([
-            'message' => 'Usuario actualizado correctamente',
-            'data' => [
-                'id' => $usuario->id,
-                'codigo_modular_docente' => $usuario->codigo_modular_docente,
-                'nombre_completo' => $usuario->nombre_completo,
-                'cargo' => $usuario->cargo,
-                'estado' => $usuario->estado,
-                'activo' => $usuario->activo,
-                'instituciones' => $usuario->institucionesActivas->map(function ($i) {
-                    return [
-                        'id' => $i->id,
-                        'codigo_modular_ie' => $i->codigo_modular_ie,
-                        'nombre' => $i->nombre,
-                        'nombre_display' => $i->nombre_display,
-                        'estado_asignacion' => $i->pivot->estado ?? null,
-                        'fecha_inicio' => $i->pivot->fecha_inicio ?? null,
-                        'fecha_fin' => $i->pivot->fecha_fin ?? null,
-                    ];
-                })->values(),
-            ],
-        ]);
     }
 
-    // =========================================================
-    // ELIMINAR USUARIO APP
-    // =========================================================
-    public function destroy($id)
+    /**
+     * Elimina un usuario
+     */
+    public function destroy($id): JsonResponse
     {
-        $usuario = UsuarioApp::find($id);
+        $usuario = UsuarioApp::findOrFail($id);
+        $this->authorize('delete', $usuario);
 
-        if (!$usuario) {
-            return response()->json(['message' => 'Usuario no encontrado'], 404);
+        try {
+            // Revocar tokens
+            $usuario->tokens()->delete();
+            
+            // Eliminar usuario (las asignaciones se eliminan en cascada según migración)
+            $usuario->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Usuario eliminado correctamente',
+            ]);
+            
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al eliminar usuario: ' . $e->getMessage()
+            ], 500);
         }
-
-        $usuario->delete();
-
-        return response()->json(['message' => 'Usuario eliminado correctamente']);
     }
 
-    // =========================================================
-    // ELIMINAR MÚLTIPLES USUARIOS APP
-    // =========================================================
-    public function destroyMultiple(Request $request)
+    /**
+     * Elimina múltiples usuarios
+     */
+    public function destroyMultiple(Request $request): JsonResponse
     {
+        $this->authorize('delete', UsuarioApp::class);
+
         $request->validate([
             'ids' => 'required|array|min:1',
             'ids.*' => 'required|integer|exists:usuarios_app,id',
         ]);
 
-        $user = $request->user();
-        $ids = $request->input('ids');
-
         $eliminados = 0;
         $errores = [];
 
-        foreach ($ids as $id) {
+        foreach ($request->ids as $id) {
             try {
                 $usuario = UsuarioApp::findOrFail($id);
-
-                // Verificar permisos (solo admin y super_admin pueden eliminar)
-                if (!in_array($user->rol, ['administrador', 'super_admin'])) {
-                    $errores[] = [
-                        'id' => $id,
-                        'error' => 'No tienes permisos para eliminar docentes',
-                    ];
-                    continue;
-                }
-
+                $this->authorize('delete', $usuario);
+                
+                $usuario->tokens()->delete();
                 $usuario->delete();
                 $eliminados++;
-
+                
             } catch (\Exception $e) {
                 $errores[] = [
                     'id' => $id,
-                    'error' => 'Error al eliminar: ' . $e->getMessage(),
+                    'error' => $e->getMessage(),
                 ];
             }
         }
 
         return response()->json([
             'success' => true,
-            'message' => "Se eliminaron {$eliminados} de " . count($ids) . " docente(s)",
+            'message' => "Se eliminaron {$eliminados} de " . count($request->ids) . " usuario(s)",
             'eliminados' => $eliminados,
-            'total' => count($ids),
+            'total' => count($request->ids),
             'errores' => $errores,
         ]);
     }
 
-    // =========================================================
-    // CAMBIAR ACTIVO (activar/desactivar)
-    // =========================================================
-    public function cambiarEstado(Request $request, $id)
+    /**
+     * Habilita/deshabilita acceso de un usuario
+     */
+    public function cambiarAcceso(Request $request, $id): JsonResponse
     {
+        $usuario = UsuarioApp::findOrFail($id);
+        $this->authorize('update', $usuario);
+
         $request->validate([
-            'activo' => 'required|boolean',
+            'acceso_habilitado' => 'required|boolean',
         ]);
 
-        $usuario = UsuarioApp::find($id);
+        try {
+            if ($request->boolean('acceso_habilitado')) {
+                $usuario->habilitarAcceso();
+                $mensaje = 'Acceso habilitado correctamente';
+            } else {
+                $usuario->deshabilitarAcceso();
+                $mensaje = 'Acceso deshabilitado correctamente';
+            }
 
-        if (!$usuario) {
-            return response()->json(['message' => 'Usuario no encontrado'], 404);
+            return response()->json([
+                'success' => true,
+                'message' => $mensaje,
+                'data' => [
+                    'id' => $usuario->id,
+                    'nombre_completo' => $usuario->nombre_completo,
+                    'acceso_habilitado' => $usuario->acceso_habilitado,
+                ],
+            ]);
+            
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al cambiar acceso: ' . $e->getMessage()
+            ], 500);
         }
-
-        $usuario->update(['activo' => (bool) $request->activo]);
-
-        return response()->json([
-            'message' => $request->activo ? 'Usuario activado correctamente' : 'Usuario desactivado correctamente',
-            'data' => [
-                'id' => $usuario->id,
-                'nombre_completo' => $usuario->nombre_completo,
-                'activo' => $usuario->activo,
-            ],
-        ]);
     }
 
-    // =========================================================
-    // PERFIL DEL USUARIO AUTENTICADO
-    // =========================================================
-    public function perfil(Request $request)
+    /**
+     * Perfil del usuario autenticado
+     */
+    public function perfil(Request $request): JsonResponse
     {
         $usuario = $request->user();
-
-        $usuario->load(['institucionesActivas:id,codigo_modular_ie,nombre,latitud,longitud,radio']);
+        $usuario->load(['asignacionesActivas.institucion', 'asignacionesActivas.horario']);
 
         return response()->json([
+            'success' => true,
             'data' => [
                 'id' => $usuario->id,
-                'codigo_modular_docente' => $usuario->codigo_modular_docente,
+                'codigo_modular' => $usuario->codigo_modular,
                 'nombre_completo' => $usuario->nombre_completo,
+                'iniciales' => $usuario->iniciales,
                 'sexo' => $usuario->sexo,
-                'cargo' => $usuario->cargo,
-                'estado' => $usuario->estado,
-                'activo' => $usuario->activo,
-                'instituciones' => $usuario->institucionesActivas->map(function ($i) {
+                'sexo_formateado' => $usuario->sexo_formateado,
+                'acceso_habilitado' => $usuario->acceso_habilitado,
+                'asignaciones' => $usuario->asignacionesActivas->map(function ($asig) {
                     return [
-                        'id' => $i->id,
-                        'codigo_modular_ie' => $i->codigo_modular_ie,
-                        'nombre' => $i->nombre,
-                        'nombre_display' => $i->nombre_display,
-                        'latitud' => $i->latitud,
-                        'longitud' => $i->longitud,
-                        'radio' => $i->radio,
-                        'estado_asignacion' => $i->pivot->estado ?? null,
-                        'fecha_inicio' => $i->pivot->fecha_inicio ?? null,
-                        'fecha_fin' => $i->pivot->fecha_fin ?? null,
+                        'cargo' => $asig->cargo,
+                        'vigente' => $asig->estaVigente(),
+                        'institucion' => [
+                            'id' => $asig->institucion->id,
+                            'codigo_modular_ie' => $asig->institucion->codigo_modular_ie,
+                            'nombre' => $asig->institucion->nombre,
+                            'nombre_display' => $asig->institucion->nombre_display,
+                            'latitud' => $asig->institucion->latitud,
+                            'longitud' => $asig->institucion->longitud,
+                            'radio' => $asig->institucion->radio,
+                        ],
+                        'horario' => [
+                            'nombre_turno' => $asig->horario->nombre_turno,
+                            'turno_formateado' => $asig->horario->turno_formateado,
+                            'hora_entrada' => $asig->horario->hora_entrada_formateada,
+                            'hora_salida' => $asig->horario->hora_salida_formateada,
+                            'tolerancia_minutos' => $asig->horario->tolerancia_minutos,
+                            'dias_laborales' => $asig->horario->dias_laborales,
+                            'dias_laborales_text' => $asig->horario->dias_laborales_text,
+                        ],
                     ];
-                })->values(),
+                }),
             ],
         ]);
     }
 
-    // =========================================================
-    // LOGOUT
-    // =========================================================
-    public function logout(Request $request)
+    /**
+     * Cierra sesión
+     */
+    public function logout(Request $request): JsonResponse
     {
         $request->user()->currentAccessToken()->delete();
 
-        return response()->json(['message' => 'Sesión cerrada correctamente']);
+        return response()->json([
+            'success' => true,
+            'message' => 'Sesión cerrada correctamente'
+        ]);
     }
 }

@@ -15,7 +15,7 @@ class HorarioInstitucionPolicy
     {
         return in_array($user->rol, [
             UsuarioWeb::ROL_SUPER_ADMIN,
-            UsuarioWeb::ROL_ADMIN,
+            UsuarioWeb::ROL_ADMINISTRADOR,
         ]);
     }
 
@@ -52,7 +52,7 @@ class HorarioInstitucionPolicy
     {
         return in_array($user->rol, [
             UsuarioWeb::ROL_SUPER_ADMIN,
-            UsuarioWeb::ROL_ADMIN,
+            UsuarioWeb::ROL_ADMINISTRADOR,
             UsuarioWeb::ROL_SUPERVISOR,
         ]);
     }

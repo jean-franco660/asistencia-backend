@@ -2,7 +2,7 @@
 
 namespace App\Services;
 
-use App\Imports\DocentesImport;
+use App\Imports\UsuariosAppImport;
 use App\Models\ImportacionLog;
 use App\Models\Institucion;
 use App\Models\UsuarioApp;
@@ -17,7 +17,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Maatwebsite\Excel\Facades\Excel;
 
-class ImportDocentesService
+class ImportUsuariosAppService
 {
     /**
      * Validación y disparo de importación (si lo usas desde controller con UploadedFile).
@@ -40,7 +40,7 @@ class ImportDocentesService
         ]);
 
         // Si insistes en ejecutar aquí (no recomendado para producción), funciona:
-        Excel::import(new DocentesImport($importLog, $this), $archivo);
+        Excel::import(new UsuariosAppImport($importLog, $this), $archivo);
 
         return [
             'message' => 'Importación ejecutada (recomendado: usar Job + worker).',
@@ -73,7 +73,7 @@ class ImportDocentesService
         ]);
 
         // Import con ruta absoluta (más estable que recrear UploadedFile)
-        Excel::import(new DocentesImport($importLog, $this), $absolutePath);
+        Excel::import(new UsuariosAppImport($importLog, $this), $absolutePath);
 
         return [
             'message' => 'Importación ejecutada por chunks.',

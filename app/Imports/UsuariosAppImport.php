@@ -3,7 +3,7 @@
 namespace App\Imports;
 
 use App\Models\ImportacionLog;
-use App\Services\ImportDocentesService;
+use App\Services\ImportUsuariosAppService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Maatwebsite\Excel\Concerns\ToCollection;
@@ -11,17 +11,17 @@ use Maatwebsite\Excel\Concerns\WithHeadingRow;
 use Maatwebsite\Excel\Concerns\WithChunkReading;
 use Maatwebsite\Excel\Concerns\WithBatchInserts;
 
-class DocentesImport implements
+class UsuariosAppImport implements
     ToCollection,
     WithHeadingRow,
     WithChunkReading,
     WithBatchInserts
 {
     protected ImportacionLog $importLog;
-    protected ImportDocentesService $service;
+    protected ImportUsuariosAppService $service;
     protected int $offset = 0;
 
-    public function __construct(ImportacionLog $importLog, ImportDocentesService $service)
+    public function __construct(ImportacionLog $importLog, ImportUsuariosAppService $service)
     {
         $this->importLog = $importLog;
         $this->service = $service;

@@ -1,77 +1,109 @@
 <?php
+
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration {
-      public function up(): void
-      {
-            Schema::create('justificaciones', function (Blueprint $table) {
-                  $table->id();
+    
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('justificaciones', function (Blueprint $table) {
+            $table->id();
 
-                  // 🔹 RELACIONES
-                  $table->foreignId('asistencia_id')
-                        ->nullable()
-                        ->constrained('asistencias')
-                        ->onDelete('cascade');
+            // Relación con asistencia (puede ser null para faltas completas)
+            $table->foreignId('asistencia_id')
+                ->nullable()
+                ->constrained('asistencias')
+                ->cascadeOnDelete();
 
-                  $table->foreignId('usuario_app_id')
-                        ->constrained('usuarios_app')
-                        ->onDelete('cascade');
+            // Usuario que justifica (siempre requerido)
+            $table->foreignId('usuario_app_id')
+                ->constrained('usuarios_app')
+                ->cascadeOnDelete();
 
-                  $table->foreignId('institucion_id')
-                        ->constrained('instituciones')
-                        ->onDelete('cascade');
+            // Institución donde ocurrió (siempre requerido)
+            $table->foreignId('institucion_id')
+                ->constrained('instituciones')
+                ->cascadeOnDelete();
 
-                  // 🔹 TIPO DE JUSTIFICACIÓN
-                  $table->enum('tipo', [
-                        'ENFERMEDAD',
-                        'PERMISO_PERSONAL',
-                        'LICENCIA',
-                        'COMISION_SERVICIO',
-                        'CAPACITACION',
-                        'DUELO',
-                        'MATERNIDAD',
-                        'PATERNIDAD',
-                        'OTRO'
-                  ]);
+            // Horario/turno específico (opcional)
+            $table->foreignId('horario_institucion_id')
+                ->nullable()
+                ->constrained('horarios_institucion')
+                ->nullOnDelete();
 
-                  // 🔹 FECHAS
-                  $table->date('fecha_inicio');
+            // Tipo de justificación
+            $table->enum('tipo', [
+                'ENFERMEDAD',
+                'PERMISO_PERSONAL',
+                'LICENCIA',
+                'COMISION_SERVICIO',
+                'CAPACITACION',
+                'DUELO',
+                'MATERNIDAD',
+                'PATERNIDAD',
+                'OLVIDO_MARCACION',
+                'OTRO'
+            ]);
 
-                  $table->date('fecha_fin');
+            // Periodo de la justificación
+            $table->date('fecha_inicio');
+            $table->date('fecha_fin');
 
-                  // 🔹 DETALLES
-                  $table->text('motivo');
+            // Motivo detallado
+            $table->text('motivo');
 
-                  // 🔹 ESTADO Y APROBACIÓN
-                  $table->enum('estado', ['PENDIENTE', 'APROBADO', 'RECHAZADO'])
-                        ->default('PENDIENTE');
+            // Estado de la justificación
+            $table->enum('estado', ['PENDIENTE', 'APROBADO', 'RECHAZADO'])
+                ->default('PENDIENTE');
 
-                  $table->foreignId('usuario_web_id')
-                        ->nullable()
-                        ->constrained('usuarios_web')
-                        ->onDelete('set null')
-                        ->comment('Usuario web que revisó la justificación');
+            // ✅ CORREGIDO: Revisor (con nullOnDelete para soft deletes)
+            $table->foreignId('usuario_web_id')
+                ->nullable()
+                ->constrained('usuarios_web')
+                ->nullOnDelete(); // Si se elimina el revisor, mantener la justificación
 
-                  $table->text('observaciones')
-                        ->nullable();
+            // Observaciones del revisor
+            $table->text('observaciones')->nullable();
+            
+            // Fecha de revisión
+            $table->timestamp('fecha_revision')->nullable();
 
-                  $table->timestamp('fecha_revision')
-                        ->nullable();
+            $table->timestamps();
 
-                  $table->timestamps();
+            // ===================================================
+            // ÍNDICES PARA OPTIMIZACIÓN DE CONSULTAS
+            // ===================================================
 
-                  // 🔹 ÍNDICES
-                  $table->index(['usuario_app_id', 'fecha_inicio']);
-                  $table->index(['institucion_id', 'estado']);
-                  $table->index('estado');
-                  $table->index('tipo');
-            });
-      }
+            // Buscar justificaciones por usuario y fecha
+            $table->index(['usuario_app_id', 'fecha_inicio'], 'idx_usuario_fecha_inicio');
+            
+            // Filtrar justificaciones por institución y estado
+            $table->index(['institucion_id', 'estado'], 'idx_institucion_estado');
+            
+            // Filtrar por tipo de justificación
+            $table->index('tipo', 'idx_tipo');
+            
+            // ✅ NUEVO: Buscar justificaciones pendientes de revisión
+            $table->index(['estado', 'fecha_inicio'], 'idx_estado_fecha');
+            
+            // ✅ NUEVO: Justificaciones por revisor
+            $table->index('usuario_web_id', 'idx_revisor');
+            
+            // ✅ NUEVO: Rango de fechas (para reportes)
+            $table->index(['fecha_inicio', 'fecha_fin'], 'idx_rango_fechas');
+        });
+    }
 
-      public function down(): void
-      {
-            Schema::dropIfExists('justificaciones');
-      }
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('justificaciones');
+    }
 };

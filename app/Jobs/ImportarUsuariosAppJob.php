@@ -2,9 +2,9 @@
 
 namespace App\Jobs;
 
-use App\Imports\DocentesImport;
+use App\Imports\UsuariosAppImport;
 use App\Models\ImportacionLog;
-use App\Services\ImportDocentesService;
+use App\Services\ImportUsuariosAppService;
 use Exception;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Maatwebsite\Excel\Facades\Excel;
 
-class ImportarDocentesJob implements ShouldQueue
+class ImportarUsuariosAppJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -40,7 +40,7 @@ class ImportarDocentesJob implements ShouldQueue
     /**
      * Ejecuta el Job usando el Service y el Import
      */
-    public function handle(ImportDocentesService $service): void
+    public function handle(ImportUsuariosAppService $service): void
     {
         $importLog = ImportacionLog::findOrFail($this->importLogId);
 
@@ -82,7 +82,7 @@ class ImportarDocentesJob implements ShouldQueue
             // El Import procesa chunks automáticamente y llama al Service
             // El Service usa cache de instituciones y maneja el pivot
             Excel::import(
-                new DocentesImport($importLog, $service),
+                new UsuariosAppImport($importLog, $service),
                 $absolutePath
             );
 
@@ -161,11 +161,11 @@ class ImportarDocentesJob implements ShouldQueue
             if (Storage::exists($this->archivoPath)) {
                 Storage::delete($this->archivoPath);
             }
-
+            
         } catch (Exception $e) {
             Log::error("Error al limpiar después del fallo del Job", [
                 'error' => $e->getMessage(),
             ]);
         }
     }
-}
+}   

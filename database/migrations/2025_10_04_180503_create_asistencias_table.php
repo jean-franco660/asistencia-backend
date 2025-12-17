@@ -11,52 +11,48 @@ return new class extends Migration
         Schema::create('asistencias', function (Blueprint $table) {
             $table->id();
 
-            // Relaciones
             $table->foreignId('usuario_app_id')
-                  ->constrained('usuarios_app')
-                  ->onDelete('cascade');
+                ->constrained('usuarios_app')
+                ->cascadeOnDelete();
 
             $table->foreignId('institucion_id')
-                  ->constrained('instituciones')
-                  ->onDelete('cascade');
+                ->constrained('instituciones')
+                ->cascadeOnDelete();
 
-            // Datos de la asistencia
+            // Turno real (horario asignado)
+            $table->foreignId('horario_institucion_id')
+                ->constrained('horarios_institucion')
+                ->restrictOnDelete();
+
+            // Fecha y hora
+            $table->date('fecha');
             $table->dateTime('fecha_hora');
-            $table->enum('tipo', ['entrada', 'salida'])->nullable();
-            $table->enum('turno', ['MAÑANA', 'TARDE', 'NOCHE'])->nullable();
-            $table->enum('estado', ['a_tiempo', 'tarde', 'salida_antes', 'falta', 'justificado'])->nullable();
+
+            // Entrada / salida
+            $table->enum('tipo', ['ENTRADA', 'SALIDA']);
+
+            // Resultado de marcación
+            $table->enum('resultado', ['A_TIEMPO', 'TARDE', 'SALIDA_ANTES'])->nullable();
+
+            // Situación administrativa
+            $table->enum('situacion', ['NORMAL', 'FALTA', 'JUSTIFICADO'])->default('NORMAL');
 
             // Geolocalización
             $table->boolean('dentro_rango')->default(false);
             $table->decimal('latitud', 10, 7)->nullable();
             $table->decimal('longitud', 10, 7)->nullable();
 
-            // Evidencia fotográfica
-            $table->string('foto', 255)->nullable();
+            // Evidencia
+            $table->string('foto')->nullable();
 
-            // Control de faltas
-            $table->boolean('falta')->default(false);
-            $table->boolean('falta_entrada')->default(false);
-            $table->boolean('falta_salida')->default(false);
-
-            // Sincronización (para app offline)
+            // Sync offline
             $table->boolean('sincronizado')->default(false);
 
             $table->timestamps();
 
-            // Índices para optimización
-            $table->index(['usuario_app_id', 'fecha_hora']);
-            $table->index(['institucion_id', 'fecha_hora']);
-            $table->index('estado');
-            $table->index('tipo');
-            $table->index('turno');
-            $table->index('falta');
-            $table->index('fecha_hora');
-
-            // Constraint único: un usuario no puede tener dos registros del mismo tipo en la misma fecha/hora
             $table->unique(
-                ['usuario_app_id', 'fecha_hora', 'tipo'],
-                'uk_asistencia_usuario_fecha_tipo'
+                ['usuario_app_id', 'institucion_id', 'horario_institucion_id', 'fecha', 'tipo'],
+                'uk_asistencia_diaria'
             );
         });
     }

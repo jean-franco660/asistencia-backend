@@ -26,7 +26,7 @@ class SupervisorDashboardController extends Controller
                 'instituciones' => [],
                 'resumen' => [
                     'total_instituciones' => 0,
-                    'total_docentes' => 0,
+                    'total_Usuarios_App' => 0,
                     'asistencias_hoy' => 0,
                     'ausencias_hoy' => 0,
                     'justificaciones_pendientes' => 0,
@@ -38,8 +38,8 @@ class SupervisorDashboardController extends Controller
            📌 ESTADÍSTICAS AGREGADAS
         ============================================================ */
 
-        // Total de docentes en todas las instituciones del supervisor
-        $totalDocentes = \App\Models\UsuarioApp::whereHas(
+        // Total de Usuarios_App en todas las instituciones del supervisor
+        $total_UsuariosAPP = \App\Models\UsuarioApp::whereHas(
             'instituciones',
             fn($q) => $q->whereIn('instituciones.id', $institucionesIds)
         )->count();
@@ -49,22 +49,22 @@ class SupervisorDashboardController extends Controller
             ->whereDate('fecha_hora', $today)
             ->count();
 
-        // Contar docentes con asistencia completa hoy
+        // Contar Usuarios_App con asistencia completa hoy
         $registrosHoy = \App\Models\Asistencia::whereIn('institucion_id', $institucionesIds)
             ->whereDate('fecha_hora', $today)
             ->get()
             ->groupBy('usuario_app_id');
 
-        $docentesPresentes = 0;
+        $usuariosAPP_Presentes = 0;
         foreach ($registrosHoy as $userId => $registros) {
             $entrada = $registros->firstWhere('tipo', 'entrada');
             $salida = $registros->firstWhere('tipo', 'salida');
             if ($entrada && $salida) {
-                $docentesPresentes++;
+                $usuariosAPP_Presentes++;
             }
         }
 
-        $ausenciasHoy = max(0, $totalDocentes - $docentesPresentes);
+        $ausenciasHoy = max(0, $total_UsuariosAPP - $usuariosAPP_Presentes);
 
         // Justificaciones pendientes
         $justificacionesPendientes = \App\Models\Justificacion::where('estado', 'PENDIENTE')
@@ -76,7 +76,7 @@ class SupervisorDashboardController extends Controller
         ============================================================ */
 
         $institucionesData = $instituciones->map(function ($institucion) use ($today) {
-            $docentesCount = $institucion->docentes()->count();
+            $UsuariosAPP_Count = $institucion->Usuarios_App()->count();
 
             $asistenciasHoyInst = \App\Models\Asistencia::where('institucion_id', $institucion->id)
                 ->whereDate('fecha_hora', $today)
@@ -86,7 +86,7 @@ class SupervisorDashboardController extends Controller
                 'id' => $institucion->id,
                 'nombre' => $institucion->nombre,
                 'codigo_modular' => $institucion->codigo_modular_ie,
-                'docentes' => $docentesCount,
+                'usuarios_APP' => $UsuariosAPP_Count,
                 'asistencias_hoy' => $asistenciasHoyInst,
             ];
         });
@@ -99,8 +99,8 @@ class SupervisorDashboardController extends Controller
             'instituciones' => $institucionesData,
             'resumen' => [
                 'total_instituciones' => $instituciones->count(),
-                'total_docentes' => $totalDocentes,
-                'asistencias_hoy' => $docentesPresentes,
+                'total_Usuarios_App' => $total_UsuariosAPP,
+                'asistencias_hoy' => $usuariosAPP_Presentes,
                 'ausencias_hoy' => $ausenciasHoy,
                 'justificaciones_pendientes' => $justificacionesPendientes,
                 'registros_asistencia_hoy' => $asistenciasHoy, // Total de marcaciones

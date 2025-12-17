@@ -29,23 +29,27 @@ class AsistenciaController extends Controller
 
     /**
      * Helper: Verifica si el usuario es super_admin o administrador
+     * ✅ CORREGIDO: Usar ROL_ADMINISTRADOR en lugar de ROL_ADMIN
      */
     private function esAdministrador(UsuarioWeb $user): bool
     {
         return in_array($user->rol, [
             UsuarioWeb::ROL_SUPER_ADMIN,
-            UsuarioWeb::ROL_ADMIN,
+            UsuarioWeb::ROL_ADMINISTRADOR,  // ✅ CORRECTO
         ]);
     }
 
     /**
      * Listar asistencias con filtros y paginación
+     * ✅ CORREGIDO: codigo_modular en lugar de codigo_modular_docente
      */
     public function index(Request $request)
     {
         try {
-            $query = Asistencia::with(['usuario:id,codigo_modular_docente,apellido_paterno,apellido_materno,nombres', 
-                                      'institucion:id,nombre,codigo_modular_ie'])
+            $query = Asistencia::with([
+                'usuario:id,codigo_modular,apellido_paterno,apellido_materno,nombres',  // ✅ CORRECTO
+                'institucion:id,nombre,codigo_modular_ie'
+            ])
                 ->orderBy('fecha_hora', 'desc');
 
             // Filtros
@@ -69,7 +73,7 @@ class AsistenciaController extends Controller
             // Super admin y administrador ven todas
             $user = $request->user();
             if (!$this->esAdministrador($user)) {
-                $institucionesIds = $user->instituciones->pluck('id');
+                $institucionesIds = $user->institucionesVigentes()->pluck('id');  // ✅ USAR institucionesVigentes
                 $query->whereIn('institucion_id', $institucionesIds);
             }
 
@@ -88,22 +92,21 @@ class AsistenciaController extends Controller
 
     /**
      * Registrar asistencia (desde la app)
+     * ✅ CORREGIDO: Eliminar campo 'turno', cambiar 'estado' por 'resultado'
      */
     public function store(Request $request)
     {
         try {
             $validated = $request->validate([
-                'usuario_app_id' => 'required|integer|exists:usuarios_app,id',
                 'institucion_id' => 'required|integer|exists:instituciones,id',
                 'fecha_hora' => 'required|date',
                 'latitud' => 'required|numeric',
                 'longitud' => 'required|numeric',
-                'dentro_rango' => 'required|boolean',
-                'tipo' => 'required|in:entrada,salida',
-                'turno' => 'nullable|string',
-                'foto' => 'nullable|string' // base64
+                'tipo' => 'required|in:ENTRADA,SALIDA',  // ✅ MAYÚSCULAS según constantes
+                'archivo' => 'nullable|file|image|mimes:jpg,jpeg,png|max:2048',
             ]);
 
+            $user = $request->user();
             $fecha = Carbon::parse($validated['fecha_hora']);
 
             // Validar día laborable
@@ -116,35 +119,47 @@ class AsistenciaController extends Controller
                 ], 403);
             }
 
-            // Calcular estado
-            $estado = $this->asistenciaService->calcularEstado(
+            // Calcular dentro_rango (backend authoritative)
+            $institucion = \App\Models\Institucion::findOrFail($validated['institucion_id']);
+            $dentroRango = $this->asistenciaService->estaDentroRango(
+                $validated['latitud'],
+                $validated['longitud'],
+                $institucion
+            );
+
+            // Calcular resultado (A_TIEMPO, TARDE, SALIDA_ANTES)
+            $resultado = $this->asistenciaService->calcularEstado(
                 $fecha,
                 $validated['tipo'],
                 $validacion['horario']
             );
 
             // Guardar foto
-            $fotoPath = $this->asistenciaService->guardarFoto($validated['foto'] ?? null, 'store');
+            $fotoPath = $this->asistenciaService->guardarFotoArchivo($request->file('archivo'), 'store');
 
-            // Registrar asistencia
+            // ✅ CORREGIDO: Registrar asistencia sin campos inexistentes
             $asistencia = Asistencia::create([
-                'usuario_app_id' => $validated['usuario_app_id'],
+                'usuario_app_id' => $user->id,
                 'institucion_id' => $validated['institucion_id'],
+                'horario_institucion_id' => $validacion['horario']->id,  // ✅ Relación completa
+                'fecha' => $fecha->toDateString(),
                 'fecha_hora' => $validated['fecha_hora'],
+                'tipo' => $validated['tipo'],
+                'resultado' => $resultado,  // ✅ CORRECTO: 'resultado' no 'estado'
+                'situacion' => Asistencia::SITUACION_NORMAL,
                 'latitud' => $validated['latitud'],
                 'longitud' => $validated['longitud'],
-                'dentro_rango' => $validated['dentro_rango'],
+                'dentro_rango' => $dentroRango,
                 'foto' => $fotoPath,
-                'tipo' => $validated['tipo'],
-                'turno' => $validated['turno'] ?? null,
-                'estado' => $estado,
-                'sincronizado' => true
+                'sincronizado' => true,
+                // ✅ ELIMINADO: 'turno' (no existe en migración, se obtiene por relación)
+                // ✅ ELIMINADO: 'estado' (el campo correcto es 'resultado')
             ]);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Asistencia registrada correctamente',
-                'data' => $asistencia
+                'data' => $asistencia->load('horario')  // Cargar relación para obtener turno
             ], 201);
 
         } catch (\Exception $e) {
@@ -163,7 +178,7 @@ class AsistenciaController extends Controller
     public function show($id)
     {
         try {
-            $asistencia = Asistencia::with(['usuario', 'institucion'])->findOrFail($id);
+            $asistencia = Asistencia::with(['usuario', 'institucion', 'horario'])->findOrFail($id);
             return response()->json($asistencia);
         } catch (\Exception $e) {
             Log::error("Error en show(): " . $e->getMessage());
@@ -194,7 +209,7 @@ class AsistenciaController extends Controller
             } else {
                 // Devolver archivo desde disco local
                 $path = storage_path("app/public/{$asistencia->foto}");
-                
+
                 if (!file_exists($path)) {
                     abort(404, 'Foto no encontrada');
                 }
@@ -216,7 +231,7 @@ class AsistenciaController extends Controller
         $user = $request->user();
         $today = now();
 
-        $instituciones = $user->instituciones->pluck('id');
+        $instituciones = $user->institucionesActivas->pluck('id');  // ✅ USAR institucionesActivas
 
         if ($instituciones->isEmpty()) {
             return response()->json([
@@ -259,7 +274,7 @@ class AsistenciaController extends Controller
      */
     public function resumenSemanal()
     {
-        /** @var \App\Models\User $user */
+        /** @var \App\Models\UsuarioApp $user */
         $user = Auth::user();
         $hoy = Carbon::now();
         $inicioSemana = $hoy->copy()->startOfWeek();
@@ -278,8 +293,8 @@ class AsistenciaController extends Controller
                 return $item->fecha_hora->format('Y-m-d') === $fecha;
             });
 
-            $entrada = $registros->firstWhere('tipo', 'entrada');
-            $salida = $registros->firstWhere('tipo', 'salida');
+            $entrada = $registros->firstWhere('tipo', Asistencia::TIPO_ENTRADA);
+            $salida = $registros->firstWhere('tipo', Asistencia::TIPO_SALIDA);
 
             $dias->push([
                 'fecha' => $fecha,
@@ -328,7 +343,7 @@ class AsistenciaController extends Controller
 
         $asistenciasMes = $query->whereBetween('fecha_hora', [$inicioMes, $finMes])
             ->get()
-            ->groupBy(function($item) {
+            ->groupBy(function ($item) {
                 return $item->fecha_hora->format('Y-m-d');
             });
 
@@ -348,7 +363,7 @@ class AsistenciaController extends Controller
             $labels[] = (string) $dia;
 
             // Verificar si es laborable usando el service
-            $institucionId = $user->instituciones->first()->id ?? 1;
+            $institucionId = $user->institucionesVigentes()->first()->id ?? 1;
             $validacion = $this->asistenciaService->esDiaLaborable($fecha, $institucionId);
 
             if (!$validacion['laborable']) {
@@ -358,8 +373,8 @@ class AsistenciaController extends Controller
             $fechaStr = $fecha->format('Y-m-d');
             $registrosDia = $asistenciasMes->get($fechaStr, collect());
 
-            $tieneEntrada = $registrosDia->where('tipo', 'entrada')->isNotEmpty();
-            $tieneSalida = $registrosDia->where('tipo', 'salida')->isNotEmpty();
+            $tieneEntrada = $registrosDia->where('tipo', Asistencia::TIPO_ENTRADA)->isNotEmpty();
+            $tieneSalida = $registrosDia->where('tipo', Asistencia::TIPO_SALIDA)->isNotEmpty();
 
             if ($tieneEntrada || $tieneSalida) {
                 $asistencias[] = 1;
@@ -397,7 +412,7 @@ class AsistenciaController extends Controller
 
         // Contar registros a exportar
         $query = Asistencia::query();
-        
+
         if ($filters['fecha_inicio']) {
             $query->whereDate('fecha_hora', '>=', $filters['fecha_inicio']);
         }
@@ -410,11 +425,10 @@ class AsistenciaController extends Controller
         if ($filters['tipo']) {
             $query->where('tipo', $filters['tipo']);
         }
-        
+
         // Supervisor solo exporta asistencias de sus instituciones
-        // Super admin y administrador exportan todas
         if (!$this->esAdministrador($filters['user'])) {
-            $query->whereIn('institucion_id', $filters['user']->instituciones->pluck('id'));
+            $query->whereIn('institucion_id', $filters['user']->institucionesVigentes()->pluck('id'));
         }
 
         $totalRegistros = $query->count();
@@ -456,84 +470,112 @@ class AsistenciaController extends Controller
 
     /**
      * Sincronización desde la app móvil (REFACTORIZADO)
+     * ✅ CORREGIDO: Eliminar 'turno', 'falta', 'estado'
      */
     public function syncMovil(Request $request)
     {
         Log::info('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-        Log::info('🔍 RECIBIENDO SINCRONIZACIÓN DE ASISTENCIAS');
+        Log::info('🔍 RECIBIENDO SINCRONIZACIÓN MULTIPART');
         Log::info('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
+        // Validación básica
         $validated = $request->validate([
             'asistencias' => 'required|array|min:1',
-            'asistencias.*.usuario_app_id' => 'required|integer|exists:usuarios_app,id',
             'asistencias.*.institucion_id' => 'required|integer|exists:instituciones,id',
             'asistencias.*.fecha_hora' => 'required|date',
-            'asistencias.*.dentro_rango' => 'required|boolean',
             'asistencias.*.latitud' => 'required|numeric',
             'asistencias.*.longitud' => 'required|numeric',
-            'asistencias.*.foto' => 'nullable|string',
-            'asistencias.*.tipo' => 'required|in:entrada,salida',
-            'asistencias.*.turno' => 'required|string',
-            'asistencias.*.falta' => 'required|boolean',
+            'asistencias.*.tipo' => 'required|in:ENTRADA,SALIDA',  // ✅ MAYÚSCULAS
+            'asistencias.*.archivo' => 'nullable|file|image|mimes:jpg,jpeg,png|max:2048',
+            'asistencias.*.es_falta' => 'required|boolean',  // ✅ RENOMBRADO de 'falta'
         ]);
 
         $registradas = [];
         $omitidas = [];
 
+        // Cache instituciones
+        $institucionesCache = [];
+
         foreach ($validated['asistencias'] as $index => $item) {
-            Log::info("🔍 Procesando asistencia #{$index}");
+            Log::info("🔍 Procesando asistencia multipart #{$index}");
 
             $fecha = Carbon::parse($item['fecha_hora']);
 
-            // Validar día laborable usando el service
+            // Validar día laborable
             $validacion = $this->asistenciaService->esDiaLaborable($fecha, $item['institucion_id']);
 
             if (!$validacion['laborable']) {
-                Log::warning("⚠️ Omitida: {$validacion['motivo']}");
+                Log::warning("⚠️ Omitida por día no laborable: {$validacion['motivo']}");
                 $omitidas[] = array_merge($item, ['motivo' => $validacion['motivo']]);
                 continue;
             }
 
-            // Calcular estado
-            $estado = $this->asistenciaService->calcularEstado(
+            // Cálculos backend
+            $resultado = $this->asistenciaService->calcularEstado(
                 $fecha,
                 $item['tipo'],
                 $validacion['horario']
             );
 
-            // Guardar foto
-            $fotoPath = $this->asistenciaService->guardarFoto($item['foto'] ?? null, 'syncMovil');
+            // Institución cache
+            if (!isset($institucionesCache[$item['institucion_id']])) {
+                $institucionesCache[$item['institucion_id']] = \App\Models\Institucion::find($item['institucion_id']);
+            }
+            $institucion = $institucionesCache[$item['institucion_id']];
 
-            // Registrar asistencia
+            $dentroRango = false;
+            if ($institucion) {
+                $dentroRango = $this->asistenciaService->estaDentroRango(
+                    $item['latitud'],
+                    $item['longitud'],
+                    $institucion
+                );
+            }
+
+            // Guardar foto
+            $fileInputName = "asistencias.{$index}.archivo";
+            $fotoPath = null;
+            if ($request->hasFile($fileInputName)) {
+                $fotoPath = $this->asistenciaService->guardarFotoArchivo($request->file($fileInputName), 'syncMovil');
+            }
+
+            // ✅ CORREGIDO: Registrar asistencia sin campos inexistentes
             $registro = Asistencia::create([
-                'usuario_app_id' => $item['usuario_app_id'],
+                'usuario_app_id' => $request->user()->id,
                 'institucion_id' => $item['institucion_id'],
+                'horario_institucion_id' => $validacion['horario']->id,
+                'fecha' => $fecha->toDateString(),
                 'fecha_hora' => $item['fecha_hora'],
-                'dentro_rango' => $item['dentro_rango'],
+                'tipo' => $item['tipo'],
+                'resultado' => $resultado,  // ✅ CORRECTO: 'resultado' no 'estado'
+                'situacion' => $item['es_falta']   // ✅ CORRECTO: 'situacion' no 'falta'
+                    ? Asistencia::SITUACION_FALTA 
+                    : Asistencia::SITUACION_NORMAL,
                 'latitud' => $item['latitud'],
                 'longitud' => $item['longitud'],
+                'dentro_rango' => $dentroRango,
                 'foto' => $fotoPath,
-                'tipo' => $item['tipo'],
-                'turno' => $item['turno'],
-                'falta' => $item['falta'],
                 'sincronizado' => true,
-                'estado' => $estado,
+                // ✅ ELIMINADO: 'turno' (no existe, se obtiene por relación)
             ]);
 
-            Log::info("✅ Asistencia registrada: ID {$registro->id}");
+            Log::info("✅ Asistencia registrada ID {$registro->id} | Rango: " . ($dentroRango ? 'SI' : 'NO'));
 
             $registradas[] = array_merge($item, [
                 'id' => $registro->id,
-                'estado' => $estado,
+                'resultado' => $resultado,  // ✅ CORRECTO
+                'dentro_rango_calculado' => $dentroRango,
                 'foto_guardada' => $fotoPath !== null,
+                'archivo' => null
             ]);
         }
 
         Log::info('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-        Log::info("✅ Sincronización completada: " . count($registradas) . " registradas, " . count($omitidas) . " omitidas");
+        Log::info("✅ Sincronización completada: " . count($registradas) . " OK, " . count($omitidas) . " Omitidas");
         Log::info('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
         return response()->json([
+            'success' => true,
             'message' => 'Sincronización completada',
             'sincronizadas' => count($registradas),
             'omitidas' => count($omitidas),

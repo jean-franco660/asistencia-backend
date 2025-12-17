@@ -10,6 +10,7 @@ use App\Models\Institucion;
 use App\Models\Asistencia;
 use App\Models\Feriado;
 use App\Models\HorarioInstitucion;
+use App\Models\UsuarioWeb;
 
 class StatsController extends Controller
 {
@@ -20,8 +21,10 @@ class StatsController extends Controller
         $dia = $today->day;
         $mes = $today->month;
 
-        $isAdmin = $user->rol === 'administrador';
-
+        $isAdmin = in_array($user->rol, [
+            UsuarioWeb::ROL_SUPER_ADMIN,
+            UsuarioWeb::ROL_ADMINISTRADOR
+        ]);
         /* ============================================================
            📌 INSTITUCIONES DEL ÁMBITO
         ============================================================ */

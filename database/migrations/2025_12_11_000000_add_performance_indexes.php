@@ -8,50 +8,84 @@ use Illuminate\Support\Facades\DB;
 return new class extends Migration {
     public function up(): void
     {
-        // Índices para optimización de performance
+        // ASISTENCIAS
         Schema::table('asistencias', function (Blueprint $table) {
-            // Índice compuesto para consultas por fecha e institución
-            $table->index(['fecha_hora', 'institucion_id'], 'idx_asistencias_fecha_inst');
+            // Consultas por día e institución
+            $table->index(
+                ['institucion_id', 'fecha'],
+                'idx_asistencias_inst_fecha'
+            );
 
-            // Índice para consultas de usuario
-            $table->index(['usuario_app_id', 'fecha_hora'], 'idx_asistencias_usuario_fecha');
+            // Consultas por usuario
+            $table->index(
+                ['usuario_app_id', 'fecha'],
+                'idx_asistencias_usuario_fecha'
+            );
 
-            // Índice para tipo de asistencia
+            // Validaciones por horario
+            $table->index(
+                ['horario_institucion_id', 'fecha'],
+                'idx_asistencias_horario_fecha'
+            );
+
             $table->index('tipo', 'idx_asistencias_tipo');
+            $table->index('situacion', 'idx_asistencias_situacion');
         });
 
-        Schema::table('docente_institucion', function (Blueprint $table) {
-            // Índice para filtrado por estado y fechas
-            $table->index(['institucion_id', 'estado'], 'idx_docente_inst_estado');
-            $table->index(['usuario_app_id', 'estado'], 'idx_docente_usuario_estado');
+        // ASIGNACIONES USUARIO - INSTITUCIÓN
+        Schema::table('usuario_app_institucion', function (Blueprint $table) {
+            $table->index(
+                ['institucion_id', 'estado'],
+                'idx_usuario_inst_estado'
+            );
+
+            $table->index(
+                ['usuario_app_id', 'estado'],
+                'idx_usuario_estado'
+            );
+
+            $table->index(
+                ['horario_institucion_id', 'estado'],
+                'idx_usuario_horario_estado'
+            );
         });
 
+        // USUARIOS APP
         Schema::table('usuarios_app', function (Blueprint $table) {
-            // Índice para búsquedas por nombre
-            $table->index('apellido_paterno', 'idx_usuarios_app_apellido');
+            $table->index(
+                'apellido_paterno',
+                'idx_usuarios_app_apellido'
+            );
 
-            // Índice para estado y activo
-            $table->index(['estado', 'activo'], 'idx_usuarios_app_estado_activo');
+            $table->index(
+                'acceso_habilitado',
+                'idx_usuarios_app_acceso'
+            );
         });
 
+        // HORARIOS
         Schema::table('horarios_institucion', function (Blueprint $table) {
-            // Índice para consultas de horarios activos por institución
-            $table->index(['institucion_id', 'activo'], 'idx_horarios_inst_activo');
+            $table->index(
+                ['institucion_id', 'activo'],
+                'idx_horarios_inst_activo'
+            );
         });
     }
 
     public function down(): void
     {
-        // Usar dropIndex con try-catch para evitar errores si no existen
-        $this->safeDropIndex('asistencias', 'idx_asistencias_fecha_inst');
+        $this->safeDropIndex('asistencias', 'idx_asistencias_inst_fecha');
         $this->safeDropIndex('asistencias', 'idx_asistencias_usuario_fecha');
+        $this->safeDropIndex('asistencias', 'idx_asistencias_horario_fecha');
         $this->safeDropIndex('asistencias', 'idx_asistencias_tipo');
+        $this->safeDropIndex('asistencias', 'idx_asistencias_situacion');
 
-        $this->safeDropIndex('docente_institucion', 'idx_docente_inst_estado');
-        $this->safeDropIndex('docente_institucion', 'idx_docente_usuario_estado');
+        $this->safeDropIndex('usuario_app_institucion', 'idx_usuario_inst_estado');
+        $this->safeDropIndex('usuario_app_institucion', 'idx_usuario_estado');
+        $this->safeDropIndex('usuario_app_institucion', 'idx_usuario_horario_estado');
 
         $this->safeDropIndex('usuarios_app', 'idx_usuarios_app_apellido');
-        $this->safeDropIndex('usuarios_app', 'idx_usuarios_app_estado_activo');
+        $this->safeDropIndex('usuarios_app', 'idx_usuarios_app_acceso');
 
         $this->safeDropIndex('horarios_institucion', 'idx_horarios_inst_activo');
     }
@@ -61,11 +95,11 @@ return new class extends Migration {
         try {
             $exists = DB::selectOne(
                 "SELECT 1
-                FROM information_schema.statistics
-                WHERE table_schema = DATABASE()
-                AND table_name = ?
-                AND index_name = ?
-                LIMIT 1",
+                 FROM information_schema.statistics
+                 WHERE table_schema = DATABASE()
+                   AND table_name = ?
+                   AND index_name = ?
+                 LIMIT 1",
                 [$table, $indexName]
             );
 
@@ -73,7 +107,7 @@ return new class extends Migration {
                 DB::statement("ALTER TABLE `{$table}` DROP INDEX `{$indexName}`");
             }
         } catch (\Exception $e) {
-            // Ignorar errores si el índice no existe
+            // Ignorar
         }
     }
 };

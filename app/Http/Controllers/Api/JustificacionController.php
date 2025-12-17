@@ -13,12 +13,13 @@ class JustificacionController extends Controller
 {
     /**
      * Helper: Verifica si el usuario es super_admin o administrador
+     * ✅ CORREGIDO: Usar ROL_ADMINISTRADOR
      */
     private function esAdministrador(UsuarioWeb $user): bool
     {
         return in_array($user->rol, [
             UsuarioWeb::ROL_SUPER_ADMIN,
-            UsuarioWeb::ROL_ADMIN,
+            UsuarioWeb::ROL_ADMINISTRADOR,  // ✅ CORRECTO
         ]);
     }
 
@@ -31,18 +32,19 @@ class JustificacionController extends Controller
             return true;
         }
 
-        return $user->instituciones()->where('instituciones.id', $institucionId)->exists();
+        return $user->institucionesVigentes()->where('instituciones.id', $institucionId)->exists();
     }
 
-    // =========================================================
-    // LISTAR JUSTIFICACIONES CON PAGINACIÓN
-    // =========================================================
+    /**
+     * LISTAR JUSTIFICACIONES CON PAGINACIÓN
+     * ✅ CORREGIDO: codigo_modular en lugar de codigo_modular_docente
+     */
     public function index(Request $request)
     {
         // Validación de filtros
         $request->validate([
             'estado' => 'sometimes|in:PENDIENTE,APROBADO,RECHAZADO',
-            'tipo' => 'sometimes|in:ENFERMEDAD,PERMISO_PERSONAL,LICENCIA,COMISION_SERVICIO,CAPACITACION,DUELO,MATERNIDAD,PATERNIDAD,OTRO',
+            'tipo' => 'sometimes|in:ENFERMEDAD,PERMISO_PERSONAL,LICENCIA,COMISION_SERVICIO,CAPACITACION,DUELO,MATERNIDAD,PATERNIDAD,OLVIDO_MARCACION,OTRO',
             'usuario_app_id' => 'sometimes|integer',
             'institucion_id' => 'sometimes|integer',
             'per_page' => 'sometimes|integer|min:1|max:100',
@@ -51,7 +53,7 @@ class JustificacionController extends Controller
         $user = $request->user();
 
         $query = Justificacion::with([
-            'usuario:id,codigo_modular_docente,apellido_paterno,apellido_materno,nombres',
+            'usuario:id,codigo_modular,apellido_paterno,apellido_materno,nombres',  // ✅ CORRECTO
             'institucion:id,nombre,codigo_modular_ie',
             'revisor:id,nombre,rol',
         ]);
@@ -64,8 +66,8 @@ class JustificacionController extends Controller
         else {
             // Super admin y administrador: ven todas las justificaciones
             if (!$this->esAdministrador($user)) {
-                // Supervisor: solo ve justificaciones de sus instituciones
-                $institucionesIds = $user->instituciones->pluck('id');
+                // Supervisor: solo ve justificaciones de sus instituciones vigentes
+                $institucionesIds = $user->institucionesVigentes()->pluck('id');
                 $query->whereIn('institucion_id', $institucionesIds);
             }
 
@@ -99,7 +101,7 @@ class JustificacionController extends Controller
                 'usuario' => $j->usuario ? [
                     'id' => $j->usuario->id,
                     'nombre' => $j->usuario->nombre_completo,
-                    'codigo_modular' => $j->usuario->codigo_modular_docente,
+                    'codigo_modular' => $j->usuario->codigo_modular,  // ✅ CORRECTO
                 ] : null,
                 'institucion' => $j->institucion ? [
                     'id' => $j->institucion->id,
@@ -125,9 +127,9 @@ class JustificacionController extends Controller
         return response()->json($justificaciones);
     }
 
-    // =========================================================
-    // CREAR JUSTIFICACIÓN (solo desde la app móvil)
-    // =========================================================
+    /**
+     * CREAR JUSTIFICACIÓN (solo desde la app móvil)
+     */
     public function store(Request $request)
     {
         $user = $request->user();
@@ -142,9 +144,9 @@ class JustificacionController extends Controller
         // Validación
         $request->validate([
             'institucion_id' => 'required|exists:instituciones,id',
-            'tipo' => 'required|in:ENFERMEDAD,PERMISO_PERSONAL,LICENCIA,COMISION_SERVICIO,CAPACITACION,DUELO,MATERNIDAD,PATERNIDAD,OTRO',
-            'fecha_inicio' => 'required|date',
-            'fecha_fin' => 'required|date|after_or_equal:fecha_inicio',
+            'tipo' => 'required|in:ENFERMEDAD,PERMISO_PERSONAL,LICENCIA,COMISION_SERVICIO,CAPACITACION,DUELO,MATERNIDAD,PATERNIDAD,OLVIDO_MARCACION,OTRO',
+            'fecha_inicio' => 'required|date|before_or_equal:today',  // ✅ No permitir futuro
+            'fecha_fin' => 'required|date|after_or_equal:fecha_inicio|before_or_equal:today',
             'motivo' => 'required|string|max:1000',
             'asistencia_id' => 'nullable|exists:asistencias,id',
         ]);
@@ -181,14 +183,16 @@ class JustificacionController extends Controller
         ]);
 
         return response()->json([
+            'success' => true,
             'message' => 'Justificación enviada correctamente. Pendiente de revisión.',
             'data' => $justificacion->load(['usuario', 'institucion']),
         ], 201);
     }
 
-    // =========================================================
-    // APROBAR JUSTIFICACIÓN (solo UsuarioWeb con permisos)
-    // =========================================================
+    /**
+     * APROBAR JUSTIFICACIÓN (solo UsuarioWeb con permisos)
+     * ✅ CORREGIDO: Eliminar auditoría manual duplicada - el Trait ya lo maneja
+     */
     public function aprobar(Request $request, $id)
     {
         $user = $request->user();
@@ -213,6 +217,7 @@ class JustificacionController extends Controller
             'observaciones' => 'nullable|string|max:500',
         ]);
 
+        // ✅ SIMPLIFICADO: Solo actualizar, el Trait Auditable registrará automáticamente
         $justificacion->update([
             'estado' => Justificacion::ESTADO_APROBADO,
             'usuario_web_id' => $user->id,
@@ -220,30 +225,30 @@ class JustificacionController extends Controller
             'fecha_revision' => now(),
         ]);
 
-        $justificacion->auditarAccion(
-            'aprobado',
-            "Justificación aprobada por {$user->nombre}",
-            [
-                'estado_anterior' => Justificacion::ESTADO_PENDIENTE,
-                'estado_nuevo' => Justificacion::ESTADO_APROBADO,
-                'observaciones' => $request->observaciones,
-            ]
-        );
-
         // Actualizar estado de asistencia si existe
         if ($justificacion->asistencia_id && $justificacion->asistencia) {
-            $justificacion->asistencia->update(['estado' => 'justificado']);
+            $justificacion->asistencia->update([
+                'situacion' => Asistencia::SITUACION_JUSTIFICADO  // ✅ CORRECTO
+            ]);
         }
 
+        // ✅ ELIMINADO: auditoría manual duplicada
+        // El Trait Auditable ya registró automáticamente el 'updated'
+        // Si necesitas una acción personalizada 'aprobado', usar:
+        // $justificacion->auditarAccion('aprobado', "...", [...])
+        // Pero evita duplicar con el 'updated' automático
+
         return response()->json([
+            'success' => true,
             'message' => 'Justificación aprobada correctamente',
             'data' => $justificacion->fresh()->load(['usuario', 'institucion', 'revisor']),
         ]);
     }
 
-    // =========================================================
-    // RECHAZAR JUSTIFICACIÓN (solo UsuarioWeb con permisos)
-    // =========================================================
+    /**
+     * RECHAZAR JUSTIFICACIÓN (solo UsuarioWeb con permisos)
+     * ✅ CORREGIDO: Eliminar auditoría manual duplicada
+     */
     public function rechazar(Request $request, $id)
     {
         $user = $request->user();
@@ -268,6 +273,7 @@ class JustificacionController extends Controller
             'observaciones' => 'required|string|max:500',
         ]);
 
+        // ✅ SIMPLIFICADO: Solo actualizar, el Trait maneja auditoría
         $justificacion->update([
             'estado' => Justificacion::ESTADO_RECHAZADO,
             'usuario_web_id' => $user->id,
@@ -275,25 +281,18 @@ class JustificacionController extends Controller
             'fecha_revision' => now(),
         ]);
 
-        $justificacion->auditarAccion(
-            'rechazado',
-            "Justificación rechazada por {$user->nombre}",
-            [
-                'estado_anterior' => Justificacion::ESTADO_PENDIENTE,
-                'estado_nuevo' => Justificacion::ESTADO_RECHAZADO,
-                'observaciones' => $request->observaciones,
-            ]
-        );
+        // ✅ ELIMINADO: auditoría manual duplicada
 
         return response()->json([
+            'success' => true,
             'message' => 'Justificación rechazada',
             'data' => $justificacion->fresh()->load(['usuario', 'institucion', 'revisor']),
         ]);
     }
 
-    // =========================================================
-    // VER DETALLE
-    // =========================================================
+    /**
+     * VER DETALLE
+     */
     public function show(Request $request, $id)
     {
         $user = $request->user();
@@ -317,9 +316,9 @@ class JustificacionController extends Controller
         return response()->json(['data' => $justificacion]);
     }
 
-    // =========================================================
-    // ELIMINAR JUSTIFICACIÓN
-    // =========================================================
+    /**
+     * ELIMINAR JUSTIFICACIÓN
+     */
     public function destroy(Request $request, $id)
     {
         $user = $request->user();
@@ -345,7 +344,11 @@ class JustificacionController extends Controller
         }
 
         $justificacion->delete();
+        // ✅ El Trait Auditable registrará automáticamente el 'deleted'
 
-        return response()->json(['message' => 'Justificación eliminada correctamente']);
+        return response()->json([
+            'success' => true,
+            'message' => 'Justificación eliminada correctamente'
+        ]);
     }
 }

@@ -4,10 +4,35 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class ImportacionLog extends Model
 {
+    use HasFactory;
+
     protected $table = 'importaciones_log';
+
+    /* =========================
+     * CONSTANTES - ESTADOS
+     * ========================= */
+
+    public const ESTADO_PENDING    = 'pending';
+    public const ESTADO_PROCESSING = 'processing';
+    public const ESTADO_COMPLETED  = 'completed';
+    public const ESTADO_FAILED     = 'failed';
+
+    /* =========================
+     * CONSTANTES - TIPOS
+     * ========================= */
+
+    public const TIPO_INSTITUCIONES = 'instituciones';
+    public const TIPO_USUARIOS_APP  = 'usuarios_app';
+    public const TIPO_ASIGNACIONES  = 'asignaciones';
+    public const TIPO_ASISTENCIAS   = 'asistencias';
+
+    /* =========================
+     * FILLABLE / CASTS
+     * ========================= */
 
     protected $fillable = [
         'usuario_id',
@@ -20,103 +45,109 @@ class ImportacionLog extends Model
         'exitosos',
         'errores_count',
         'errores_detalle',
-        'porcentaje',
+        'errores_archivo',
         'iniciado_en',
         'completado_en',
     ];
 
     protected $casts = [
+        'total'           => 'integer',
+        'procesados'      => 'integer',
+        'exitosos'        => 'integer',
+        'errores_count'   => 'integer',
         'errores_detalle' => 'array',
-        'total' => 'integer',
-        'procesados' => 'integer',
-        'exitosos' => 'integer',
-        'errores_count' => 'integer',
-        'porcentaje' => 'integer',
-        'iniciado_en' => 'datetime',
-        'completado_en' => 'datetime',
+        'iniciado_en'     => 'datetime',
+        'completado_en'   => 'datetime',
     ];
 
-    /**
-     * Estados posibles:
-     * - pending: En cola esperando procesamiento
-     * - processing: Siendo procesado
-     * - completed: Completado exitosamente
-     * - failed: Falló completamente
-     */
-    const ESTADO_PENDING = 'pending';
-    const ESTADO_PROCESSING = 'processing';
-    const ESTADO_COMPLETED = 'completed';
-    const ESTADO_FAILED = 'failed';
+    protected $attributes = [
+        'estado'         => self::ESTADO_PENDING,
+        'total'          => 0,
+        'procesados'     => 0,
+        'exitosos'       => 0,
+        'errores_count'  => 0,
+    ];
 
-    /**
-     * Tipos de importación
-     */
-    const TIPO_INSTITUCIONES = 'instituciones';
-    const TIPO_DOCENTES = 'docentes';
+    /* =========================
+     * RELACIONES
+     * ========================= */
 
     public function usuario(): BelongsTo
     {
         return $this->belongsTo(UsuarioWeb::class, 'usuario_id');
     }
 
-    /**
-     * Scope para filtrar por tipo
-     */
+    /* =========================
+     * SCOPES
+     * ========================= */
+
     public function scopeTipo($query, string $tipo)
     {
         return $query->where('tipo', $tipo);
     }
 
-    /**
-     * Scope para filtrar por estado
-     */
     public function scopeEstado($query, string $estado)
     {
         return $query->where('estado', $estado);
     }
 
-    /**
-     * Scope para importaciones completadas
-     */
     public function scopeCompletadas($query)
     {
         return $query->where('estado', self::ESTADO_COMPLETED);
     }
 
-    /**
-     * Scope para importaciones en progreso
-     */
     public function scopeEnProgreso($query)
     {
-        return $query->whereIn('estado', [self::ESTADO_PENDING, self::ESTADO_PROCESSING]);
+        return $query->whereIn('estado', [
+            self::ESTADO_PENDING,
+            self::ESTADO_PROCESSING,
+        ]);
     }
 
-    /**
-     * Scope para importaciones fallidas
-     */
     public function scopeFallidas($query)
     {
         return $query->where('estado', self::ESTADO_FAILED);
     }
 
-    /**
-     * Accessor: Calcular porcentaje si no está guardado
-     */
-    public function getPorcentajeAttribute($value)
+    public function scopePorUsuario($query, int $usuarioId)
     {
-        if ($value !== null) {
-            return $value;
+        return $query->where('usuario_id', $usuarioId);
+    }
+
+    public function scopeRecientes($query, int $limite = 10)
+    {
+        return $query->orderBy('created_at', 'desc')->limit($limite);
+    }
+
+    public function scopeDelDia($query)
+    {
+        return $query->whereDate('created_at', today());
+    }
+
+    public function scopeDelMes($query)
+    {
+        return $query->whereYear('created_at', now()->year)
+                     ->whereMonth('created_at', now()->month);
+    }
+
+    /* =========================
+     * ACCESSORS
+     * ========================= */
+
+    /**
+     * Porcentaje de avance
+     */
+    public function getPorcentajeAttribute(): int
+    {
+        if (($this->total ?? 0) === 0) {
+            return 0;
         }
 
-        if ($this->total > 0) {
-            return round(($this->procesados / $this->total) * 100);
-        }
-
-        return 0;
+        return (int) round((($this->procesados ?? 0) / $this->total) * 100);
     }
 
     /**
-     * Accessor: Duración de la importación en segundos
+     * Duración en segundos
      */
     public function getDuracionAttribute(): ?int
     {
@@ -132,12 +163,12 @@ class ImportacionLog extends Model
     }
 
     /**
-     * Accessor: Formato legible de duración
+     * Duración legible
      */
     public function getDuracionFormateadaAttribute(): ?string
     {
         $duracion = $this->duracion;
-        
+
         if ($duracion === null) {
             return null;
         }
@@ -146,81 +177,282 @@ class ImportacionLog extends Model
             return "{$duracion} segundos";
         }
 
-        $minutos = floor($duracion / 60);
+        $minutos = intdiv($duracion, 60);
         $segundos = $duracion % 60;
 
         if ($minutos < 60) {
-            return "{$minutos} minutos, {$segundos} segundos";
+            return "{$minutos} min, {$segundos} seg";
         }
 
-        $horas = floor($minutos / 60);
-        $minutos = $minutos % 60;
+        $horas = intdiv($minutos, 60);
+        $minRest = $minutos % 60;
 
-        return "{$horas} horas, {$minutos} minutos";
+        return "{$horas}h {$minRest}min";
     }
 
     /**
-     * Accessor: Tasa de éxito en porcentaje
+     * Tasa de éxito (%)
      */
     public function getTasaExitoAttribute(): float
     {
-        if ($this->procesados === 0) {
-            return 0;
+        if (($this->procesados ?? 0) === 0) {
+            return 0.0;
         }
 
-        return round(($this->exitosos / $this->procesados) * 100, 2);
+        return round((($this->exitosos ?? 0) / $this->procesados) * 100, 2);
     }
 
     /**
-     * Verificar si la importación está completada
+     * Estado formateado
      */
+    public function getEstadoFormateadoAttribute(): string
+    {
+        return match($this->estado) {
+            self::ESTADO_PENDING    => 'Pendiente',
+            self::ESTADO_PROCESSING => 'Procesando',
+            self::ESTADO_COMPLETED  => 'Completado',
+            self::ESTADO_FAILED     => 'Fallido',
+            default => 'Desconocido',
+        };
+    }
+
+    /**
+     * Tipo formateado
+     */
+    public function getTipoFormateadoAttribute(): string
+    {
+        return match($this->tipo) {
+            self::TIPO_INSTITUCIONES => 'Instituciones',
+            self::TIPO_USUARIOS_APP  => 'Usuarios',
+            self::TIPO_ASIGNACIONES  => 'Asignaciones',
+            self::TIPO_ASISTENCIAS   => 'Asistencias',
+            default => ucfirst($this->tipo),
+        };
+    }
+
+    /**
+     * Resumen compacto para API / dashboard
+     */
+    public function getResumenAttribute(): array
+    {
+        return [
+            'id'            => $this->id,
+            'tipo'          => $this->tipo,
+            'tipo_texto'    => $this->tipo_formateado,
+            'estado'        => $this->estado,
+            'estado_texto'  => $this->estado_formateado,
+            'total'         => $this->total,
+            'procesados'    => $this->procesados,
+            'exitosos'      => $this->exitosos,
+            'errores'       => $this->errores_count,
+            'porcentaje'    => $this->porcentaje,
+            'tasa_exito'    => $this->tasa_exito,
+            'duracion'      => $this->duracion_formateada,
+            'usuario'       => $this->usuario?->nombre,
+            'iniciado_en'   => $this->iniciado_en?->toIso8601String(),
+            'completado_en' => $this->completado_en?->toIso8601String(),
+        ];
+    }
+
+    /* =========================
+     * HELPERS DE ESTADO
+     * ========================= */
+
+    public function estaPendiente(): bool
+    {
+        return $this->estado === self::ESTADO_PENDING;
+    }
+
+    public function estaProcesando(): bool
+    {
+        return $this->estado === self::ESTADO_PROCESSING;
+    }
+
     public function estaCompletada(): bool
     {
         return $this->estado === self::ESTADO_COMPLETED;
     }
 
-    /**
-     * Verificar si la importación está en progreso
-     */
     public function estaEnProgreso(): bool
     {
-        return in_array($this->estado, [self::ESTADO_PENDING, self::ESTADO_PROCESSING]);
+        return in_array($this->estado, [
+            self::ESTADO_PENDING,
+            self::ESTADO_PROCESSING,
+        ], true);
     }
 
-    /**
-     * Verificar si la importación falló
-     */
     public function fallo(): bool
     {
         return $this->estado === self::ESTADO_FAILED;
     }
 
-    /**
-     * Verificar si tiene errores
-     */
     public function tieneErrores(): bool
     {
-        return $this->errores_count > 0;
+        return ($this->errores_count ?? 0) > 0;
+    }
+
+    public function completoSinErrores(): bool
+    {
+        return $this->estaCompletada() && !$this->tieneErrores();
+    }
+
+    /* =========================
+     * MÉTODOS DE NEGOCIO
+     * ========================= */
+
+    /**
+     * Inicia el procesamiento de la importación
+     */
+    public function marcarComoProcesando(): bool
+    {
+        $this->estado = self::ESTADO_PROCESSING;
+        $this->iniciado_en = now();
+        return $this->save();
     }
 
     /**
-     * Obtener resumen de la importación
+     * Marca la importación como completada
      */
-    public function getResumenAttribute(): array
+    public function marcarComoCompletada(): bool
+    {
+        $this->estado = self::ESTADO_COMPLETED;
+        $this->completado_en = now();
+        return $this->save();
+    }
+
+    /**
+     * Marca la importación como fallida
+     */
+    public function marcarComoFallida(string $error): bool
+    {
+        $this->estado = self::ESTADO_FAILED;
+        $this->completado_en = now();
+        $this->agregarError(['mensaje' => $error, 'fatal' => true]);
+        return $this->save();
+    }
+
+    /**
+     * Incrementa el contador de procesados
+     */
+    public function incrementarProcesados(): bool
+    {
+        $this->procesados++;
+        return $this->save();
+    }
+
+    /**
+     * Incrementa el contador de exitosos
+     */
+    public function incrementarExitosos(): bool
+    {
+        $this->exitosos++;
+        return $this->save();
+    }
+
+    /**
+     * Agrega un error al detalle
+     */
+    public function agregarError(array $error): bool
+    {
+        $errores = $this->errores_detalle ?? [];
+        $errores[] = array_merge($error, ['timestamp' => now()->toIso8601String()]);
+        
+        $this->errores_detalle = $errores;
+        $this->errores_count++;
+        
+        return $this->save();
+    }
+
+    /**
+     * Actualiza el total de registros
+     */
+    public function actualizarTotal(int $total): bool
+    {
+        $this->total = $total;
+        return $this->save();
+    }
+
+    /**
+     * Actualiza el progreso en batch
+     */
+    public function actualizarProgreso(int $procesados, int $exitosos, int $errores = 0): bool
+    {
+        $this->procesados = $procesados;
+        $this->exitosos = $exitosos;
+        $this->errores_count = $errores;
+        
+        return $this->save();
+    }
+
+    /* =========================
+     * MÉTODOS ESTÁTICOS
+     * ========================= */
+
+    public static function getTiposDisponibles(): array
     {
         return [
-            'id' => $this->id,
-            'tipo' => $this->tipo,
-            'estado' => $this->estado,
-            'total' => $this->total,
-            'procesados' => $this->procesados,
-            'exitosos' => $this->exitosos,
-            'errores' => $this->errores_count,
-            'porcentaje' => $this->porcentaje,
-            'tasa_exito' => $this->tasa_exito,
-            'duracion' => $this->duracion_formateada,
-            'iniciado_en' => $this->iniciado_en?->toIso8601String(),
-            'completado_en' => $this->completado_en?->toIso8601String(),
+            self::TIPO_INSTITUCIONES,
+            self::TIPO_USUARIOS_APP,
+            self::TIPO_ASIGNACIONES,
+            self::TIPO_ASISTENCIAS,
         ];
+    }
+
+    public static function getTiposConEtiquetas(): array
+    {
+        return [
+            self::TIPO_INSTITUCIONES => 'Instituciones',
+            self::TIPO_USUARIOS_APP  => 'Usuarios de la App',
+            self::TIPO_ASIGNACIONES  => 'Asignaciones',
+            self::TIPO_ASISTENCIAS   => 'Asistencias',
+        ];
+    }
+
+    public static function getEstadosDisponibles(): array
+    {
+        return [
+            self::ESTADO_PENDING,
+            self::ESTADO_PROCESSING,
+            self::ESTADO_COMPLETED,
+            self::ESTADO_FAILED,
+        ];
+    }
+
+    public static function getEstadosConEtiquetas(): array
+    {
+        return [
+            self::ESTADO_PENDING    => 'Pendiente',
+            self::ESTADO_PROCESSING => 'Procesando',
+            self::ESTADO_COMPLETED  => 'Completado',
+            self::ESTADO_FAILED     => 'Fallido',
+        ];
+    }
+
+    /**
+     * Crea una nueva importación
+     */
+    public static function crear(
+        UsuarioWeb $usuario,
+        string $tipo,
+        string $archivoOriginal,
+        string $archivoTemp
+    ): self {
+        return static::create([
+            'usuario_id'       => $usuario->id,
+            'tipo'             => $tipo,
+            'archivo_original' => $archivoOriginal,
+            'archivo_temp'     => $archivoTemp,
+            'estado'           => self::ESTADO_PENDING,
+        ]);
+    }
+
+    /**
+     * Limpia importaciones antiguas completadas
+     */
+    public static function limpiarAntiguas(int $diasAtras = 30): int
+    {
+        return static::where('estado', self::ESTADO_COMPLETED)
+                     ->where('completado_en', '<', now()->subDays($diasAtras))
+                     ->delete();
     }
 }

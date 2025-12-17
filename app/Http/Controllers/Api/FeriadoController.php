@@ -12,13 +12,13 @@ use Illuminate\Support\Facades\Log;
 class FeriadoController extends Controller
 {
     /**
-     * Verifica si el usuario tiene permisos de administrador
+     * ✅ CORREGIDO: Usar ROL_ADMINISTRADOR
      */
     private function isAdmin($user): bool
     {
         return in_array($user->rol, [
             UsuarioWeb::ROL_SUPER_ADMIN,
-            UsuarioWeb::ROL_ADMIN,
+            UsuarioWeb::ROL_ADMINISTRADOR,
         ]);
     }
 
@@ -32,7 +32,7 @@ class FeriadoController extends Controller
         // Validar que tenga permisos
         if (!in_array($user->rol, [
             UsuarioWeb::ROL_SUPER_ADMIN,
-            UsuarioWeb::ROL_ADMIN,
+            UsuarioWeb::ROL_ADMINISTRADOR, 
             UsuarioWeb::ROL_SUPERVISOR
         ])) {
             return response()->json(['message' => 'No autorizado'], 403);
@@ -48,9 +48,9 @@ class FeriadoController extends Controller
             return $query->get();
         }
 
-        // Supervisor solo ve feriados nacionales + de sus instituciones
+        // Supervisor solo ve feriados nacionales + de sus instituciones vigentes
         if ($user->rol === UsuarioWeb::ROL_SUPERVISOR) {
-            $ids = $user->instituciones->pluck('id');
+            $ids = $user->institucionesVigentes()->pluck('id');
 
             $query->where(function ($q) use ($ids) {
                 $q->where('tipo', 'nacional')
@@ -74,7 +74,7 @@ class FeriadoController extends Controller
         // Validar que tenga permisos
         if (!in_array($user->rol, [
             UsuarioWeb::ROL_SUPER_ADMIN,
-            UsuarioWeb::ROL_ADMIN,
+            UsuarioWeb::ROL_ADMINISTRADOR,
             UsuarioWeb::ROL_SUPERVISOR
         ])) {
             return response()->json(['message' => 'No autorizado'], 403);
@@ -91,7 +91,7 @@ class FeriadoController extends Controller
 
         // Supervisor solo puede crear feriados institucionales de sus instituciones
         if ($request->tipo === 'institucional' && $user->rol === UsuarioWeb::ROL_SUPERVISOR) {
-            if (!$user->instituciones->pluck('id')->contains($request->institucion_id)) {
+            if (!$user->institucionesVigentes()->pluck('id')->contains($request->institucion_id)) {
                 return response()->json(['message' => 'No autorizado para esta institución'], 403);
             }
         }
@@ -139,7 +139,7 @@ class FeriadoController extends Controller
         // Validar que tenga permisos
         if (!in_array($user->rol, [
             UsuarioWeb::ROL_SUPER_ADMIN,
-            UsuarioWeb::ROL_ADMIN,
+            UsuarioWeb::ROL_ADMINISTRADOR, 
             UsuarioWeb::ROL_SUPERVISOR
         ])) {
             return response()->json(['message' => 'No autorizado'], 403);
@@ -153,7 +153,7 @@ class FeriadoController extends Controller
                 return response()->json(['message' => 'No puede modificar feriados nacionales'], 403);
             }
 
-            if (!$user->instituciones->pluck('id')->contains($feriado->institucion_id)) {
+            if (!$user->institucionesVigentes()->pluck('id')->contains($feriado->institucion_id)) {
                 return response()->json(['message' => 'No autorizado para esta institución'], 403);
             }
         }
@@ -197,7 +197,7 @@ class FeriadoController extends Controller
         // Validar que tenga permisos
         if (!in_array($user->rol, [
             UsuarioWeb::ROL_SUPER_ADMIN,
-            UsuarioWeb::ROL_ADMIN,
+            UsuarioWeb::ROL_ADMINISTRADOR, 
             UsuarioWeb::ROL_SUPERVISOR
         ])) {
             return response()->json(['message' => 'No autorizado'], 403);
@@ -211,7 +211,7 @@ class FeriadoController extends Controller
                 return response()->json(['message' => 'No puede eliminar feriados nacionales'], 403);
             }
 
-            if (!$user->instituciones->pluck('id')->contains($feriado->institucion_id)) {
+            if (!$user->institucionesVigentes()->pluck('id')->contains($feriado->institucion_id)) {
                 return response()->json(['message' => 'No autorizado para esta institución'], 403);
             }
         }
@@ -223,7 +223,6 @@ class FeriadoController extends Controller
 
     /**
      * IMPORTAR AUTOMÁTICAMENTE LOS FERIADOS NACIONALES
-     * Solo super_admin y administrador
      */
     public function actualizarAutomatico(Request $request)
     {

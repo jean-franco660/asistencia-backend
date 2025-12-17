@@ -1,4 +1,5 @@
 <?php
+
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -7,48 +8,30 @@ return new class extends Migration {
     public function up(): void
     {
         Schema::create('usuarios_app', function (Blueprint $table) {
-            $table->id(); // PK: BIGINT UNSIGNED AUTO_INCREMENT
-            
-            // 🔹 CÓDIGO MODULAR DEL DOCENTE (puede cambiar, SOLO para login)
-            $table->string('codigo_modular_docente', 20)
-                  ->unique();
+            $table->id();
 
-            // 🔹 FK: Relación con institución usando ID
-            $table->foreignId('institucion_id')
-                  ->nullable()
-                  ->constrained('instituciones')
-                  ->onUpdate('cascade')
-                  ->onDelete('restrict');
+            // Identificador oficial UGEL para login
+            $table->string('codigo_modular', 20)->unique();
 
-            // 🔹 DATOS PERSONALES
+            // Datos personales
             $table->string('apellido_paterno', 100);
-
             $table->string('apellido_materno', 100);
-
             $table->string('nombres', 100);
+            $table->char('sexo', 1)->nullable()->comment('M=Masculino, F=Femenino');
 
-            $table->char('sexo', 1);
+            // Acceso general a la app
+            $table->boolean('acceso_habilitado')->default(true);
 
-            // 🔹 DATOS LABORALES
-            $table->enum('estado', ['ACTIVO', 'INACTIVO'])
-                  ->default('ACTIVO');
-
-            $table->string('cargo', 50);
-
-            // 🔹 CREDENCIALES DE ACCESO
+            // Credenciales
             $table->string('password');
-            
-            $table->boolean('activo')
-                  ->default(true);
+            $table->rememberToken();
 
             $table->timestamps();
-            
-            // 🔹 ÍNDICES
-            $table->index('institucion_id');
-            $table->index('estado');
-            $table->index(['cargo', 'estado']);
-            $table->index('apellido_paterno');
-            $table->index('activo');
+
+            // Índices para consultas frecuentes
+            $table->index('apellido_paterno', 'idx_apellido_paterno');
+            $table->index('acceso_habilitado', 'idx_acceso');
+            $table->index(['apellido_paterno', 'apellido_materno'], 'idx_apellidos');
         });
     }
 

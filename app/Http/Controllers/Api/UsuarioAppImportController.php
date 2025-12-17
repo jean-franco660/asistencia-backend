@@ -2,14 +2,14 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Exports\DocentesErroresExport;
+use App\Exports\UsuariosAppErroresExport;
 use App\Http\Controllers\Controller;
-use App\Jobs\ImportarDocentesJob;
+use App\Jobs\ImportarUsuariosAppJob;
 use App\Models\AuditLog;
 use App\Models\ImportacionLog;
 use App\Models\UsuarioApp;
 use App\Models\UsuarioWeb;
-use App\Services\ImportDocentesService;
+use App\Services\ImportUsuariosAppService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
@@ -18,14 +18,17 @@ use Maatwebsite\Excel\Facades\Excel;
 class DocenteImportController extends Controller
 {
     public function __construct(
-        protected ImportDocentesService $importService
+        protected ImportUsuariosAppService $importService
     ) {}
 
+    /**
+     * ✅ CORREGIDO: Usar ROL_ADMINISTRADOR
+     */
     private function esAdministrador($user): bool
     {
         return $user && in_array($user->rol ?? null, [
             UsuarioWeb::ROL_SUPER_ADMIN,
-            UsuarioWeb::ROL_ADMIN,
+            UsuarioWeb::ROL_ADMINISTRADOR,  // ✅ CORRECTO
         ], true);
     }
 
@@ -69,8 +72,7 @@ class DocenteImportController extends Controller
                 'errores_detalle' => [],
             ]);
 
-            // 🔧 CAMBIO: Pasar ID en lugar del objeto completo
-            ImportarDocentesJob::dispatch($importLog->id, $archivoPath);
+            ImportarUsuariosAppJob::dispatch($importLog->id, $archivoPath);
 
             Log::info('Importación de docentes encolada', [
                 'import_id' => $importLog->id,
@@ -78,11 +80,12 @@ class DocenteImportController extends Controller
                 'archivo' => $archivoNombre,
             ]);
 
-            // Auditoría (fallback seguro para actor_nombre)
+            // ✅ SIMPLIFICADO: El trait Auditable del ImportacionLog ya registrará 'created'
+            // Si necesitas metadata adicional, usa:
             AuditLog::create([
                 'actor_id' => $user->id,
                 'actor_type' => get_class($user),
-                'actor_nombre' => $user->nombre ?? trim(($user->nombres ?? '') . ' ' . ($user->apellidos ?? '')) ?? null,
+                'actor_nombre' => $user->nombre,
                 'actor_rol' => $user->rol,
                 'accion' => 'importacion_iniciada',
                 'descripcion' => 'Importación masiva de docentes iniciada',
@@ -99,7 +102,6 @@ class DocenteImportController extends Controller
                 'metodo_http' => $request->method(),
             ]);
 
-            // Respuesta inmediata: estado real en DB es pending
             return response()->json([
                 'success' => true,
                 'data' => [
@@ -168,10 +170,6 @@ class DocenteImportController extends Controller
         ]);
     }
 
-    /**
-     * Descargar Excel de errores directamente desde errores_detalle del ImportacionLog
-     * GET /docentes/importaciones/{id}/errores
-     */
     public function erroresExcel($id)
     {
         $importLog = ImportacionLog::find($id);
@@ -200,7 +198,7 @@ class DocenteImportController extends Controller
         $nombreArchivo = 'docentes_errores_' . $importLog->id . '.xlsx';
 
         return Excel::download(
-            new DocentesErroresExport($importLog->errores_detalle),
+            new UsuariosAppErroresExport($importLog->errores_detalle),
             $nombreArchivo
         );
     }
@@ -215,7 +213,7 @@ class DocenteImportController extends Controller
         }
 
         return Excel::download(
-            new \App\Exports\DocentesTemplateExport(),
+            new \App\Exports\UsuariosAppTemplateExport(),
             'plantilla_usuarios_app.xlsx'
         );
     }

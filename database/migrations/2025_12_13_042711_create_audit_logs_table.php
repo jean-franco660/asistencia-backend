@@ -10,40 +10,41 @@ return new class extends Migration
     {
         Schema::create('audit_logs', function (Blueprint $table) {
             $table->id();
-            
-            // ¿Quién realizó la acción?
+
+            // Actor
             $table->unsignedBigInteger('actor_id')->nullable();
-            $table->string('actor_type')->nullable(); // UsuarioWeb o UsuarioApp
-            $table->string('actor_nombre')->nullable(); // Guardar nombre por si se elimina el usuario
-            $table->string('actor_rol')->nullable(); // super_admin, administrador, supervisor
-            
-            // ¿Qué acción se realizó?
-            $table->string('accion'); // created, updated, deleted, autorizado, rechazado, importado
-            $table->string('descripcion')->nullable(); // Descripción legible de la acción
-            
-            // ¿Sobre qué entidad?
-            $table->string('modelo'); // UsuarioWeb, UsuarioApp, Institucion, etc.
+            $table->string('actor_type', 30)->nullable(); // USUARIO_WEB / USUARIO_APP
+            $table->string('actor_nombre')->nullable();
+            $table->string('actor_rol', 30)->nullable();
+
+            // Acción
+            $table->string('accion', 50);
+            $table->string('descripcion')->nullable();
+
+            // Entidad afectada
+            $table->string('modelo', 50);
             $table->unsignedBigInteger('modelo_id')->nullable();
-            $table->string('modelo_nombre')->nullable(); // Nombre del registro afectado
-            
-            // Datos de la acción
-            $table->json('datos_anteriores')->nullable(); // Estado antes del cambio
-            $table->json('datos_nuevos')->nullable(); // Estado después del cambio
-            $table->json('metadata')->nullable(); // Info adicional (IPs, archivos importados, etc.)
-            
-            // Contexto de la petición
+            $table->string('modelo_nombre')->nullable();
+
+            // Datos
+            $table->json('datos_anteriores')->nullable();
+            $table->json('datos_nuevos')->nullable();
+            $table->json('metadata')->nullable();
+
+            // Contexto HTTP
             $table->string('ip_address', 45)->nullable();
             $table->text('user_agent')->nullable();
             $table->string('url')->nullable();
-            $table->string('metodo_http')->nullable(); // GET, POST, PUT, DELETE
-            
+            $table->string('metodo_http', 10)->nullable();
+
             $table->timestamps();
-            
-            // Índices para búsquedas rápidas
-            $table->index(['actor_id', 'actor_type']);
-            $table->index(['modelo', 'modelo_id']);
+
+            // Índices
+            $table->index(['actor_id','actor_type']);
+            $table->index(['modelo','modelo_id']);
             $table->index('accion');
             $table->index('created_at');
+            $table->index(['accion','created_at'], 'idx_audit_accion_fecha');
         });
     }
 

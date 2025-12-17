@@ -7,6 +7,8 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Http\UploadedFile;
+use App\Models\Institucion;
 
 class AsistenciaService
 {
@@ -50,7 +52,7 @@ class AsistenciaService
             'sunday' => 'D'
         ];
 
-        $diaHoy = $diaMapa[strtolower($fecha->dayName)] ?? null;
+        $diaHoy = $diaMapa[strtolower($fecha->englishDayOfWeek)] ?? null;
 
         if (!$diaHoy) {
             return null;
@@ -177,5 +179,80 @@ class AsistenciaService
             'saturday' => 'S',
             'sunday' => 'D'
         ];
+    }
+
+    /**
+     * Calcular distancia geodésica (Haversine) en metros
+     */
+    private function haversineGreatCircleDistance($latitudeFrom, $longitudeFrom, $latitudeTo, $longitudeTo, $earthRadius = 6371000): float
+    {
+        // Convertir de grados a radianes
+        $latFrom = deg2rad($latitudeFrom);
+        $lonFrom = deg2rad($longitudeFrom);
+        $latTo = deg2rad($latitudeTo);
+        $lonTo = deg2rad($longitudeTo);
+
+        $latDelta = $latTo - $latFrom;
+        $lonDelta = $lonTo - $lonFrom;
+
+        $angle = 2 * asin(sqrt(pow(sin($latDelta / 2), 2) +
+            cos($latFrom) * cos($latTo) * pow(sin($lonDelta / 2), 2)));
+
+        return $angle * $earthRadius;
+    }
+
+    /**
+     * Verifica si la coordenada está dentro del radio de la institución
+     */
+    public function estaDentroRango($lat, $lng, Institucion $institucion): bool
+    {
+        $distancia = $this->haversineGreatCircleDistance(
+            $lat,
+            $lng,
+            $institucion->latitud,
+            $institucion->longitud
+        );
+
+        // Retorna true si la distancia es menor o igual al radio de la institución
+        // Si no tiene radio definido, asumimos 150m como fallback razonable (o podría ser false)
+        $radioPermitido = $institucion->radio ?? 150.0;
+
+        return $distancia <= $radioPermitido;
+    }
+
+    /**
+     * Guardar foto desde un archivo subido (UploadedFile)
+     */
+    public function guardarFotoArchivo(?UploadedFile $file, string $contexto = 'store'): ?string
+    {
+        if (!$file) {
+            return null;
+        }
+
+        try {
+            Log::info("📸 Procesando foto Archivo ({$contexto})...");
+
+            $fileName = 'selfies/' . uniqid('selfie_') . '.jpg';
+            $useS3 = env('USE_S3', false);
+
+            // Contenido del archivo
+            $fileContent = file_get_contents($file->getRealPath());
+
+            if ($useS3) {
+                // Guardar en S3
+                Storage::disk('s3')->put($fileName, $fileContent, 'public');
+                Log::info("✅ Foto guardada en S3 ({$contexto})", ['path' => $fileName]);
+            } else {
+                // Guardar en disco local
+                Storage::disk('public')->put($fileName, $fileContent);
+                Log::info("✅ Foto guardada en disco local ({$contexto})", ['path' => $fileName]);
+            }
+
+            return $fileName;
+
+        } catch (\Throwable $e) {
+            Log::error("❌ Error guardando foto archivo ({$contexto}): " . $e->getMessage());
+            return null;
+        }
     }
 }

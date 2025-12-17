@@ -12,20 +12,25 @@ return new class extends Migration
             $table->id();
 
             $table->foreignId('institucion_id')
-                  ->constrained('instituciones')
-                  ->onDelete('cascade');
+                ->constrained('instituciones')
+                ->cascadeOnDelete();
 
-            $table->string('nombre_turno', 50); // mañana / tarde / noche
+            $table->enum('nombre_turno', ['MAÑANA','TARDE','NOCHE']);
             $table->time('hora_entrada');
             $table->time('hora_salida');
             $table->unsignedTinyInteger('tolerancia_minutos')->default(5);
-            
-            // Días laborales (L,M,X,J,V,S,D)
+
+            // Días laborales: ["L","M","X","J","V"]
             $table->json('dias_semana')->nullable();
 
             $table->boolean('activo')->default(true);
 
             $table->timestamps();
+
+            // Evita duplicados de turnos por IE
+            $table->unique(['institucion_id','nombre_turno'], 'uk_ie_turno');
+
+            $table->index(['institucion_id','activo']);
         });
     }
 

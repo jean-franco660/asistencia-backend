@@ -4,284 +4,440 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\LoginWebRequest;
+use App\Http\Requests\StoreUsuarioWebRequest;
+use App\Http\Requests\UpdateUsuarioWebRequest;
 use App\Models\UsuarioWeb;
 use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Facades\DB;
 
 class UsuarioWebController extends Controller
 {
-
     use AuthorizesRequests;
 
-    public function login(LoginWebRequest $request)
+    /**
+     * Login de usuarios web (admin/supervisor)
+     */
+    public function login(LoginWebRequest $request): JsonResponse
     {
         $email = strtolower($request->email);
         $user = UsuarioWeb::whereRaw('LOWER(email) = ?', [$email])->first();
 
         if (!$user || !Hash::check($request->password, $user->password)) {
-            return response()->json(['message' => 'Credenciales inválidas'], 401);
+            return response()->json([
+                'success' => false,
+                'message' => 'Credenciales inválidas'
+            ], 401);
         }
 
-        // Supervisor no puede entrar si no está autorizado
-        if ($user->rol === UsuarioWeb::ROL_SUPERVISOR && $user->estado !== 'autorizado') {
-            return response()->json(['message' => 'Tu cuenta aún no ha sido autorizada'], 403);
+        // Verificar si el usuario fue eliminado (soft delete)
+        if ($user->trashed()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Esta cuenta ha sido desactivada'
+            ], 403);
         }
 
-        // Cerrar tokens previos
+        // Supervisor debe estar autorizado
+        if ($user->esSupervisor() && !$user->estaAutorizado()) {
+            $mensaje = match($user->estado) {
+                UsuarioWeb::ESTADO_PENDIENTE => 'Tu cuenta aún no ha sido autorizada',
+                UsuarioWeb::ESTADO_RECHAZADO => 'Tu cuenta ha sido rechazada',
+                default => 'No tienes acceso al sistema',
+            };
+            
+            return response()->json([
+                'success' => false,
+                'message' => $mensaje
+            ], 403);
+        }
+
+        // Revocar tokens anteriores
         $user->tokens()->delete();
 
-        $token = $user->createToken('web-token')->plainTextToken;
+        // Crear nuevo token
+        $token = $user->createToken('web-token', ['web'])->plainTextToken;
 
-        $instituciones = $user->rol === UsuarioWeb::ROL_SUPERVISOR
-            ? $user->instituciones()->select('instituciones.id', 'instituciones.nombre')->get()
+        // Obtener instituciones vigentes si es supervisor
+        $instituciones = $user->esSupervisor()
+            ? $user->institucionesVigentes()->select('id', 'nombre', 'codigo_modular_ie')->get()
             : [];
 
         return response()->json([
             'success' => true,
+            'message' => 'Inicio de sesión exitoso',
             'user' => [
                 'id' => $user->id,
                 'nombre' => $user->nombre,
                 'email' => $user->email,
                 'rol' => $user->rol,
                 'estado' => $user->estado,
+                'puede_gestionar_justificaciones' => $user->puedeGestionarJustificaciones(),
+                'puede_importar' => $user->puedeImportar(),
+                'puede_gestionar_usuarios' => $user->puedeGestionarUsuarios(),
+                'puede_ver_todas_instituciones' => $user->puedeVerTodasInstituciones(),
                 'instituciones' => $instituciones,
             ],
             'token' => $token,
         ]);
     }
 
-    public function me(Request $request)
+    /**
+     * Obtiene el usuario autenticado
+     */
+    public function me(Request $request): JsonResponse
     {
         $user = $request->user();
 
-        $instituciones = $user->rol === UsuarioWeb::ROL_SUPERVISOR
-            ? $user->instituciones()->select('instituciones.id', 'instituciones.nombre')->get()
+        $instituciones = $user->esSupervisor()
+            ? $user->institucionesVigentes()->select('id', 'nombre', 'codigo_modular_ie')->get()
             : [];
 
         return response()->json([
-            'id' => $user->id,
-            'nombre' => $user->nombre,
-            'email' => $user->email,
-            'rol' => $user->rol,
-            'estado' => $user->estado,
-            'instituciones' => $instituciones,
+            'success' => true,
+            'data' => [
+                'id' => $user->id,
+                'nombre' => $user->nombre,
+                'email' => $user->email,
+                'rol' => $user->rol,
+                'estado' => $user->estado,
+                'puede_gestionar_justificaciones' => $user->puedeGestionarJustificaciones(),
+                'puede_importar' => $user->puedeImportar(),
+                'puede_gestionar_usuarios' => $user->puedeGestionarUsuarios(),
+                'puede_ver_todas_instituciones' => $user->puedeVerTodasInstituciones(),
+                'instituciones' => $instituciones,
+            ]
         ]);
     }
 
-    public function index(Request $request)
+    /**
+     * Lista usuarios web
+     */
+    public function index(Request $request): JsonResponse
     {
         $this->authorize('viewAny', UsuarioWeb::class);
 
         $actor = $request->user();
         $query = UsuarioWeb::query();
 
-        // Reglas de visibilidad:
-        // - super_admin: puede listar todo
-        // - administrador: SOLO supervisores (no se incluye a sí mismo)
-        if ($actor->rol === UsuarioWeb::ROL_ADMIN) {
-            $query->where('rol', UsuarioWeb::ROL_SUPERVISOR);
+        // Filtro por rol del actor
+        if ($actor->esAdministrador()) {
+            // Admin solo ve supervisores
+            $query->supervisores();
+        } elseif (!$actor->esSuperAdmin()) {
+            // Otros roles no deberían llegar aquí, pero por seguridad
+            return response()->json([
+                'success' => false,
+                'message' => 'No autorizado'
+            ], 403);
         }
 
+        // Filtros
         if ($request->filled('estado')) {
-            $query->where('estado', $request->estado); // pendiente/autorizado/rechazado
+            $query->where('estado', $request->estado);
         }
 
-        // Solo super_admin puede filtrar por rol arbitrario
-        if ($request->filled('rol') && $actor->rol === UsuarioWeb::ROL_SUPER_ADMIN) {
-            $query->where('rol', $request->rol);
+        if ($request->filled('rol') && $actor->esSuperAdmin()) {
+            $query->porRol($request->rol);
         }
 
         if ($request->filled('search')) {
-            $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->where('nombre', 'like', "%{$search}%")
-                    ->orWhere('email', 'like', "%{$search}%");
-            });
+            $query->buscar($request->search);
         }
 
-        return response()->json(
-            $query->with('instituciones')->latest()->paginate(20)
-        );
-    }
+        // Ordenamiento
+        $sortBy = $request->input('sort_by', 'created_at');
+        $sortOrder = $request->input('sort_order', 'desc');
+        $query->orderBy($sortBy, $sortOrder);
 
-    public function pendientes(Request $request)
-    {
-        // Solo admin/super_admin deberían llegar aquí (según tus rutas protegidas)
-        // Si quieres, también puedes autorizar con policy:
-        $this->authorize('viewAny', UsuarioWeb::class);
-
-        $actor = $request->user();
-
-        $query = UsuarioWeb::where('estado', 'pendiente')
-            ->where('rol', UsuarioWeb::ROL_SUPERVISOR)
-            ->with('instituciones')
-            ->latest();
-
-        // admin: solo supervisores (ya está)
-        // super_admin: también (tu pantalla de pendientes típicamente es para supervisores)
-
-        // admin NO se incluye, no aplica
-
-        return response()->json(['data' => $query->get()]);
-    }
-
-    public function store(Request $request)
-    {
-        $this->authorize('create', UsuarioWeb::class);
-
-        // Admin crea supervisores, NO admins, NO super_admin
-        // UPDATE: Test expects Admin to create Admin.
-        $request->validate([
-            'nombre' => 'required|string|max:255',
-            'email' => 'required|email|unique:usuarios_web,email',
-            'password' => 'required|string|min:8',
-            'password_confirmation' => 'required|same:password',
-            'rol' => 'nullable|in:administrador,supervisor',
-            'institucion_id' => 'required_if:rol,supervisor|required_without:rol|exists:instituciones,id',
-        ]);
-
-        $rol = $request->input('rol', UsuarioWeb::ROL_SUPERVISOR);
-        $estado = $rol === UsuarioWeb::ROL_ADMIN ? 'autorizado' : 'pendiente';
-
-        $usuario = UsuarioWeb::create([
-            'nombre' => $request->nombre,
-            'email' => strtolower($request->email),
-            'password' => $request->password,
-            'rol' => $rol,
-            'estado' => $estado,
-        ]);
-
-        if ($request->filled('institucion_id')) {
-            $usuario->instituciones()->sync([$request->institucion_id]);
-        }
+        $perPage = $request->input('per_page', 20);
+        $usuarios = $query->with('instituciones')->paginate($perPage);
 
         return response()->json([
             'success' => true,
-            'message' => 'Supervisor creado correctamente',
-            'data' => $usuario->load('instituciones'),
-        ], 201);
+            'data' => $usuarios
+        ]);
     }
 
-    public function show(Request $request, $id)
+    /**
+     * Lista supervisores pendientes de autorización
+     */
+    public function pendientes(Request $request): JsonResponse
+    {
+        $this->authorize('viewAny', UsuarioWeb::class);
+
+        $query = UsuarioWeb::supervisores()
+                          ->pendientes()
+                          ->with('instituciones')
+                          ->orderBy('created_at', 'asc'); // Más antiguos primero
+
+        $pendientes = $query->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => $pendientes,
+            'total' => $pendientes->count()
+        ]);
+    }
+
+    /**
+     * Crea un nuevo usuario web
+     */
+    public function store(StoreUsuarioWebRequest $request): JsonResponse
+    {
+        $this->authorize('create', UsuarioWeb::class);
+
+        DB::beginTransaction();
+        
+        try {
+            $rol = $request->input('rol', UsuarioWeb::ROL_SUPERVISOR);
+            
+            // Admin y super_admin se autorizan automáticamente (booted del modelo)
+            $usuario = UsuarioWeb::create([
+                'nombre' => $request->nombre,
+                'email' => $request->email, // Ya viene normalizado del mutator
+                'password' => $request->password, // Ya viene hasheado del mutator
+                'rol' => $rol,
+            ]);
+
+            // Asignar instituciones si es supervisor
+            if ($usuario->esSupervisor() && $request->filled('instituciones')) {
+                $instituciones = collect($request->instituciones)->mapWithKeys(function ($inst) {
+                    return [$inst['id'] => [
+                        'fecha_inicio' => $inst['fecha_inicio'] ?? now(),
+                        'fecha_fin' => $inst['fecha_fin'] ?? null,
+                    ]];
+                });
+                
+                $usuario->instituciones()->sync($instituciones);
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => $usuario->esSupervisor() 
+                    ? 'Supervisor creado correctamente' 
+                    : 'Administrador creado correctamente',
+                'data' => $usuario->load('instituciones'),
+            ], 201);
+            
+        } catch (\Exception $e) {
+            DB::rollBack();
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al crear usuario: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Muestra un usuario específico
+     */
+    public function show(Request $request, $id): JsonResponse
     {
         $usuario = UsuarioWeb::with('instituciones')->findOrFail($id);
         $this->authorize('view', $usuario);
 
-        return response()->json(['data' => $usuario]);
+        return response()->json([
+            'success' => true,
+            'data' => $usuario
+        ]);
     }
 
-    public function update(Request $request, $id)
+    /**
+     * Actualiza un usuario
+     */
+    public function update(UpdateUsuarioWebRequest $request, $id): JsonResponse
     {
         $usuario = UsuarioWeb::with('instituciones')->findOrFail($id);
         $this->authorize('update', $usuario);
 
-        // Admin solo puede editar supervisores (policy ya lo fuerza)
-        $request->validate([
-            'nombre' => 'sometimes|string|max:255',
-            'email' => 'sometimes|email|unique:usuarios_web,email,' . $id,
-            'password' => 'sometimes|string|min:8',
-            'password_confirmation' => 'required_with:password|same:password',
-            'estado' => 'sometimes|in:pendiente,autorizado,rechazado',
-            'institucion_id' => 'sometimes|exists:instituciones,id',
-            // rol no se permite desde aquí (ni admin ni super_admin deberían cambiarlo por este endpoint)
-        ]);
+        DB::beginTransaction();
+        
+        try {
+            $data = $request->only(['nombre', 'email', 'estado']);
 
-        $data = $request->only(['nombre', 'email', 'estado']);
+            if ($request->filled('password')) {
+                $data['password'] = $request->password;
+            }
 
-        if ($request->filled('email')) {
-            $data['email'] = strtolower($request->email);
+            $usuario->update($data);
+
+            // Actualizar instituciones si es supervisor
+            if ($usuario->esSupervisor() && $request->has('instituciones')) {
+                $instituciones = collect($request->instituciones)->mapWithKeys(function ($inst) {
+                    return [$inst['id'] => [
+                        'fecha_inicio' => $inst['fecha_inicio'] ?? now(),
+                        'fecha_fin' => $inst['fecha_fin'] ?? null,
+                    ]];
+                });
+                
+                $usuario->instituciones()->sync($instituciones);
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Usuario actualizado correctamente',
+                'data' => $usuario->fresh()->load('instituciones'),
+            ]);
+            
+        } catch (\Exception $e) {
+            DB::rollBack();
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al actualizar usuario: ' . $e->getMessage()
+            ], 500);
         }
-
-        if ($request->filled('password')) {
-            $data['password'] = $request->password; // mutator hashea
-        }
-
-        $usuario->update($data);
-
-        if ($request->has('institucion_id')) {
-            $usuario->instituciones()->sync([$request->institucion_id]);
-        }
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Supervisor actualizado correctamente',
-            'data' => $usuario->fresh()->load('instituciones'),
-        ]);
     }
 
-    public function destroy(Request $request, $id)
+    /**
+     * Elimina un usuario (soft delete)
+     */
+    public function destroy(Request $request, $id): JsonResponse
     {
         $usuario = UsuarioWeb::with('instituciones')->findOrFail($id);
         $this->authorize('delete', $usuario);
 
-        $usuario->tokens()->delete();
-        $usuario->instituciones()->detach();
-        $usuario->delete();
+        try {
+            // Revocar todos los tokens
+            $usuario->tokens()->delete();
+            
+            // Soft delete (desvincula instituciones automáticamente por el evento)
+            $usuario->delete();
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Supervisor eliminado correctamente',
-        ]);
+            return response()->json([
+                'success' => true,
+                'message' => 'Usuario eliminado correctamente',
+            ]);
+            
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al eliminar usuario: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
-    public function autorizar(Request $request, $id)
+    /**
+     * Autoriza un supervisor pendiente
+     */
+    public function autorizar(Request $request, $id): JsonResponse
     {
         $usuario = UsuarioWeb::with('instituciones')->findOrFail($id);
         $this->authorize('autorizar', $usuario);
 
-        if ($usuario->estado !== 'pendiente') {
+        if (!$usuario->estaPendiente()) {
             return response()->json([
-                'message' => 'Solo se puede autorizar a supervisores en estado pendiente'
+                'success' => false,
+                'message' => 'Solo se pueden autorizar supervisores en estado pendiente'
             ], 400);
         }
 
-        $usuario->update(['estado' => 'autorizado']);
+        DB::beginTransaction();
+        
+        try {
+            $usuario->autorizar();
 
-        // Auditoría personalizada
-        $usuario->auditarAccion(
-            'autorizado',
-            "Supervisor autorizado por " . $request->user()->nombre,
-            [
-                'estado_anterior' => 'pendiente',
-                'estado_nuevo' => 'autorizado'
-            ]
-        );
+            // Auditoría personalizada
+            $usuario->auditarAccion(
+                'autorizado',
+                "Supervisor autorizado por {$request->user()->nombre}",
+                [
+                    'estado_anterior' => UsuarioWeb::ESTADO_PENDIENTE,
+                    'estado_nuevo' => UsuarioWeb::ESTADO_AUTORIZADO,
+                    'autorizado_por' => $request->user()->id,
+                ]
+            );
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Supervisor autorizado correctamente',
-            'data' => $usuario->fresh()->load('instituciones'),
-        ]);
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Supervisor autorizado correctamente',
+                'data' => $usuario->fresh()->load('instituciones'),
+            ]);
+            
+        } catch (\Exception $e) {
+            DB::rollBack();
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al autorizar supervisor: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
-    public function rechazar(Request $request, $id)
+    /**
+     * Rechaza un supervisor pendiente
+     */
+    public function rechazar(Request $request, $id): JsonResponse
     {
         $usuario = UsuarioWeb::with('instituciones')->findOrFail($id);
         $this->authorize('rechazar', $usuario);
 
-        if ($usuario->estado !== 'pendiente') {
+        if (!$usuario->estaPendiente()) {
             return response()->json([
-                'message' => 'Solo se puede rechazar a supervisores en estado pendiente'
+                'success' => false,
+                'message' => 'Solo se pueden rechazar supervisores en estado pendiente'
             ], 400);
         }
 
-        $usuario->update(['estado' => 'rechazado']);
+        $request->validate([
+            'motivo' => 'sometimes|string|max:500'
+        ]);
 
-        // Auditoría personalizada
-        $usuario->auditarAccion(
-            'rechazado',
-            "Supervisor rechazado por " . $request->user()->nombre,
-            [
-                'estado_anterior' => 'pendiente',
-                'estado_nuevo' => 'rechazado'
-            ]
-        );
+        DB::beginTransaction();
+        
+        try {
+            $usuario->rechazar();
+
+            // Auditoría personalizada
+            $usuario->auditarAccion(
+                'rechazado',
+                "Supervisor rechazado por {$request->user()->nombre}",
+                [
+                    'estado_anterior' => UsuarioWeb::ESTADO_PENDIENTE,
+                    'estado_nuevo' => UsuarioWeb::ESTADO_RECHAZADO,
+                    'rechazado_por' => $request->user()->id,
+                    'motivo' => $request->motivo ?? 'Sin motivo especificado',
+                ]
+            );
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Supervisor rechazado',
+                'data' => $usuario->fresh()->load('instituciones'),
+            ]);
+            
+        } catch (\Exception $e) {
+            DB::rollBack();
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al rechazar supervisor: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Cierra sesión
+     */
+    public function logout(Request $request): JsonResponse
+    {
+        $request->user()->currentAccessToken()->delete();
 
         return response()->json([
             'success' => true,
-            'message' => 'Supervisor rechazado',
-            'data' => $usuario->fresh()->load('instituciones'),
+            'message' => 'Sesión cerrada correctamente'
         ]);
     }
 }

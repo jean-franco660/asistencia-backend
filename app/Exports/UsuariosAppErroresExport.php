@@ -1,5 +1,5 @@
 <?php
-// app/Exports/DocentesErroresExport.php
+// app/Exports/UsuariosAppErroresExport.php
 
 namespace App\Exports;
 
@@ -11,7 +11,7 @@ use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 
-class DocentesErroresExport implements FromArray, WithHeadings, WithStyles, WithColumnWidths
+class UsuariosAppErroresExport implements FromArray, WithHeadings, WithStyles, WithColumnWidths
 {
     protected $errores;
 
