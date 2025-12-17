@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Jobs\ImportarInstitucionesJob;
-use App\Models\AuditLog;
 use App\Models\ImportacionLog;
 use App\Models\Institucion;
 use App\Models\UsuarioWeb;
@@ -19,9 +18,6 @@ class InstitucionImportController extends Controller
 {
     public function __construct() {}
 
-    /**
-     * Helper: Verifica si el usuario es super_admin o administrador
-     */
     private function esAdministrador($user): bool
     {
         return $user && in_array($user->rol ?? null, [
@@ -31,7 +27,81 @@ class InstitucionImportController extends Controller
     }
 
     /**
-     * Importar instituciones desde archivo Excel/CSV (solo admin/super_admin)
+     * ✅ NUEVO: Estadísticas para la vista de importaciones
+     * GET /api/instituciones/import/stats
+     */
+    public function stats(Request $request)
+    {
+        $user = $request->user();
+
+        if (!$this->esAdministrador($user)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No autorizado',
+            ], 403);
+        }
+
+        try {
+            // Total de instituciones en el sistema
+            $total = Institucion::count();
+
+            // Última importación completada
+            $ultimaImportacion = ImportacionLog::tipo(ImportacionLog::TIPO_INSTITUCIONES)
+                ->completadas()
+                ->latest('completado_en')
+                ->first();
+
+            $ultimaImportData = null;
+            if ($ultimaImportacion) {
+                $ultimaImportData = [
+                    'total' => $ultimaImportacion->total,
+                    'exitosos' => $ultimaImportacion->exitosos,
+                    'errores' => $ultimaImportacion->errores_count,
+                    'fecha' => $ultimaImportacion->completado_en?->toIso8601String(),
+                ];
+            }
+
+            // Tasa de éxito promedio (últimas 10 importaciones)
+            $ultimasImportaciones = ImportacionLog::tipo(ImportacionLog::TIPO_INSTITUCIONES)
+                ->completadas()
+                ->recientes(10)
+                ->get();
+
+            $tasaExitoPromedio = $ultimasImportaciones->isNotEmpty()
+                ? round($ultimasImportaciones->avg('tasa_exito'), 2)
+                : 0.0;
+
+            // Errores pendientes de revisar (suma de todas las importaciones con errores)
+            $erroresPendientes = ImportacionLog::tipo(ImportacionLog::TIPO_INSTITUCIONES)
+                ->completadas()
+                ->where('errores_count', '>', 0)
+                ->sum('errores_count');
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'total' => $total,
+                    'ultima_importacion' => $ultimaImportData,
+                    'tasa_exito_promedio' => $tasaExitoPromedio,
+                    'errores_pendientes' => $erroresPendientes,
+                ],
+            ]);
+
+        } catch (\Throwable $e) {
+            Log::error('Error al obtener stats de instituciones', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al obtener estadísticas',
+            ], 500);
+        }
+    }
+
+    /**
+     * Importar instituciones desde archivo Excel/CSV
+     * POST /api/instituciones/import
      */
     public function import(Request $request)
     {
@@ -60,20 +130,15 @@ class InstitucionImportController extends Controller
             $archivoPath = $archivo->store('temp/importaciones');
             $archivoNombre = $archivo->getClientOriginalName();
 
+            // ✅ USAR CONSTANTES
             $importLog = ImportacionLog::create([
                 'usuario_id' => $user->id,
-                'tipo' => 'instituciones',
+                'tipo' => ImportacionLog::TIPO_INSTITUCIONES,
                 'archivo_original' => $archivoNombre,
                 'archivo_temp' => $archivoPath,
-                'estado' => 'pending',
-                'total' => 0,
-                'procesados' => 0,
-                'exitosos' => 0,
-                'errores_count' => 0,
-                'errores_detalle' => [],
+                'estado' => ImportacionLog::ESTADO_PENDING,
             ]);
 
-            // 🔧 CAMBIO: Pasar ID en lugar del objeto completo
             ImportarInstitucionesJob::dispatch($importLog->id, $archivoPath);
 
             Log::info('Importación de instituciones encolada', [
@@ -82,32 +147,12 @@ class InstitucionImportController extends Controller
                 'archivo' => $archivoNombre,
             ]);
 
-            AuditLog::create([
-                'actor_id' => $user->id,
-                'actor_type' => get_class($user),
-                'actor_nombre' => $user->nombre ?? trim(($user->nombres ?? '') . ' ' . ($user->apellidos ?? '')) ?? null,
-                'actor_rol' => $user->rol,
-                'accion' => 'importacion_iniciada',
-                'descripcion' => 'Importación masiva de instituciones iniciada',
-                'modelo' => Institucion::class,
-                'modelo_id' => null,
-                'modelo_nombre' => 'Importación masiva de instituciones',
-                'metadata' => [
-                    'import_id' => $importLog->id,
-                    'archivo_nombre' => $archivoNombre,
-                ],
-                'ip_address' => $request->ip(),
-                'user_agent' => $request->userAgent(),
-                'url' => $request->fullUrl(),
-                'metodo_http' => $request->method(),
-            ]);
-
             return response()->json([
                 'success' => true,
                 'data' => [
                     'import_id' => $importLog->id,
-                    'estado' => $importLog->estado, // pending real
-                    'mensaje' => 'La importación fue encolada y se procesará con el worker',
+                    'estado' => $importLog->estado,
+                    'mensaje' => 'La importación fue encolada y se procesará en segundo plano',
                 ],
                 'message' => 'Importación iniciada correctamente',
             ]);
@@ -134,6 +179,7 @@ class InstitucionImportController extends Controller
 
     /**
      * Consultar estado de una importación
+     * GET /api/instituciones/import/{id}/estado
      */
     public function estadoImportacion(Request $request, int $id)
     {
@@ -166,16 +212,18 @@ class InstitucionImportController extends Controller
                 'exitosos' => (int) $importLog->exitosos,
                 'errores_count' => (int) $importLog->errores_count,
                 'porcentaje' => $importLog->porcentaje,
-                'iniciado_en' => $importLog->iniciado_en?->toISOString(),
-                'completado_en' => $importLog->completado_en?->toISOString(),
+                'tasa_exito' => $importLog->tasa_exito,
+                'iniciado_en' => $importLog->iniciado_en?->toIso8601String(),
+                'completado_en' => $importLog->completado_en?->toIso8601String(),
+                'duracion' => $importLog->duracion_formateada,
                 'errores' => $importLog->errores_detalle ?? [],
             ],
         ]);
     }
 
     /**
-     * Descargar Excel de errores directamente desde ImportacionLog->errores_detalle
-     * GET /instituciones/importaciones/{id}/errores
+     * Descargar Excel de errores
+     * GET /api/instituciones/import/{id}/errores
      */
     public function erroresExcel($id)
     {
@@ -188,7 +236,8 @@ class InstitucionImportController extends Controller
             ], 404);
         }
 
-        if ($importLog->tipo !== 'instituciones') {
+        // ✅ USAR CONSTANTE
+        if ($importLog->tipo !== ImportacionLog::TIPO_INSTITUCIONES) {
             return response()->json([
                 'success' => false,
                 'message' => 'La importación no corresponde a instituciones',
@@ -202,7 +251,8 @@ class InstitucionImportController extends Controller
             ], 400);
         }
 
-        $nombreArchivo = 'instituciones_errores_' . $importLog->id . '.xlsx';
+        $nombreArchivo = 'instituciones_errores_' . $importLog->id . '_' . 
+                         now()->format('YmdHis') . '.xlsx';
 
         return Excel::download(
             new InstitucionesErroresExport($importLog->errores_detalle),
@@ -211,7 +261,8 @@ class InstitucionImportController extends Controller
     }
 
     /**
-     * Descargar plantilla de instituciones (solo admin/super_admin)
+     * Descargar plantilla de instituciones
+     * GET /api/instituciones/import/plantilla
      */
     public function downloadTemplate(Request $request)
     {
@@ -224,7 +275,7 @@ class InstitucionImportController extends Controller
 
         return Excel::download(
             new InstitucionesTemplateExport(),
-            'plantilla_instituciones.xlsx'
+            'plantilla_instituciones_' . now()->format('Ymd') . '.xlsx'
         );
     }
 }

@@ -7,7 +7,7 @@ use App\Http\Controllers\Api\UsuarioWebController;
 use App\Http\Controllers\Api\UsuarioAppController;
 use App\Http\Controllers\Api\InstitucionController;
 use App\Http\Controllers\Api\AsistenciaController;
-use App\Http\Controllers\Api\DocenteImportController;
+use App\Http\Controllers\Api\UsuarioAppImportController;
 use App\Http\Controllers\Api\HorariosInstitucionController;
 use App\Http\Controllers\Api\FeriadoController;
 use App\Http\Controllers\Api\StatsController;
@@ -115,7 +115,7 @@ Route::prefix('v1/web')->middleware(['auth:sanctum', 'throttle:api'])->group(fun
     */
     Route::prefix('usuarios-app')->group(function () {
         // Plantilla de importación
-        Route::get('/template', [DocenteImportController::class, 'downloadTemplate']);
+        Route::get('/template', [UsuarioAppImportController::class, 'downloadTemplate']);
 
         // Rutas específicas ANTES de las rutas con parámetros
         Route::delete('/delete-multiple', [UsuarioAppController::class, 'destroyMultiple']);
@@ -126,13 +126,14 @@ Route::prefix('v1/web')->middleware(['auth:sanctum', 'throttle:api'])->group(fun
         Route::put('/{id}', [UsuarioAppController::class, 'update'])->whereNumber('id');
         Route::patch('/{id}', [UsuarioAppController::class, 'update'])->whereNumber('id');
         Route::delete('/{id}', [UsuarioAppController::class, 'destroy'])->whereNumber('id');
+        Route::patch('/{id}/asignar-horario', [UsuarioAppController::class, 'asignarHorario'])->whereNumber('id');
         Route::patch('/{id}/estado', [UsuarioAppController::class, 'cambiarEstado'])->whereNumber('id');
 
         // IMPORTACIÓN - THROTTLE: 3 por minuto
         Route::middleware('throttle:importaciones')->group(function () {
-            Route::post('/importar', [DocenteImportController::class, 'import']);
-            Route::get('/importacion/{id}', [DocenteImportController::class, 'estadoImportacion'])->whereNumber('id');
-            Route::get('/importacion/{id}/errores.xlsx', [DocenteImportController::class, 'erroresExcel'])->whereNumber('id');
+            Route::post('/importar', [UsuarioAppImportController::class, 'import']);
+            Route::get('/importacion/{id}', [UsuarioAppImportController::class, 'estadoImportacion'])->whereNumber('id');
+            Route::get('/importacion/{id}/errores.xlsx', [UsuarioAppImportController::class, 'erroresExcel'])->whereNumber('id');
         });
     });
 

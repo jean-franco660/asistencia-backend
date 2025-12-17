@@ -3,35 +3,103 @@
 namespace App\Http\Controllers\Api;
 
 use App\Exports\UsuariosAppErroresExport;
+use App\Exports\UsuariosAppTemplateExport;
 use App\Http\Controllers\Controller;
 use App\Jobs\ImportarUsuariosAppJob;
-use App\Models\AuditLog;
 use App\Models\ImportacionLog;
 use App\Models\UsuarioApp;
 use App\Models\UsuarioWeb;
-use App\Services\ImportUsuariosAppService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use Maatwebsite\Excel\Facades\Excel;
 
-class DocenteImportController extends Controller
+class UsuarioAppImportController extends Controller
 {
-    public function __construct(
-        protected ImportUsuariosAppService $importService
-    ) {}
+    public function __construct() {}
 
-    /**
-     * ✅ CORREGIDO: Usar ROL_ADMINISTRADOR
-     */
     private function esAdministrador($user): bool
     {
         return $user && in_array($user->rol ?? null, [
             UsuarioWeb::ROL_SUPER_ADMIN,
-            UsuarioWeb::ROL_ADMINISTRADOR,  // ✅ CORRECTO
+            UsuarioWeb::ROL_ADMINISTRADOR,
         ], true);
     }
 
+    /**
+     * ✅ NUEVO: Estadísticas para la vista de importaciones
+     * GET /api/usuarios-app/import/stats
+     */
+    public function stats(Request $request)
+    {
+        $user = $request->user();
+
+        if (!$this->esAdministrador($user)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No autorizado',
+            ], 403);
+        }
+
+        try {
+            $total = UsuarioApp::count();
+
+            // ✅ USAR CONSTANTE CORRECTA
+            $ultimaImportacion = ImportacionLog::tipo(ImportacionLog::TIPO_USUARIOS_APP)
+                ->completadas()
+                ->latest('completado_en')
+                ->first();
+
+            $ultimaImportData = null;
+            if ($ultimaImportacion) {
+                $ultimaImportData = [
+                    'total' => $ultimaImportacion->total,
+                    'exitosos' => $ultimaImportacion->exitosos,
+                    'errores' => $ultimaImportacion->errores_count,
+                    'fecha' => $ultimaImportacion->completado_en?->toIso8601String(),
+                ];
+            }
+
+            $ultimasImportaciones = ImportacionLog::tipo(ImportacionLog::TIPO_USUARIOS_APP)
+                ->completadas()
+                ->recientes(10)
+                ->get();
+
+            $tasaExitoPromedio = $ultimasImportaciones->isNotEmpty()
+                ? round($ultimasImportaciones->avg('tasa_exito'), 2)
+                : 0.0;
+
+            $erroresPendientes = ImportacionLog::tipo(ImportacionLog::TIPO_USUARIOS_APP)
+                ->completadas()
+                ->where('errores_count', '>', 0)
+                ->sum('errores_count');
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'total' => $total,
+                    'ultima_importacion' => $ultimaImportData,
+                    'tasa_exito_promedio' => $tasaExitoPromedio,
+                    'errores_pendientes' => $erroresPendientes,
+                ],
+            ]);
+
+        } catch (\Throwable $e) {
+            Log::error('Error al obtener stats de usuarios app', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al obtener estadísticas',
+            ], 500);
+        }
+    }
+
+    /**
+     * Importar usuarios app desde archivo Excel/CSV
+     * POST /api/usuarios-app/import
+     */
     public function import(Request $request)
     {
         $user = $request->user();
@@ -59,47 +127,21 @@ class DocenteImportController extends Controller
             $archivoPath = $archivo->store('temp/importaciones');
             $archivoNombre = $archivo->getClientOriginalName();
 
+            // ✅ CORREGIDO: Usar TIPO_USUARIOS_APP (no 'docentes')
             $importLog = ImportacionLog::create([
                 'usuario_id' => $user->id,
-                'tipo' => 'docentes',
+                'tipo' => ImportacionLog::TIPO_USUARIOS_APP,
                 'archivo_original' => $archivoNombre,
                 'archivo_temp' => $archivoPath,
-                'estado' => 'pending',
-                'total' => 0,
-                'procesados' => 0,
-                'exitosos' => 0,
-                'errores_count' => 0,
-                'errores_detalle' => [],
+                'estado' => ImportacionLog::ESTADO_PENDING,
             ]);
 
             ImportarUsuariosAppJob::dispatch($importLog->id, $archivoPath);
 
-            Log::info('Importación de docentes encolada', [
+            Log::info('Importación de usuarios app encolada', [
                 'import_id' => $importLog->id,
                 'usuario_id' => $user->id,
                 'archivo' => $archivoNombre,
-            ]);
-
-            // ✅ SIMPLIFICADO: El trait Auditable del ImportacionLog ya registrará 'created'
-            // Si necesitas metadata adicional, usa:
-            AuditLog::create([
-                'actor_id' => $user->id,
-                'actor_type' => get_class($user),
-                'actor_nombre' => $user->nombre,
-                'actor_rol' => $user->rol,
-                'accion' => 'importacion_iniciada',
-                'descripcion' => 'Importación masiva de docentes iniciada',
-                'modelo' => UsuarioApp::class,
-                'modelo_id' => null,
-                'modelo_nombre' => 'Importación masiva de docentes',
-                'metadata' => [
-                    'import_id' => $importLog->id,
-                    'archivo_nombre' => $archivoNombre,
-                ],
-                'ip_address' => $request->ip(),
-                'user_agent' => $request->userAgent(),
-                'url' => $request->fullUrl(),
-                'metodo_http' => $request->method(),
             ]);
 
             return response()->json([
@@ -107,7 +149,7 @@ class DocenteImportController extends Controller
                 'data' => [
                     'import_id' => $importLog->id,
                     'estado' => $importLog->estado,
-                    'mensaje' => 'La importación fue encolada y se procesará con el worker',
+                    'mensaje' => 'La importación fue encolada y se procesará en segundo plano',
                 ],
                 'message' => 'Importación iniciada correctamente',
             ]);
@@ -120,7 +162,7 @@ class DocenteImportController extends Controller
             ], 422);
 
         } catch (\Throwable $e) {
-            Log::error('Error al iniciar importación de docentes', [
+            Log::error('Error al iniciar importación de usuarios app', [
                 'usuario_id' => $user->id ?? null,
                 'error' => $e->getMessage(),
             ]);
@@ -132,6 +174,10 @@ class DocenteImportController extends Controller
         }
     }
 
+    /**
+     * Consultar estado de una importación
+     * GET /api/usuarios-app/import/{id}/estado
+     */
     public function estadoImportacion(Request $request, int $id)
     {
         $user = $request->user();
@@ -163,13 +209,19 @@ class DocenteImportController extends Controller
                 'exitosos' => (int) $importLog->exitosos,
                 'errores_count' => (int) $importLog->errores_count,
                 'porcentaje' => $importLog->porcentaje,
-                'iniciado_en' => $importLog->iniciado_en?->toISOString(),
-                'completado_en' => $importLog->completado_en?->toISOString(),
+                'tasa_exito' => $importLog->tasa_exito,
+                'iniciado_en' => $importLog->iniciado_en?->toIso8601String(),
+                'completado_en' => $importLog->completado_en?->toIso8601String(),
+                'duracion' => $importLog->duracion_formateada,
                 'errores' => $importLog->errores_detalle ?? [],
             ],
         ]);
     }
 
+    /**
+     * Descargar Excel de errores
+     * GET /api/usuarios-app/import/{id}/errores
+     */
     public function erroresExcel($id)
     {
         $importLog = ImportacionLog::find($id);
@@ -181,10 +233,11 @@ class DocenteImportController extends Controller
             ], 404);
         }
 
-        if ($importLog->tipo !== 'docentes') {
+        // ✅ CORREGIDO: Usar TIPO_USUARIOS_APP (no 'docentes')
+        if ($importLog->tipo !== ImportacionLog::TIPO_USUARIOS_APP) {
             return response()->json([
                 'success' => false,
-                'message' => 'La importación no corresponde a docentes',
+                'message' => 'La importación no corresponde a usuarios app',
             ], 400);
         }
 
@@ -195,7 +248,8 @@ class DocenteImportController extends Controller
             ], 400);
         }
 
-        $nombreArchivo = 'docentes_errores_' . $importLog->id . '.xlsx';
+        $nombreArchivo = 'usuarios_app_errores_' . $importLog->id . '_' . 
+                         now()->format('YmdHis') . '.xlsx';
 
         return Excel::download(
             new UsuariosAppErroresExport($importLog->errores_detalle),
@@ -203,6 +257,10 @@ class DocenteImportController extends Controller
         );
     }
 
+    /**
+     * Descargar plantilla de usuarios app
+     * GET /api/usuarios-app/import/plantilla
+     */
     public function downloadTemplate(Request $request)
     {
         if (!$this->esAdministrador($request->user())) {
@@ -213,8 +271,8 @@ class DocenteImportController extends Controller
         }
 
         return Excel::download(
-            new \App\Exports\UsuariosAppTemplateExport(),
-            'plantilla_usuarios_app.xlsx'
+            new UsuariosAppTemplateExport(),
+            'plantilla_usuarios_app_' . now()->format('Ymd') . '.xlsx'
         );
     }
 }

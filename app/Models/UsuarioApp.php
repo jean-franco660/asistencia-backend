@@ -60,14 +60,13 @@ class UsuarioApp extends Authenticatable
 
     public function getInicialesAttribute(): string
     {
-        $nombres = explode(' ', $this->nombres);
-        $inicial = substr($nombres[0] ?? '', 0, 1);
+        $ap = mb_substr($this->apellido_paterno ?? '', 0, 1, 'UTF-8');
+        $am = mb_substr($this->apellido_materno ?? '', 0, 1, 'UTF-8');
         
-        return strtoupper(
-            substr($this->apellido_paterno, 0, 1) . 
-            substr($this->apellido_materno, 0, 1) . 
-            $inicial
-        );
+        $nombres = explode(' ', $this->nombres ?? '');
+        $n = mb_substr($nombres[0] ?? '', 0, 1, 'UTF-8');
+        
+        return mb_strtoupper($ap . $am . $n, 'UTF-8') ?: 'N/A';
     }
 
     public function getSexoFormateadoAttribute(): string
@@ -81,24 +80,33 @@ class UsuarioApp extends Authenticatable
 
     public function setPasswordAttribute($value): void
     {
-        if (!empty($value)) {
+        if (empty($value)) {
+            return; // No hacer nada si está vacío
+        }
+
+        // Detectar si ya está hasheado (bcrypt tiene 60 caracteres y empieza con $2y$ o $2a$)
+        if (strlen($value) === 60 && preg_match('/^\$2[ayb]\$.{56}$/', $value)) {
+            // Ya está hasheado, asignar directamente
+            $this->attributes['password'] = $value;
+        } else {
+            // Texto plano, hashear
             $this->attributes['password'] = Hash::make($value);
         }
     }
 
     public function setApellidoPaternoAttribute($value): void
     {
-        $this->attributes['apellido_paterno'] = mb_strtoupper(trim($value));
+        $this->attributes['apellido_paterno'] = mb_strtoupper(trim($value), 'UTF-8');
     }
 
     public function setApellidoMaternoAttribute($value): void
     {
-        $this->attributes['apellido_materno'] = mb_strtoupper(trim($value));
+        $this->attributes['apellido_materno'] = mb_strtoupper(trim($value), 'UTF-8');
     }
 
     public function setNombresAttribute($value): void
     {
-        $this->attributes['nombres'] = mb_strtoupper(trim($value));
+        $this->attributes['nombres'] = mb_strtoupper(trim($value), 'UTF-8');
     }
 
     public function setCodigoModularAttribute($value): void

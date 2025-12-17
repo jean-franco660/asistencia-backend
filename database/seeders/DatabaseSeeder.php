@@ -10,15 +10,18 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
-        $this->call([
-            SuperAdminSeeder::class,
-        ]);
+        // Seeders deshabilitados temporalmente debido a problemas estructurales
+        // SuperAdminSeeder y DevDatosSeeder requieren horario_institucion_id
 
-        if (app()->environment('local')) {
-            $this->call([
-                DevDatosSeeder::class,
-            ]);
-        }
+        // $this->call([
+        //     SuperAdminSeeder::class,
+        // ]);
+
+        // if (app()->environment('local')) {
+        //     $this->call([
+        //         DevDatosSeeder::class,
+        //     ]);
+        // }
     }
 
 }

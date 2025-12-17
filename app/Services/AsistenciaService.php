@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Asistencia;
 use App\Models\Feriado;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -66,20 +67,24 @@ class AsistenciaService
     }
 
     /**
-     * Calcular estado de la asistencia (a_tiempo, tarde, salida_antes)
+     * Calcular estado de la asistencia (A_TIEMPO, TARDE, SALIDA_ANTES)
      */
     public function calcularEstado(Carbon $fecha, string $tipo, object $horario): string
     {
         $horaMarcada = $fecha->format('H:i:s');
 
-        if ($tipo === 'entrada') {
+        if ($tipo === Asistencia::TIPO_ENTRADA) {
             $horaEntradaMax = Carbon::parse($horario->hora_entrada)
                 ->addMinutes($horario->tolerancia_minutos)
                 ->format('H:i:s');
 
-            return ($horaMarcada <= $horaEntradaMax) ? 'a_tiempo' : 'tarde';
+            return ($horaMarcada <= $horaEntradaMax)
+                ? Asistencia::RESULTADO_A_TIEMPO
+                : Asistencia::RESULTADO_TARDE;
         } else {
-            return ($horaMarcada < $horario->hora_salida) ? 'salida_antes' : 'a_tiempo';
+            return ($horaMarcada < $horario->hora_salida)
+                ? Asistencia::RESULTADO_SALIDA_ANTES
+                : Asistencia::RESULTADO_A_TIEMPO;
         }
     }
 

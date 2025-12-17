@@ -118,7 +118,7 @@ class ImportUsuariosAppService
                 $resultados['errores']++;
 
                 $requeridos = [
-                    'codigo_modular_docente',
+                    'codigo_modular', // ✅ CORREGIDO: nombre de campo correcto
                     'apellido_paterno',
                     'apellido_materno',
                     'nombres',
@@ -128,14 +128,16 @@ class ImportUsuariosAppService
 
                 $faltantes = [];
                 foreach ($requeridos as $k) {
-                    if (empty($rowArray[$k] ?? null)) {
+                    // Verificar tanto el nombre nuevo como los alias legacy
+                    $valor = $rowArray[$k] ?? $rowArray['codigo_modular'] ?? $rowArray['codigo'] ?? null;
+                    if (empty($valor)) {
                         $faltantes[] = $k;
                     }
                 }
 
                 $resultados['errores_detalle'][] = [
                     'fila' => $numeroFila,
-                    'codigo_docente' => $rowArray['codigo_modular_docente'] ?? ($rowArray['codigo'] ?? null),
+                    'codigo_docente' => $rowArray['codigo_modular'] ?? ($rowArray['codigo_modular'] ?? ($rowArray['codigo'] ?? null)),
                     'docente' => trim(
                         ($rowArray['apellido_paterno'] ?? '') . ' ' .
                         ($rowArray['apellido_materno'] ?? '') . ', ' .
@@ -168,7 +170,8 @@ class ImportUsuariosAppService
      */
     protected function procesarFila(array $row, Collection $instCache): string
     {
-        $codigoModular = $row['codigo_modular_docente'] ?? $row['codigo'] ?? null;
+        // ✅ CORREGIDO: Usar 'codigo_modular' en lugar de 'codigo_modular_docente'
+        $codigoModular = $row['codigo_modular_docente'] ?? $row['codigo'] ?? $row['codigo_modular'] ?? null;
         $apellidoPaterno = $row['apellido_paterno'] ?? null;
         $apellidoMaterno = $row['apellido_materno'] ?? null;
         $nombres = $row['nombres'] ?? null;
@@ -177,8 +180,9 @@ class ImportUsuariosAppService
         $passwordRaw = $row['password'] ?? null;
         $codigoModularIE = $row['codigo_modular_ie'] ?? null;
 
+        // Validaciones
         if (empty($codigoModular))
-            throw new Exception('Falta campo obligatorio: codigo_modular_docente');
+            throw new Exception('Falta campo obligatorio: codigo_modular');
         if (empty($apellidoPaterno))
             throw new Exception('Falta campo obligatorio: apellido_paterno');
         if (empty($apellidoMaterno))
@@ -190,7 +194,8 @@ class ImportUsuariosAppService
         if (empty($codigoModularIE))
             throw new Exception('Falta campo obligatorio: codigo_modular_ie');
 
-        $codigoDoc = strtolower(trim((string) $codigoModular));
+        // Normalización
+        $codigoDoc = strtoupper(trim((string) $codigoModular));
         $sexoSan = $this->normalizarSexo((string) $sexo);
         $cargoSan = strtoupper(trim((string) $cargo));
         $codigoIE = $this->normalizarCodigoInstitucion(trim((string) $codigoModularIE));
@@ -202,45 +207,60 @@ class ImportUsuariosAppService
         }
 
         return DB::transaction(function () use ($codigoDoc, $apellidoPaterno, $apellidoMaterno, $nombres, $sexoSan, $cargoSan, $passwordRaw, $institucion) {
-            $usuario = UsuarioApp::whereRaw('LOWER(codigo_modular_docente) = ?', [$codigoDoc])->first();
+            // ✅ CORREGIDO: Buscar por 'codigo_modular' (campo correcto)
+            $usuario = UsuarioApp::whereRaw('UPPER(codigo_modular) = ?', [$codigoDoc])->first();
 
             $accion = 'actualizado';
 
             if (!$usuario) {
                 $usuario = new UsuarioApp();
-                $usuario->codigo_modular_docente = $codigoDoc;
+                // ✅ CORREGIDO: Usar 'codigo_modular' en lugar de 'codigo_modular_docente'
+                $usuario->codigo_modular = $codigoDoc;
 
-                $usuario->password = Hash::make(
-                    !empty($passwordRaw) ? (string) $passwordRaw : '12345678',
-                    ['rounds' => 10]
-                );
+                // ✅ CORREGIDO: No hashear si ya viene hasheado, usar mutator del modelo
+                $usuario->password = !empty($passwordRaw) ? (string) $passwordRaw : '12345678';
 
                 $accion = 'creado';
             }
 
+            // ✅ CORREGIDO: Solo actualizar campos que existen en usuarios_app
             $usuario->apellido_paterno = trim((string) $apellidoPaterno);
             $usuario->apellido_materno = trim((string) $apellidoMaterno);
             $usuario->nombres = trim((string) $nombres);
             $usuario->sexo = $sexoSan;
-            $usuario->cargo = $cargoSan;
-            $usuario->estado = 'ACTIVO';
-            $usuario->activo = true;
+            $usuario->acceso_habilitado = true; // ✅ Campo correcto
 
-            // Asignar institución principal (la del Excel)
-            $usuario->institucion_id = $institucion->id;
+            // ✅ ELIMINADO: No asignar campos que no existen (institucion_id, cargo, estado, activo)
 
             $usuario->save();
 
-            // Pivot docente_institucion: evitar duplicados
-            $yaExistePivot = $usuario->instituciones()
-                ->where('institucion_id', $institucion->id)
-                ->exists();
+            // ✅ CORREGIDO: Crear relación en tabla pivot usuario_app_institucion
+            // El horario se asigna DESPUÉS de importar, no durante la importación
 
-            if (!$yaExistePivot) {
-                $usuario->instituciones()->attach($institucion->id, [
-                    'estado' => 'ACTIVO',
+            // Verificar si ya existe la asignación
+            $asignacionExistente = \App\Models\UsuarioAppInstitucion::where('usuario_app_id', $usuario->id)
+                ->where('institucion_id', $institucion->id)
+                ->first();
+
+            if (!$asignacionExistente) {
+                // Crear nueva asignación en la tabla pivot (sin horario, estado PENDIENTE)
+                \App\Models\UsuarioAppInstitucion::create([
+                    'usuario_app_id' => $usuario->id,
+                    'institucion_id' => $institucion->id,
+                    'horario_institucion_id' => null, // Se asigna después
+                    'cargo' => $cargoSan,
+                    'estado' => \App\Models\UsuarioAppInstitucion::ESTADO_ACTIVO,
                     'fecha_inicio' => now(),
                     'fecha_fin' => null,
+                ]);
+            } else {
+                // Actualizar asignación existente
+                $asignacionExistente->update([
+                    'cargo' => $cargoSan,
+                    // Mantener estado actual si ya tiene horario asignado
+                    'estado' => $asignacionExistente->horario_institucion_id
+                        ? $asignacionExistente->estado
+                        : \App\Models\UsuarioAppInstitucion::ESTADO_PENDIENTE,
                 ]);
             }
 

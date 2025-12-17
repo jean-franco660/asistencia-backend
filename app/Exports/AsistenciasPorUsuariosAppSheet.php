@@ -13,7 +13,7 @@ use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 
-class AsistenciasPorDocenteSheet implements
+class AsistenciasPorUsuariosAppSheet implements
     FromCollection,
     WithHeadings,
     WithMapping,
@@ -58,9 +58,9 @@ class AsistenciasPorDocenteSheet implements
         $agrupado = $asistencias->groupBy('usuario_app_id')->map(function ($group) {
             $usuario = $group->first()->usuario;
             $total = $group->count();
-            $a_tiempo = $group->where('estado', 'a_tiempo')->count();
-            $tarde = $group->where('estado', 'tarde')->count();
-            $ausente = $group->where('falta', true)->count();
+            $a_tiempo = $group->where('resultado', Asistencia::RESULTADO_A_TIEMPO)->count();
+            $tarde = $group->where('resultado', Asistencia::RESULTADO_TARDE)->count();
+            $ausente = $group->where('situacion', Asistencia::SITUACION_FALTA)->count();
 
             return (object) [
                 'codigo' => $usuario->codigo ?? '-',
@@ -135,6 +135,6 @@ class AsistenciasPorDocenteSheet implements
 
     public function title(): string
     {
-        return 'Por Docente';
+        return 'Por UsuariosApp';
     }
 }

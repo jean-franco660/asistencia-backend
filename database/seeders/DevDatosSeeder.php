@@ -16,15 +16,15 @@ class DevDatosSeeder extends Seeder
         // =========================================================
         $inst = Institucion::create([
             'codigo_modular_ie' => 'PRUEBA001',
-            'nombre'            => 'IE Prueba Seed',
-            'nivel_educativo'   => 'Primaria',
-            'distrito'          => 'Lima',
-            'centro_poblado'    => null,
-            'direccion'         => null,
-            'latitud'           => -12.0464,
-            'longitud'          => -77.0428,
-            'radio'             => 100,
-            'logo'              => null,
+            'nombre' => 'IE Prueba Seed',
+            'nivel_educativo' => 'Primaria',
+            'distrito' => 'Lima',
+            'centro_poblado' => null,
+            'direccion' => null,
+            'latitud' => -12.0464,
+            'longitud' => -77.0428,
+            'radio' => 100,
+            'logo' => null,
         ]);
 
         // =========================================================
@@ -32,18 +32,13 @@ class DevDatosSeeder extends Seeder
         // NOTA: tu modelo hashea automáticamente "password"
         // =========================================================
         $doc = UsuarioApp::create([
-            'codigo_modular_docente' => '102030',
-            'apellido_paterno'       => 'Pérez',
-            'apellido_materno'       => 'Quispe',
-            'nombres'                => 'Juan Carlos',
-            'sexo'                   => 'M',
-            'cargo'                  => 'Docente',
-            'password'               => 'Temp12345!',
-            'estado'                 => 'ACTIVO',
-            'activo'                 => 1,
-
-            // Si quieres mantener "principal/legacy":
-            // 'institucion_id'      => $inst->id,
+            'codigo_modular' => '102030',
+            'apellido_paterno' => 'Pérez',
+            'apellido_materno' => 'Quispe',
+            'nombres' => 'Juan Carlos',
+            'sexo' => UsuarioApp::SEXO_MASCULINO,
+            'acceso_habilitado' => true,
+            'password' => 'Temp12345!',
         ]);
 
         // =========================================================
@@ -52,9 +47,9 @@ class DevDatosSeeder extends Seeder
         // =========================================================
         $doc->instituciones()->syncWithoutDetaching([
             $inst->id => [
-                'estado'       => 'ACTIVO',
+                'estado' => 'ACTIVO',
                 'fecha_inicio' => now()->toDateString(),
-                'fecha_fin'    => null,
+                'fecha_fin' => null,
             ],
         ]);
     }

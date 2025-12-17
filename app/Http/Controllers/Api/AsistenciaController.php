@@ -109,6 +109,39 @@ class AsistenciaController extends Controller
             $user = $request->user();
             $fecha = Carbon::parse($validated['fecha_hora']);
 
+            // ✅ VALIDAR: Usuario debe tener asignación ACTIVA con horario
+            $asignacion = \App\Models\UsuarioAppInstitucion::where('usuario_app_id', $user->id)
+                ->where('institucion_id', $validated['institucion_id'])
+                ->first();
+
+            if (!$asignacion) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No estás asignado a esta institución'
+                ], 403);
+            }
+
+            if ($asignacion->estado === \App\Models\UsuarioAppInstitucion::ESTADO_PENDIENTE) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Tu asignación está pendiente. Contacta al administrador para que te asigne un horario.'
+                ], 403);
+            }
+
+            if ($asignacion->estado === \App\Models\UsuarioAppInstitucion::ESTADO_INACTIVO) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Tu asignación está inactiva'
+                ], 403);
+            }
+
+            if (!$asignacion->horario_institucion_id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No tienes un horario asignado. Contacta al administrador.'
+                ], 403);
+            }
+
             // Validar día laborable
             $validacion = $this->asistenciaService->esDiaLaborable($fecha, $validated['institucion_id']);
 
@@ -499,6 +532,35 @@ class AsistenciaController extends Controller
         foreach ($validated['asistencias'] as $index => $item) {
             Log::info("🔍 Procesando asistencia multipart #{$index}");
 
+            // ✅ VALIDAR: Usuario debe tener asignación ACTIVA con horario
+            $asignacion = \App\Models\UsuarioAppInstitucion::where('usuario_app_id', $request->user()->id)
+                ->where('institucion_id', $item['institucion_id'])
+                ->first();
+
+            if (!$asignacion) {
+                Log::warning("⚠️ Omitida: Usuario no asignado a institución");
+                $omitidas[] = array_merge($item, ['motivo' => 'No estás asignado a esta institución']);
+                continue;
+            }
+
+            if ($asignacion->estado === \App\Models\UsuarioAppInstitucion::ESTADO_PENDIENTE) {
+                Log::warning("⚠️ Omitida: Asignación pendiente");
+                $omitidas[] = array_merge($item, ['motivo' => 'Tu asignación está pendiente. Necesitas un horario asignado.']);
+                continue;
+            }
+
+            if ($asignacion->estado === \App\Models\UsuarioAppInstitucion::ESTADO_INACTIVO) {
+                Log::warning("⚠️ Omitida: Asignación inactiva");
+                $omitidas[] = array_merge($item, ['motivo' => 'Tu asignación está inactiva']);
+                continue;
+            }
+
+            if (!$asignacion->horario_institucion_id) {
+                Log::warning("⚠️ Omitida: Sin horario asignado");
+                $omitidas[] = array_merge($item, ['motivo' => 'No tienes un horario asignado']);
+                continue;
+            }
+
             $fecha = Carbon::parse($item['fecha_hora']);
 
             // Validar día laborable
@@ -549,7 +611,7 @@ class AsistenciaController extends Controller
                 'tipo' => $item['tipo'],
                 'resultado' => $resultado,  // ✅ CORRECTO: 'resultado' no 'estado'
                 'situacion' => $item['es_falta']   // ✅ CORRECTO: 'situacion' no 'falta'
-                    ? Asistencia::SITUACION_FALTA 
+                    ? Asistencia::SITUACION_FALTA
                     : Asistencia::SITUACION_NORMAL,
                 'latitud' => $item['latitud'],
                 'longitud' => $item['longitud'],

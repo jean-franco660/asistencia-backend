@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Asistencia;
 use Illuminate\Http\Request;
 
 class SupervisorDashboardController extends Controller
@@ -45,20 +46,20 @@ class SupervisorDashboardController extends Controller
         )->count();
 
         // Asistencias de hoy (entrada + salida)
-        $asistenciasHoy = \App\Models\Asistencia::whereIn('institucion_id', $institucionesIds)
+        $asistenciasHoy = Asistencia::whereIn('institucion_id', $institucionesIds)
             ->whereDate('fecha_hora', $today)
             ->count();
 
         // Contar Usuarios_App con asistencia completa hoy
-        $registrosHoy = \App\Models\Asistencia::whereIn('institucion_id', $institucionesIds)
+        $registrosHoy = Asistencia::whereIn('institucion_id', $institucionesIds)
             ->whereDate('fecha_hora', $today)
             ->get()
             ->groupBy('usuario_app_id');
 
         $usuariosAPP_Presentes = 0;
         foreach ($registrosHoy as $userId => $registros) {
-            $entrada = $registros->firstWhere('tipo', 'entrada');
-            $salida = $registros->firstWhere('tipo', 'salida');
+            $entrada = $registros->firstWhere('tipo', Asistencia::TIPO_ENTRADA);
+            $salida = $registros->firstWhere('tipo', Asistencia::TIPO_SALIDA);
             if ($entrada && $salida) {
                 $usuariosAPP_Presentes++;
             }
@@ -78,7 +79,7 @@ class SupervisorDashboardController extends Controller
         $institucionesData = $instituciones->map(function ($institucion) use ($today) {
             $UsuariosAPP_Count = $institucion->Usuarios_App()->count();
 
-            $asistenciasHoyInst = \App\Models\Asistencia::where('institucion_id', $institucion->id)
+            $asistenciasHoyInst = Asistencia::where('institucion_id', $institucion->id)
                 ->whereDate('fecha_hora', $today)
                 ->count();
 

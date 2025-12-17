@@ -11,34 +11,35 @@ return new class extends Migration {
             $table->id();
 
             $table->foreignId('usuario_app_id')
-                  ->constrained('usuarios_app')
-                  ->cascadeOnDelete();
+                ->constrained('usuarios_app')
+                ->cascadeOnDelete();
 
             $table->foreignId('institucion_id')
-                  ->constrained('instituciones')
-                  ->restrictOnDelete();
+                ->constrained('instituciones')
+                ->restrictOnDelete();
 
-            // Turno/horario asignado
+            // Turno/horario asignado (nullable - se configura después de importar)
             $table->foreignId('horario_institucion_id')
-                  ->constrained('horarios_institucion')
-                  ->restrictOnDelete();
+                ->nullable()
+                ->constrained('horarios_institucion')
+                ->restrictOnDelete();
 
             // Cargo del usuario en esta institución
             $table->string('cargo', 50)->nullable();
-            
+
             // Estado de la asignación
             $table->enum('estado', ['ACTIVO', 'INACTIVO'])->default('ACTIVO');
-            
+
             // Periodo de vigencia
             $table->date('fecha_inicio')->nullable();
             $table->date('fecha_fin')->nullable();
 
             $table->timestamps();
 
-            // Constraint: No duplicar usuario + institución + horario
+            // Constraint: No duplicar usuario + institución
             $table->unique(
-                ['usuario_app_id', 'institucion_id', 'horario_institucion_id'],
-                'uk_usuario_ie_horario'
+                ['usuario_app_id', 'institucion_id'],
+                'uk_usuario_ie'
             );
 
             // Índices para consultas frecuentes

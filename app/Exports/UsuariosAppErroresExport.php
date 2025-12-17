@@ -7,11 +7,18 @@ use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithStyles;
 use Maatwebsite\Excel\Concerns\WithColumnWidths;
+use Maatwebsite\Excel\Concerns\WithEvents;
+use Maatwebsite\Excel\Events\AfterSheet;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 
-class UsuariosAppErroresExport implements FromArray, WithHeadings, WithStyles, WithColumnWidths
+class UsuariosAppErroresExport implements 
+    FromArray, 
+    WithHeadings, 
+    WithStyles, 
+    WithColumnWidths,
+    WithEvents // ⭐ NUEVO
 {
     protected $errores;
 
@@ -23,6 +30,24 @@ class UsuariosAppErroresExport implements FromArray, WithHeadings, WithStyles, W
     public function array(): array
     {
         $rows = [];
+        
+        // ⭐ NUEVO: Fila de instrucciones
+        $rows[] = [
+            '📋 INSTRUCCIONES',
+            'Corrija los errores en las columnas correspondientes y vuelva a importar este archivo.',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+        ];
+        
+        // ⭐ NUEVO: Fila vacía
+        $rows[] = [];
         
         foreach ($this->errores as $error) {
             $rows[] = [
@@ -63,7 +88,20 @@ class UsuariosAppErroresExport implements FromArray, WithHeadings, WithStyles, W
     public function styles(Worksheet $sheet)
     {
         return [
+            // ⭐ NUEVO: Fila de instrucciones (fila 1)
             1 => [
+                'font' => [
+                    'bold' => true,
+                    'color' => ['rgb' => 'FFFFFF'],
+                    'size' => 12,
+                ],
+                'fill' => [
+                    'fillType' => Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => '0066CC'], // Azul
+                ],
+            ],
+            // Headers (ahora en fila 3)
+            3 => [
                 'font' => [
                     'bold' => true,
                     'color' => ['rgb' => 'FFFFFF'],
@@ -71,7 +109,7 @@ class UsuariosAppErroresExport implements FromArray, WithHeadings, WithStyles, W
                 ],
                 'fill' => [
                     'fillType' => Fill::FILL_SOLID,
-                    'startColor' => ['rgb' => 'DC3545'],
+                    'startColor' => ['rgb' => 'DC3545'], // Rojo
                 ],
                 'alignment' => [
                     'horizontal' => Alignment::HORIZONTAL_CENTER,
@@ -84,17 +122,41 @@ class UsuariosAppErroresExport implements FromArray, WithHeadings, WithStyles, W
     public function columnWidths(): array
     {
         return [
-            'A' => 12, // Fila
-            'B' => 18, // Código Docente
-            'C' => 50, // Errores
-            'D' => 25, // codigo_modular_docente
-            'E' => 20, // apellido_paterno
-            'F' => 20, // apellido_materno
-            'G' => 25, // nombres
-            'H' => 12, // sexo
-            'I' => 18, // cargo
-            'J' => 15, // password
-            'K' => 20, // codigo_modular_ie
+            'A' => 12,
+            'B' => 18,
+            'C' => 50,
+            'D' => 25,
+            'E' => 20,
+            'F' => 20,
+            'G' => 25,
+            'H' => 12,
+            'I' => 18,
+            'J' => 15,
+            'K' => 20,
+        ];
+    }
+
+    // ⭐ NUEVO: Eventos para personalización adicional
+    public function registerEvents(): array
+    {
+        return [
+            AfterSheet::class => function(AfterSheet $event) {
+                // Merge de la fila de instrucciones
+                $event->sheet->mergeCells('A1:K1');
+                
+                // Altura de filas
+                $event->sheet->getDelegate()->getRowDimension(1)->setRowHeight(30);
+                $event->sheet->getDelegate()->getRowDimension(3)->setRowHeight(25);
+                
+                // Wrap text en columna de errores
+                $event->sheet->getDelegate()->getStyle('C:C')->getAlignment()->setWrapText(true);
+                
+                // Auto-filtro en los headers
+                $event->sheet->getDelegate()->setAutoFilter('A3:K3');
+                
+                // Congelar primera fila
+                $event->sheet->getDelegate()->freezePane('A4');
+            },
         ];
     }
 }

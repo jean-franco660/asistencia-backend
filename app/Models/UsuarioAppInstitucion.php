@@ -17,8 +17,9 @@ class UsuarioAppInstitucion extends Model
      * CONSTANTES - ESTADOS
      * ========================= */
 
-    public const ESTADO_ACTIVO   = 'ACTIVO';
+    public const ESTADO_ACTIVO = 'ACTIVO';
     public const ESTADO_INACTIVO = 'INACTIVO';
+    public const ESTADO_PENDIENTE = 'PENDIENTE';
 
     /* =========================
      * CONSTANTES - CARGOS (Ejemplos comunes, pero NO limitantes)
@@ -26,15 +27,15 @@ class UsuarioAppInstitucion extends Model
 
     // Nota: Estos son solo ejemplos. El sistema acepta cualquier cargo
     // que sea ingresado por el usuario o importado desde UGEL
-    public const CARGO_DOCENTE           = 'DOCENTE';
-    public const CARGO_DIRECTOR          = 'DIRECTOR';
-    public const CARGO_SUBDIRECTOR       = 'SUBDIRECTOR';
-    public const CARGO_COORDINADOR       = 'COORDINADOR';
-    public const CARGO_AUXILIAR          = 'AUXILIAR';
-    public const CARGO_PSICOPEDAGOGO     = 'PSICOPEDAGOGO';
+    public const CARGO_DOCENTE = 'DOCENTE';
+    public const CARGO_DIRECTOR = 'DIRECTOR';
+    public const CARGO_SUBDIRECTOR = 'SUBDIRECTOR';
+    public const CARGO_COORDINADOR = 'COORDINADOR';
+    public const CARGO_AUXILIAR = 'AUXILIAR';
+    public const CARGO_PSICOPEDAGOGO = 'PSICOPEDAGOGO';
     public const CARGO_TRABAJADOR_SOCIAL = 'TRABAJADOR_SOCIAL';
-    public const CARGO_BIBLIOTECARIO     = 'BIBLIOTECARIO';
-    public const CARGO_ADMINISTRATIVO    = 'ADMINISTRATIVO';
+    public const CARGO_BIBLIOTECARIO = 'BIBLIOTECARIO';
+    public const CARGO_ADMINISTRATIVO = 'ADMINISTRATIVO';
     public const CARGO_PERSONAL_SERVICIO = 'PERSONAL_SERVICIO';
 
     /* =========================
@@ -52,8 +53,8 @@ class UsuarioAppInstitucion extends Model
     ];
 
     protected $casts = [
-        'fecha_inicio' => 'date',
-        'fecha_fin'    => 'date',
+        'fecha_inicio' => 'datetime',  // ✅ Cambiado de 'date' a 'datetime'
+        'fecha_fin' => 'datetime',      // ✅ Esto elimina las advertencias del analizador
     ];
 
     protected $attributes = [
@@ -146,42 +147,42 @@ class UsuarioAppInstitucion extends Model
     public function scopeVigentes($query)
     {
         $hoy = today(); // ✅ Carbon object
-        
+
         return $query->where('estado', self::ESTADO_ACTIVO)
-                     ->where(function ($q) use ($hoy) {
-                         $q->whereNull('fecha_inicio')
-                           ->orWhereDate('fecha_inicio', '<=', $hoy);
-                     })
-                     ->where(function ($q) use ($hoy) {
-                         $q->whereNull('fecha_fin')
-                           ->orWhereDate('fecha_fin', '>=', $hoy);
-                     });
+            ->where(function ($q) use ($hoy) {
+                $q->whereNull('fecha_inicio')
+                    ->orWhereDate('fecha_inicio', '<=', $hoy);
+            })
+            ->where(function ($q) use ($hoy) {
+                $q->whereNull('fecha_fin')
+                    ->orWhereDate('fecha_fin', '>=', $hoy);
+            });
     }
 
     public function scopeFinalizadas($query)
     {
         $hoy = today();
-        
+
         return $query->whereNotNull('fecha_fin')
-                     ->whereDate('fecha_fin', '<', $hoy);
+            ->whereDate('fecha_fin', '<', $hoy);
     }
 
     public function scopeFuturas($query)
     {
         $hoy = today();
-        
+
         return $query->whereNotNull('fecha_inicio')
-                     ->whereDate('fecha_inicio', '>', $hoy);
+            ->whereDate('fecha_inicio', '>', $hoy);
     }
 
     public function scopeProximasAVencer($query, int $dias = 30)
     {
         $hoy = today();
         $limite = today()->addDays($dias);
-        
+
         return $query->where('estado', self::ESTADO_ACTIVO)
-                     ->whereNotNull('fecha_fin')
-                     ->whereBetween('fecha_fin', [$hoy, $limite]);
+            ->whereNotNull('fecha_fin')
+            ->whereBetween('fecha_fin', [$hoy, $limite]);
     }
 
     /* =========================
@@ -204,7 +205,7 @@ class UsuarioAppInstitucion extends Model
         }
 
         $hoy = today();
-        
+
         if ($this->fecha_fin->isBefore($hoy)) {
             return 0;
         }
@@ -214,7 +215,7 @@ class UsuarioAppInstitucion extends Model
 
     public function getEstadoFormateadoAttribute(): string
     {
-        return match($this->estado) {
+        return match ($this->estado) {
             self::ESTADO_ACTIVO => 'Activo',
             self::ESTADO_INACTIVO => 'Inactivo',
             default => 'Desconocido',
@@ -284,7 +285,7 @@ class UsuarioAppInstitucion extends Model
         }
 
         $limite = today()->addDays($dias);
-        
+
         return $this->fecha_fin->between(today(), $limite);
     }
 
@@ -344,10 +345,10 @@ class UsuarioAppInstitucion extends Model
      */
     public function renovarPor(int $meses): bool
     {
-        $nuevaFechaFin = $this->fecha_fin 
+        $nuevaFechaFin = $this->fecha_fin
             ? $this->fecha_fin->copy()->addMonths($meses) // ✅ Usar copy()
             : today()->addMonths($meses);
-            
+
         return $this->extenderHasta($nuevaFechaFin);
     }
 
@@ -362,11 +363,11 @@ class UsuarioAppInstitucion extends Model
     public static function getCargosRegistrados(): array
     {
         return static::whereNotNull('cargo')
-                     ->distinct()
-                     ->pluck('cargo')
-                     ->sort()
-                     ->values()
-                     ->toArray();
+            ->distinct()
+            ->pluck('cargo')
+            ->sort()
+            ->values()
+            ->toArray();
     }
 
     /**
@@ -376,11 +377,11 @@ class UsuarioAppInstitucion extends Model
     public static function getCargosConFrecuencia(): array
     {
         return static::whereNotNull('cargo')
-                     ->selectRaw('cargo, COUNT(*) as total')
-                     ->groupBy('cargo')
-                     ->orderByDesc('total')
-                     ->pluck('total', 'cargo')
-                     ->toArray();
+            ->selectRaw('cargo, COUNT(*) as total')
+            ->groupBy('cargo')
+            ->orderByDesc('total')
+            ->pluck('total', 'cargo')
+            ->toArray();
     }
 
     /**
@@ -389,12 +390,12 @@ class UsuarioAppInstitucion extends Model
     public static function getCargosPorInstitucion(int $institucionId): array
     {
         return static::where('institucion_id', $institucionId)
-                     ->whereNotNull('cargo')
-                     ->distinct()
-                     ->pluck('cargo')
-                     ->sort()
-                     ->values()
-                     ->toArray();
+            ->whereNotNull('cargo')
+            ->distinct()
+            ->pluck('cargo')
+            ->sort()
+            ->values()
+            ->toArray();
     }
 
     public static function getEstadosDisponibles(): array
@@ -408,7 +409,7 @@ class UsuarioAppInstitucion extends Model
     public static function getEstadosConEtiquetas(): array
     {
         return [
-            self::ESTADO_ACTIVO   => 'Activo',
+            self::ESTADO_ACTIVO => 'Activo',
             self::ESTADO_INACTIVO => 'Inactivo',
         ];
     }
@@ -421,7 +422,7 @@ class UsuarioAppInstitucion extends Model
     {
         $usuario = $this->usuario?->nombre_completo ?? 'Usuario';
         $institucion = $this->institucion?->nombre ?? 'Institución';
-        
+
         return "{$usuario} → {$institucion} ({$this->cargo})";
     }
 }

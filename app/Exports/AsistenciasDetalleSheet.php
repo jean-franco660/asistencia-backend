@@ -14,10 +14,10 @@ use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 
 class AsistenciasDetalleSheet implements
-    FromCollection, 
-    WithHeadings, 
-    WithMapping, 
-    WithStyles, 
+    FromCollection,
+    WithHeadings,
+    WithMapping,
+    WithStyles,
     WithColumnWidths,
     WithTitle
 {
@@ -88,7 +88,7 @@ class AsistenciasDetalleSheet implements
             $asistencia->institucion->nombre ?? '-',
             $asistencia->fecha_hora ? $asistencia->fecha_hora->format('d/m/Y') : '-',
             $asistencia->fecha_hora ? $asistencia->fecha_hora->format('H:i:s') : '-',
-            $asistencia->tipo === 'entrada' ? 'Entrada' : 'Salida',
+            $asistencia->tipo === Asistencia::TIPO_ENTRADA ? 'Entrada' : 'Salida',
             $this->getEstadoTexto($asistencia),
             $asistencia->dentro_rango ? 'En rango' : 'Fuera de rango',
             number_format($asistencia->latitud ?? 0, 6),
@@ -98,10 +98,14 @@ class AsistenciasDetalleSheet implements
 
     private function getEstadoTexto($asistencia): string
     {
-        if ($asistencia->falta) return 'Ausente';
-        if ($asistencia->estado === 'a_tiempo') return 'A Tiempo';
-        if ($asistencia->estado === 'tarde') return 'Tarde';
-        if ($asistencia->estado === 'salida_antes') return 'Salida Anticipada';
+        if ($asistencia->situacion === Asistencia::SITUACION_FALTA)
+            return 'Ausente';
+        if ($asistencia->resultado === Asistencia::RESULTADO_A_TIEMPO)
+            return 'A Tiempo';
+        if ($asistencia->resultado === Asistencia::RESULTADO_TARDE)
+            return 'Tarde';
+        if ($asistencia->resultado === Asistencia::RESULTADO_SALIDA_ANTES)
+            return 'Salida Anticipada';
         return '-';
     }
 
@@ -111,7 +115,7 @@ class AsistenciasDetalleSheet implements
             1 => [
                 'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
                 'fill' => [
-                    'fillType'   => Fill::FILL_SOLID,
+                    'fillType' => Fill::FILL_SOLID,
                     'startColor' => ['rgb' => '4472C4']
                 ],
                 'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],

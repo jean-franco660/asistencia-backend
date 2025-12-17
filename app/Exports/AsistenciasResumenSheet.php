@@ -13,11 +13,11 @@ use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 
-class AsistenciasResumenSheet implements 
-    FromCollection, 
-    WithHeadings, 
-    WithMapping, 
-    WithStyles, 
+class AsistenciasResumenSheet implements
+    FromCollection,
+    WithHeadings,
+    WithMapping,
+    WithStyles,
     WithColumnWidths,
     WithTitle
 {
@@ -31,7 +31,7 @@ class AsistenciasResumenSheet implements
     public function collection()
     {
         $query = Asistencia::query();
-        
+
         // Aplicar filtros
         if (!empty($this->filters['fecha_inicio'])) {
             $query->whereDate('fecha_hora', '>=', $this->filters['fecha_inicio']);
@@ -57,30 +57,30 @@ class AsistenciasResumenSheet implements
 
         $asistencias = $query->get();
 
-        $total   = $asistencias->count();
-        $a_tiempo = $asistencias->where('estado', 'a_tiempo')->count();
-        $tarde    = $asistencias->where('estado', 'tarde')->count();
-        $ausente  = $asistencias->where('falta', true)->count();
+        $total = $asistencias->count();
+        $a_tiempo = $asistencias->where('resultado', Asistencia::RESULTADO_A_TIEMPO)->count();
+        $tarde = $asistencias->where('resultado', Asistencia::RESULTADO_TARDE)->count();
+        $ausente = $asistencias->where('situacion', Asistencia::SITUACION_FALTA)->count();
 
         return collect([
-            (object)[
-                'estado'     => 'A Tiempo',
-                'cantidad'   => $a_tiempo,
+            (object) [
+                'estado' => 'A Tiempo',
+                'cantidad' => $a_tiempo,
                 'porcentaje' => $total > 0 ? round(($a_tiempo / $total) * 100, 1) : 0,
             ],
-            (object)[
-                'estado'     => 'Tarde',
-                'cantidad'   => $tarde,
+            (object) [
+                'estado' => 'Tarde',
+                'cantidad' => $tarde,
                 'porcentaje' => $total > 0 ? round(($tarde / $total) * 100, 1) : 0,
             ],
-            (object)[
-                'estado'     => 'Ausente',
-                'cantidad'   => $ausente,
+            (object) [
+                'estado' => 'Ausente',
+                'cantidad' => $ausente,
                 'porcentaje' => $total > 0 ? round(($ausente / $total) * 100, 1) : 0,
             ],
-            (object)[
-                'estado'     => 'TOTAL',
-                'cantidad'   => $total,
+            (object) [
+                'estado' => 'TOTAL',
+                'cantidad' => $total,
                 'porcentaje' => 100,
             ],
         ]);
@@ -106,7 +106,7 @@ class AsistenciasResumenSheet implements
             1 => [
                 'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
                 'fill' => [
-                    'fillType'   => Fill::FILL_SOLID,
+                    'fillType' => Fill::FILL_SOLID,
                     'startColor' => ['rgb' => '4472C4']
                 ],
                 'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],

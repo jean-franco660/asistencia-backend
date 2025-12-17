@@ -4,8 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration
-{
+return new class extends Migration {
     /**
      * Run the migrations.
      */
@@ -14,7 +13,7 @@ return new class extends Migration
         // ===================================================
         // 1. JUSTIFICACIONES
         // ===================================================
-        
+
         Schema::table('justificaciones', function (Blueprint $table) {
             // Verificar si ya existe la foreign key antes de modificarla
             try {
@@ -26,15 +25,15 @@ return new class extends Migration
 
             // Recrear con nullOnDelete
             $table->foreign('usuario_web_id')
-                  ->references('id')
-                  ->on('usuarios_web')
-                  ->nullOnDelete();
+                ->references('id')
+                ->on('usuarios_web')
+                ->nullOnDelete();
         });
 
         // ===================================================
         // 2. IMPORTACIONES_LOG
         // ===================================================
-        
+
         Schema::table('importaciones_log', function (Blueprint $table) {
             try {
                 $table->dropForeign(['usuario_id']);
@@ -43,25 +42,25 @@ return new class extends Migration
             }
 
             $table->foreign('usuario_id')
-                  ->references('id')
-                  ->on('usuarios_web')
-                  ->nullOnDelete();
+                ->references('id')
+                ->on('usuarios_web')
+                ->nullOnDelete();
         });
 
         // ===================================================
         // 3. ÍNDICES ADICIONALES EN ASISTENCIAS
         // ===================================================
-        
+
         Schema::table('asistencias', function (Blueprint $table) {
             // Índices para consultas frecuentes por fecha
             if (!$this->hasIndex('asistencias', 'idx_institucion_fecha')) {
                 $table->index(['institucion_id', 'fecha'], 'idx_institucion_fecha');
             }
-            
+
             if (!$this->hasIndex('asistencias', 'idx_usuario_fecha')) {
                 $table->index(['usuario_app_id', 'fecha'], 'idx_usuario_fecha');
             }
-            
+
             if (!$this->hasIndex('asistencias', 'idx_fecha_tipo')) {
                 $table->index(['fecha', 'tipo'], 'idx_fecha_tipo');
             }
@@ -75,12 +74,12 @@ return new class extends Migration
         // ===================================================
         // 4. ÍNDICES ADICIONALES EN FERIADOS
         // ===================================================
-        
+
         Schema::table('feriados', function (Blueprint $table) {
             if (!$this->hasIndex('feriados', 'idx_institucion_fecha')) {
                 $table->index(['institucion_id', 'fecha'], 'idx_institucion_fecha');
             }
-            
+
             if (!$this->hasIndex('feriados', 'idx_tipo_fecha_activo')) {
                 $table->index(['tipo', 'fecha', 'activo'], 'idx_tipo_fecha_activo');
             }
@@ -89,7 +88,7 @@ return new class extends Migration
         // ===================================================
         // 5. ÍNDICES ADICIONALES EN JUSTIFICACIONES
         // ===================================================
-        
+
         Schema::table('justificaciones', function (Blueprint $table) {
             if (!$this->hasIndex('justificaciones', 'idx_estado_fecha')) {
                 $table->index(['estado', 'fecha_inicio'], 'idx_estado_fecha');
@@ -107,8 +106,8 @@ return new class extends Migration
             try {
                 $table->dropForeign(['usuario_web_id']);
                 $table->foreign('usuario_web_id')
-                      ->references('id')
-                      ->on('usuarios_web');
+                    ->references('id')
+                    ->on('usuarios_web');
             } catch (\Exception $e) {
                 // Ignorar si falla
             }
@@ -119,8 +118,8 @@ return new class extends Migration
             try {
                 $table->dropForeign(['usuario_id']);
                 $table->foreign('usuario_id')
-                      ->references('id')
-                      ->on('usuarios_web');
+                    ->references('id')
+                    ->on('usuarios_web');
             } catch (\Exception $e) {
                 // Ignorar si falla
             }
@@ -158,9 +157,10 @@ return new class extends Migration
 
         // Eliminar índices de justificaciones
         Schema::table('justificaciones', function (Blueprint $table) {
-            if ($this->hasIndex('justificaciones', 'idx_estado_fecha')) {
-                $table->dropIndex('idx_estado_fecha');
-            }
+            // idx_estado_fecha ya existe en la migración original, no se elimina aquí
+            // if ($this->hasIndex('justificaciones', 'idx_estado_fecha')) {
+            //     $table->dropIndex('idx_estado_fecha');
+            // }
         });
     }
 

@@ -5,7 +5,7 @@ namespace App\Exports;
 use Maatwebsite\Excel\Concerns\WithMultipleSheets;
 use App\Exports\AsistenciasResumenSheet;
 use App\Exports\AsistenciasDetalleSheet;
-use App\Exports\AsistenciasPorDocenteSheet;
+use App\Exports\AsistenciasPorUsuariosAppSheet;
 
 
 class AsistenciasMultipleExport implements WithMultipleSheets
@@ -25,7 +25,7 @@ class AsistenciasMultipleExport implements WithMultipleSheets
         return [
             new AsistenciasResumenSheet($this->filters),
             new AsistenciasDetalleSheet($this->filters),
-            new AsistenciasPorDocenteSheet($this->filters),
+            new AsistenciasPorUsuariosAppSheet($this->filters),
         ];
     }
 }

@@ -55,7 +55,7 @@ class UsuarioAppController extends Controller
         $usuario->tokens()->delete();
 
         // Crear nuevo token
-        $token = $usuario->createToken('app-movil', ['app'])->plainTextToken();
+        $token = $usuario->createToken('app-movil', ['app'])->plainTextToken;
 
         return response()->json([
             'success' => true,
@@ -110,7 +110,7 @@ class UsuarioAppController extends Controller
             $institucionIds = $user->getInstitucionesVigentesIds();
             $query->whereHas('asignaciones', function ($q) use ($institucionIds) {
                 $q->whereIn('institucion_id', $institucionIds)
-                  ->where('estado', UsuarioAppInstitucion::ESTADO_ACTIVO);
+                    ->where('estado', UsuarioAppInstitucion::ESTADO_ACTIVO);
             });
         }
 
@@ -122,7 +122,7 @@ class UsuarioAppController extends Controller
         if ($request->filled('cargo')) {
             $query->whereHas('asignaciones', function ($q) use ($request) {
                 $q->where('cargo', mb_strtoupper($request->cargo))
-                  ->where('estado', UsuarioAppInstitucion::ESTADO_ACTIVO);
+                    ->where('estado', UsuarioAppInstitucion::ESTADO_ACTIVO);
             });
         }
 
@@ -176,7 +176,7 @@ class UsuarioAppController extends Controller
         $this->authorize('create', UsuarioApp::class);
 
         DB::beginTransaction();
-        
+
         try {
             // Crear usuario
             $usuario = UsuarioApp::create($request->validated());
@@ -189,7 +189,10 @@ class UsuarioAppController extends Controller
                         'institucion_id' => $asig['institucion_id'],
                         'horario_institucion_id' => $asig['horario_institucion_id'],
                         'cargo' => $asig['cargo'] ?? null,
-                        'estado' => $asig['estado'] ?? UsuarioAppInstitucion::ESTADO_ACTIVO,
+                        // ✅ Estado basado en horario: ACTIVO si tiene horario, PENDIENTE si no
+                        'estado' => $asig['horario_institucion_id']
+                            ? UsuarioAppInstitucion::ESTADO_ACTIVO
+                            : UsuarioAppInstitucion::ESTADO_PENDIENTE,
                         'fecha_inicio' => $asig['fecha_inicio'] ?? now(),
                         'fecha_fin' => $asig['fecha_fin'] ?? null,
                     ]);
@@ -203,10 +206,10 @@ class UsuarioAppController extends Controller
                 'message' => 'Usuario creado correctamente',
                 'data' => $usuario->load('asignacionesActivas.institucion'),
             ], 201);
-            
+
         } catch (\Exception $e) {
             DB::rollBack();
-            
+
             return response()->json([
                 'success' => false,
                 'message' => 'Error al crear usuario: ' . $e->getMessage()
@@ -220,8 +223,8 @@ class UsuarioAppController extends Controller
     public function show($id): JsonResponse
     {
         $usuario = UsuarioApp::with(['asignacionesActivas.institucion', 'asignacionesActivas.horario'])
-                             ->findOrFail($id);
-        
+            ->findOrFail($id);
+
         $this->authorize('view', $usuario);
 
         return response()->json([
@@ -276,10 +279,10 @@ class UsuarioAppController extends Controller
         $this->authorize('update', $usuario);
 
         DB::beginTransaction();
-        
+
         try {
             $data = $request->validated();
-            
+
             // No actualizar password si está vacío
             if (isset($data['password']) && empty($data['password'])) {
                 unset($data['password']);
@@ -291,7 +294,7 @@ class UsuarioAppController extends Controller
             if ($request->has('asignaciones')) {
                 // Desactivar asignaciones actuales
                 $usuario->asignaciones()->update(['estado' => UsuarioAppInstitucion::ESTADO_INACTIVO]);
-                
+
                 // Crear/actualizar nuevas asignaciones
                 foreach ($request->asignaciones as $asig) {
                     UsuarioAppInstitucion::updateOrCreate(
@@ -317,10 +320,10 @@ class UsuarioAppController extends Controller
                 'message' => 'Usuario actualizado correctamente',
                 'data' => $usuario->fresh()->load('asignacionesActivas.institucion'),
             ]);
-            
+
         } catch (\Exception $e) {
             DB::rollBack();
-            
+
             return response()->json([
                 'success' => false,
                 'message' => 'Error al actualizar usuario: ' . $e->getMessage()
@@ -339,7 +342,7 @@ class UsuarioAppController extends Controller
         try {
             // Revocar tokens
             $usuario->tokens()->delete();
-            
+
             // Eliminar usuario (las asignaciones se eliminan en cascada según migración)
             $usuario->delete();
 
@@ -347,7 +350,7 @@ class UsuarioAppController extends Controller
                 'success' => true,
                 'message' => 'Usuario eliminado correctamente',
             ]);
-            
+
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -375,11 +378,11 @@ class UsuarioAppController extends Controller
             try {
                 $usuario = UsuarioApp::findOrFail($id);
                 $this->authorize('delete', $usuario);
-                
+
                 $usuario->tokens()->delete();
                 $usuario->delete();
                 $eliminados++;
-                
+
             } catch (\Exception $e) {
                 $errores[] = [
                     'id' => $id,
@@ -427,11 +430,55 @@ class UsuarioAppController extends Controller
                     'acceso_habilitado' => $usuario->acceso_habilitado,
                 ],
             ]);
-            
+
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Error al cambiar acceso: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Asigna horario a un usuario y activa su asignación
+     */
+    public function asignarHorario(Request $request, $id): JsonResponse
+    {
+        $usuario = UsuarioApp::findOrFail($id);
+        $this->authorize('update', $usuario);
+
+        $request->validate([
+            'institucion_id' => 'required|exists:instituciones,id',
+            'horario_institucion_id' => 'required|exists:horarios_institucion,id'
+        ]);
+
+        try {
+            // Buscar asignación
+            $asignacion = UsuarioAppInstitucion::where('usuario_app_id', $id)
+                ->where('institucion_id', $request->institucion_id)
+                ->firstOrFail();
+
+            // Verificar que el horario pertenece a la institución
+            $horario = \App\Models\HorarioInstitucion::where('id', $request->horario_institucion_id)
+                ->where('institucion_id', $request->institucion_id)
+                ->firstOrFail();
+
+            // Actualizar asignación
+            $asignacion->update([
+                'horario_institucion_id' => $horario->id,
+                'estado' => UsuarioAppInstitucion::ESTADO_ACTIVO
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Horario asignado correctamente. El usuario ahora puede marcar asistencia.',
+                'data' => $asignacion->load(['institucion', 'horario'])
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al asignar horario: ' . $e->getMessage()
             ], 500);
         }
     }

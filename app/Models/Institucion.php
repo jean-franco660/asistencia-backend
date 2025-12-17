@@ -32,9 +32,9 @@ class Institucion extends Model
     ];
 
     protected $casts = [
-        'latitud'  => 'decimal:7',
+        'latitud' => 'decimal:7',
         'longitud' => 'decimal:7',
-        'radio'    => 'integer',
+        'radio' => 'integer',
     ];
 
     protected $appends = ['logo_url', 'nombre_display'];
@@ -55,14 +55,14 @@ class Institucion extends Model
             'institucion_id',
             'usuario_app_id'
         )
-        ->withPivot([
-            'horario_institucion_id',
-            'cargo',
-            'estado',
-            'fecha_inicio',
-            'fecha_fin',
-        ])
-        ->withTimestamps();
+            ->withPivot([
+                'horario_institucion_id',
+                'cargo',
+                'estado',
+                'fecha_inicio',
+                'fecha_fin',
+            ])
+            ->withTimestamps();
     }
 
     /**
@@ -113,8 +113,8 @@ class Institucion extends Model
             'institucion_id',
             'usuario_web_id'
         )
-        ->withPivot(['fecha_inicio', 'fecha_fin'])
-        ->withTimestamps();
+            ->withPivot(['fecha_inicio', 'fecha_fin'])
+            ->withTimestamps();
     }
 
     /**
@@ -127,11 +127,11 @@ class Institucion extends Model
         return $this->supervisores()
             ->where(function ($q) use ($hoy) {
                 $q->whereNull('supervisor_institucion.fecha_inicio')
-                  ->orWhere('supervisor_institucion.fecha_inicio', '<=', $hoy);
+                    ->orWhere('supervisor_institucion.fecha_inicio', '<=', $hoy);
             })
             ->where(function ($q) use ($hoy) {
                 $q->whereNull('supervisor_institucion.fecha_fin')
-                  ->orWhere('supervisor_institucion.fecha_fin', '>=', $hoy);
+                    ->orWhere('supervisor_institucion.fecha_fin', '>=', $hoy);
             });
     }
 
@@ -207,16 +207,16 @@ class Institucion extends Model
     public function scopeConCoordenadasCompletas($query)
     {
         return $query->whereNotNull('latitud')
-                     ->whereNotNull('longitud');
+            ->whereNotNull('longitud');
     }
 
     public function scopeBuscar($query, string $termino)
     {
         return $query->where(function ($q) use ($termino) {
             $q->where('nombre', 'like', "%{$termino}%")
-              ->orWhere('codigo_modular_ie', 'like', "%{$termino}%")
-              ->orWhere('distrito', 'like', "%{$termino}%")
-              ->orWhere('centro_poblado', 'like', "%{$termino}%");
+                ->orWhere('codigo_modular_ie', 'like', "%{$termino}%")
+                ->orWhere('distrito', 'like', "%{$termino}%")
+                ->orWhere('centro_poblado', 'like', "%{$termino}%");
         });
     }
 
@@ -247,12 +247,16 @@ class Institucion extends Model
 
         $earthRadius = 6371000; // metros
 
-        $dLat = deg2rad($lat - $this->latitud);
-        $dLon = deg2rad($lon - $this->longitud);
+        // ✅ Cast explícito a float para satisfacer al analizador estático
+        $latitud = (float) $this->latitud;
+        $longitud = (float) $this->longitud;
+
+        $dLat = deg2rad($lat - $latitud);
+        $dLon = deg2rad($lon - $longitud);
 
         $a = sin($dLat / 2) * sin($dLat / 2) +
-             cos(deg2rad($this->latitud)) * cos(deg2rad($lat)) *
-             sin($dLon / 2) * sin($dLon / 2);
+            cos(deg2rad($latitud)) * cos(deg2rad($lat)) *
+            sin($dLon / 2) * sin($dLon / 2);
 
         $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
 
@@ -288,8 +292,8 @@ class Institucion extends Model
     public function getHorarioPorTurno(string $turno): ?HorarioInstitucion
     {
         return $this->horariosActivos()
-                    ->where('nombre_turno', $turno)
-                    ->first();
+            ->where('nombre_turno', $turno)
+            ->first();
     }
 
     /**
@@ -298,8 +302,8 @@ class Institucion extends Model
     public function contarUsuariosPorCargo(string $cargo): int
     {
         return $this->asignacionesActivas()
-                    ->where('cargo', $cargo)
-                    ->count();
+            ->where('cargo', $cargo)
+            ->count();
     }
 
     /**
@@ -308,10 +312,10 @@ class Institucion extends Model
     public static function getDistritosUnicos(): array
     {
         return static::distinct()
-                     ->pluck('distrito')
-                     ->sort()
-                     ->values()
-                     ->toArray();
+            ->pluck('distrito')
+            ->sort()
+            ->values()
+            ->toArray();
     }
 
     /**
@@ -320,11 +324,11 @@ class Institucion extends Model
     public static function getNivelesEducativosUnicos(): array
     {
         return static::whereNotNull('nivel_educativo')
-                     ->distinct()
-                     ->pluck('nivel_educativo')
-                     ->sort()
-                     ->values()
-                     ->toArray();
+            ->distinct()
+            ->pluck('nivel_educativo')
+            ->sort()
+            ->values()
+            ->toArray();
     }
 
     /* =========================

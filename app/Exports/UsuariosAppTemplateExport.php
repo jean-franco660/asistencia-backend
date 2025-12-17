@@ -6,15 +6,21 @@ use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithStyles;
 use Maatwebsite\Excel\Concerns\WithColumnWidths;
+use Maatwebsite\Excel\Concerns\WithEvents;
+use Maatwebsite\Excel\Events\AfterSheet;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 
-class UsuariosAppTemplateExport implements FromArray, WithHeadings, WithStyles, WithColumnWidths
+class UsuariosAppTemplateExport implements 
+    FromArray, 
+    WithHeadings, 
+    WithStyles, 
+    WithColumnWidths,
+    WithEvents  // ⭐ NUEVO
 {
     public function array(): array
     {
-        // Ejemplos realistas con sexo normalizado
         return [
             ['DOC001', 'GARCÍA', 'PÉREZ', 'JUAN CARLOS', 'Masculino', 'DOCENTE', 'juan123', '0123456'],
             ['DOC002', 'RODRÍGUEZ', 'LÓPEZ', 'MARÍA ELENA', 'Femenino', 'DIRECTOR', 'maria123', '0123456'],
@@ -25,21 +31,20 @@ class UsuariosAppTemplateExport implements FromArray, WithHeadings, WithStyles, 
     public function headings(): array
     {
         return [
-            'codigo_modular_docente',
+            'codigo_modular',
             'apellido_paterno',
             'apellido_materno',
             'nombres',
-            'sexo',              // Masculino / Femenino (o M / F)
-            'cargo',             // DOCENTE / DIRECTOR / COORDINADOR
-            'password',          // Texto plano (se hashea automáticamente)
-            'codigo_modular_ie', // Código de institución (debe existir previamente)
+            'sexo',
+            'cargo',
+            'password',
+            'codigo_modular_ie',
         ];
     }
 
     public function styles(Worksheet $sheet)
     {
         return [
-            // Encabezado con fondo azul
             1 => [
                 'font' => [
                     'bold' => true,
@@ -61,14 +66,99 @@ class UsuariosAppTemplateExport implements FromArray, WithHeadings, WithStyles, 
     public function columnWidths(): array
     {
         return [
-            'A' => 25, // codigo_modular_docente
-            'B' => 20, // apellido_paterno
-            'C' => 20, // apellido_materno
-            'D' => 25, // nombres
-            'E' => 12, // sexo (ajustado para "Masculino"/"Femenino")
-            'F' => 18, // cargo
-            'G' => 18, // password
-            'H' => 20, // codigo_modular_ie
+            'A' => 25,
+            'B' => 20,
+            'C' => 20,
+            'D' => 25,
+            'E' => 12,
+            'F' => 18,
+            'G' => 18,
+            'H' => 20,
+        ];
+    }
+
+    // ⭐ NUEVO: Agregar instrucciones y validaciones
+    public function registerEvents(): array
+    {
+        return [
+            AfterSheet::class => function(AfterSheet $event) {
+                $sheet = $event->sheet->getDelegate();
+                
+                // Altura de la fila de encabezado
+                $sheet->getRowDimension(1)->setRowHeight(25);
+                
+                // Auto-filtro en encabezados
+                $sheet->setAutoFilter('A1:H1');
+                
+                // Congelar primera fila
+                $sheet->freezePane('A2');
+                
+                // ⭐ NUEVO: Agregar comentarios/notas en encabezados
+                $sheet->getComment('A1')->getText()->createTextRun(
+                    "Código único del usuario. Ejemplo: DOC001, DIR001"
+                );
+                
+                $sheet->getComment('E1')->getText()->createTextRun(
+                    "Valores permitidos:\n- Masculino\n- Femenino\n- M\n- F"
+                );
+                
+                $sheet->getComment('F1')->getText()->createTextRun(
+                    "Ejemplos: DOCENTE, DIRECTOR, COORDINADOR, AUXILIAR"
+                );
+                
+                $sheet->getComment('G1')->getText()->createTextRun(
+                    "Contraseña en texto plano (se hashea automáticamente)"
+                );
+                
+                $sheet->getComment('H1')->getText()->createTextRun(
+                    "Código de la institución. IMPORTANTE: La institución debe existir previamente en el sistema."
+                );
+                
+                // ⭐ NUEVO: Agregar fila de instrucciones en la parte superior
+                $sheet->insertNewRowBefore(1, 2);
+                
+                // Instrucciones - Fila 1
+                $sheet->setCellValue('A1', 'INSTRUCCIONES');
+                $sheet->mergeCells('A1:H1');
+                $sheet->getStyle('A1')->applyFromArray([
+                    'font' => [
+                        'bold' => true,
+                        'size' => 14,
+                        'color' => ['rgb' => 'FFFFFF'],
+                    ],
+                    'fill' => [
+                        'fillType' => Fill::FILL_SOLID,
+                        'startColor' => ['rgb' => '0066CC'],
+                    ],
+                    'alignment' => [
+                        'horizontal' => Alignment::HORIZONTAL_CENTER,
+                        'vertical' => Alignment::VERTICAL_CENTER,
+                    ],
+                ]);
+                
+                // Notas - Fila 2
+                $sheet->setCellValue('A2', 'Complete los datos siguiendo los ejemplos. Las instituciones (codigo_modular_ie) deben existir previamente.');
+                $sheet->mergeCells('A2:H2');
+                $sheet->getStyle('A2')->applyFromArray([
+                    'font' => [
+                        'italic' => true,
+                        'size' => 10,
+                        'color' => ['rgb' => '666666'],
+                    ],
+                    'alignment' => [
+                        'horizontal' => Alignment::HORIZONTAL_CENTER,
+                    ],
+                ]);
+                
+                // Ajustar alturas
+                $sheet->getRowDimension(1)->setRowHeight(30);
+                $sheet->getRowDimension(2)->setRowHeight(25);
+                $sheet->getRowDimension(3)->setRowHeight(25); // Headers ahora en fila 3
+                
+                // Actualizar auto-filtro y freeze
+                $sheet->setAutoFilter('A3:H3');
+                $sheet->freezePane('A4');
+            },
         ];
     }
 }

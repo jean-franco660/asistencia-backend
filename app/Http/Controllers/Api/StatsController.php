@@ -122,8 +122,8 @@ class StatsController extends Controller
 
             $registros = $registrosHoy->get($docenteId, collect());
 
-            $entrada = $registros->firstWhere('tipo', 'entrada');
-            $salida = $registros->firstWhere('tipo', 'salida');
+            $entrada = $registros->firstWhere('tipo', Asistencia::TIPO_ENTRADA);
+            $salida = $registros->firstWhere('tipo', Asistencia::TIPO_SALIDA);
 
             // Asistencia válida: entrada y salida
             if ($entrada && $salida) {
@@ -138,7 +138,7 @@ class StatsController extends Controller
         ============================================================ */
 
         // Instituciones activas (con al menos un docente o actividad reciente)
-        $institucionesActivas = Institucion::whereHas('docentes')
+        $institucionesActivas = Institucion::whereHas('asignacionesActivas')
             ->whereIn('id', $institucionIds)
             ->count();
 
@@ -153,7 +153,7 @@ class StatsController extends Controller
         $asistenciasMesActual = Asistencia::whereIn('institucion_id', $institucionIds)
             ->whereYear('fecha_hora', $today->year)
             ->whereMonth('fecha_hora', $today->month)
-            ->where('tipo', 'entrada')
+            ->where('tipo', Asistencia::TIPO_ENTRADA)
             ->count();
 
         // Promedio de asistencia (basado en últimos 30 días)

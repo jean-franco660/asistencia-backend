@@ -3,226 +3,170 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Jobs\ImportarInstitucionesJob;
-use App\Models\AuditLog;
-use App\Models\ImportacionLog;
 use App\Models\Institucion;
 use App\Models\UsuarioWeb;
-use App\Exports\InstitucionesErroresExport;
-use App\Exports\InstitucionesTemplateExport;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Validation\ValidationException;
-use Maatwebsite\Excel\Facades\Excel;
 
-class InstitucionImportController extends Controller
+class InstitucionController extends Controller
 {
-    public function __construct() {}
-
     /**
-     * Helper: Verifica si el usuario es super_admin o administrador
+     * Listar instituciones
      */
-    private function esAdministrador($user): bool
+    public function index(Request $request)
     {
-        return $user && in_array($user->rol ?? null, [
-            UsuarioWeb::ROL_SUPER_ADMIN,
-            UsuarioWeb::ROL_ADMINISTRADOR,  
-        ], true);
+        $query = Institucion::query();
+
+        // Filtros
+        if ($request->filled('search')) {
+            $query->where(function ($q) use ($request) {
+                $q->where('nombre', 'like', '%' . $request->search . '%')
+                    ->orWhere('codigo_modular_ie', 'like', '%' . $request->search . '%');
+            });
+        }
+
+        if ($request->filled('nivel_educativo')) {
+            $query->where('nivel_educativo', $request->nivel_educativo);
+        }
+
+        if ($request->filled('distrito')) {
+            $query->where('distrito', $request->distrito);
+        }
+
+        $perPage = $request->input('per_page', 20);
+        $limit = $request->input('limit');
+
+        if ($limit) {
+            $instituciones = $query->limit($limit)->get();
+            return response()->json($instituciones);
+        }
+
+        $instituciones = $query->withCount('usuarios', 'horarios')
+            ->orderBy('nombre')
+            ->paginate($perPage);
+
+        return response()->json($instituciones);
     }
 
     /**
-     * Importar instituciones desde archivo Excel/CSV (solo admin/super_admin)
+     * Crear institución
      */
-    public function import(Request $request)
+    public function store(Request $request)
     {
-        $user = $request->user();
+        $validated = $request->validate([
+            'codigo_modular_ie' => 'required|string|unique:instituciones,codigo_modular_ie',
+            'nombre' => 'required|string|max:255',
+            'nivel_educativo' => 'nullable|string|max:100',
+            'distrito' => 'nullable|string|max:100',
+            'centro_poblado' => 'nullable|string|max:100',
+            'direccion' => 'nullable|string|max:500',
+            'latitud' => 'required|numeric|between:-90,90',
+            'longitud' => 'required|numeric|between:-180,180',
+            'radio' => 'required|integer|min:10|max:1000',
+            'logo' => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
+        ]);
 
-        if (!$this->esAdministrador($user)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'No tienes permisos para importar instituciones',
-            ], 403);
+        if ($request->hasFile('logo')) {
+            $validated['logo'] = $request->file('logo')->store('logos', 'public');
         }
 
-        if (!$request->hasFile('archivo')) {
-            return response()->json([
-                'success' => false,
-                'message' => 'No se envió ningún archivo (campo: archivo)',
-            ], 400);
-        }
-
-        try {
-            $request->validate([
-                'archivo' => 'required|file|mimes:xlsx,xls,csv|max:10240',
-            ]);
-
-            $archivo = $request->file('archivo');
-            $archivoPath = $archivo->store('temp/importaciones');
-            $archivoNombre = $archivo->getClientOriginalName();
-
-            $importLog = ImportacionLog::create([
-                'usuario_id' => $user->id,
-                'tipo' => 'instituciones',
-                'archivo_original' => $archivoNombre,
-                'archivo_temp' => $archivoPath,
-                'estado' => 'pending',
-                'total' => 0,
-                'procesados' => 0,
-                'exitosos' => 0,
-                'errores_count' => 0,
-                'errores_detalle' => [],
-            ]);
-
-            ImportarInstitucionesJob::dispatch($importLog->id, $archivoPath);
-
-            Log::info('Importación de instituciones encolada', [
-                'import_id' => $importLog->id,
-                'usuario_id' => $user->id,
-                'archivo' => $archivoNombre,
-            ]);
-
-            AuditLog::create([
-                'actor_id' => $user->id,
-                'actor_type' => get_class($user),
-                'actor_nombre' => $user->nombre,
-                'actor_rol' => $user->rol,
-                'accion' => 'importacion_iniciada',
-                'descripcion' => 'Importación masiva de instituciones iniciada',
-                'modelo' => Institucion::class,
-                'modelo_id' => null,
-                'modelo_nombre' => 'Importación masiva de instituciones',
-                'metadata' => [
-                    'import_id' => $importLog->id,
-                    'archivo_nombre' => $archivoNombre,
-                ],
-                'ip_address' => $request->ip(),
-                'user_agent' => $request->userAgent(),
-                'url' => $request->fullUrl(),
-                'metodo_http' => $request->method(),
-            ]);
-
-            return response()->json([
-                'success' => true,
-                'data' => [
-                    'import_id' => $importLog->id,
-                    'estado' => $importLog->estado,
-                    'mensaje' => 'La importación fue encolada y se procesará con el worker',
-                ],
-                'message' => 'Importación iniciada correctamente',
-            ]);
-
-        } catch (ValidationException $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Error de validación',
-                'errors' => $e->errors(),
-            ], 422);
-
-        } catch (\Throwable $e) {
-            Log::error('Error al iniciar importación de instituciones', [
-                'usuario_id' => $user->id ?? null,
-                'error' => $e->getMessage(),
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Error al iniciar la importación',
-            ], 500);
-        }
-    }
-
-    /**
-     * Consultar estado de una importación
-     */
-    public function estadoImportacion(Request $request, int $id)
-    {
-        $user = $request->user();
-
-        if (!$this->esAdministrador($user)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'No autorizado',
-            ], 403);
-        }
-
-        $importLog = ImportacionLog::find($id);
-
-        if (!$importLog) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Importación no encontrada',
-            ], 404);
-        }
+        $institucion = Institucion::create($validated);
 
         return response()->json([
             'success' => true,
-            'data' => [
-                'import_id' => $importLog->id,
-                'tipo' => $importLog->tipo,
-                'estado' => $importLog->estado,
-                'total' => (int) $importLog->total,
-                'procesados' => (int) $importLog->procesados,
-                'exitosos' => (int) $importLog->exitosos,
-                'errores_count' => (int) $importLog->errores_count,
-                'porcentaje' => $importLog->porcentaje,
-                'iniciado_en' => $importLog->iniciado_en?->toISOString(),
-                'completado_en' => $importLog->completado_en?->toISOString(),
-                'errores' => $importLog->errores_detalle ?? [],
-            ],
+            'message' => 'Institución creada correctamente',
+            'data' => $institucion,
+        ], 201);
+    }
+
+    /**
+     * Mostrar institución
+     */
+    public function show($id)
+    {
+        $institucion = Institucion::withCount('usuarios', 'horarios')->findOrFail($id);
+        return response()->json($institucion);
+    }
+
+    /**
+     * Actualizar institución
+     */
+    public function update(Request $request, $id)
+    {
+        $institucion = Institucion::findOrFail($id);
+
+        $validated = $request->validate([
+            'codigo_modular_ie' => 'sometimes|string|unique:instituciones,codigo_modular_ie,' . $id,
+            'nombre' => 'sometimes|string|max:255',
+            'nivel_educativo' => 'nullable|string|max:100',
+            'distrito' => 'nullable|string|max:100',
+            'centro_poblado' => 'nullable|string|max:100',
+            'direccion' => 'nullable|string|max:500',
+            'latitud' => 'sometimes|numeric|between:-90,90',
+            'longitud' => 'sometimes|numeric|between:-180,180',
+            'radio' => 'sometimes|integer|min:10|max:1000',
+            'logo' => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
+        ]);
+
+        if ($request->hasFile('logo')) {
+            $validated['logo'] = $request->file('logo')->store('logos', 'public');
+        }
+
+        $institucion->update($validated);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Institución actualizada correctamente',
+            'data' => $institucion->fresh(),
         ]);
     }
 
     /**
-     * Descargar Excel de errores
+     * Eliminar institución
      */
-    public function erroresExcel($id)
+    public function destroy($id)
     {
-        $importLog = ImportacionLog::find($id);
+        $institucion = Institucion::findOrFail($id);
+        $institucion->delete();
 
-        if (!$importLog) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Importación no encontrada',
-            ], 404);
-        }
-
-        if ($importLog->tipo !== 'instituciones') {
-            return response()->json([
-                'success' => false,
-                'message' => 'La importación no corresponde a instituciones',
-            ], 400);
-        }
-
-        if (empty($importLog->errores_detalle)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'No existen errores para exportar',
-            ], 400);
-        }
-
-        $nombreArchivo = 'instituciones_errores_' . $importLog->id . '.xlsx';
-
-        return Excel::download(
-            new InstitucionesErroresExport($importLog->errores_detalle),
-            $nombreArchivo
-        );
+        return response()->json([
+            'success' => true,
+            'message' => 'Institución eliminada correctamente',
+        ]);
     }
 
     /**
-     * Descargar plantilla de instituciones
+     * Eliminar múltiples instituciones
      */
-    public function downloadTemplate(Request $request)
+    public function destroyMultiple(Request $request)
     {
-        if (!$this->esAdministrador($request->user())) {
-            return response()->json([
-                'success' => false,
-                'message' => 'No tienes permisos para descargar la plantilla',
-            ], 403);
+        $validated = $request->validate([
+            'ids' => 'required|array',
+            'ids.*' => 'integer|exists:instituciones,id',
+        ]);
+
+        Institucion::whereIn('id', $validated['ids'])->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => count($validated['ids']) . ' instituciones eliminadas',
+        ]);
+    }
+
+    /**
+     * Instituciones del supervisor autenticado
+     */
+    public function misInstituciones(Request $request)
+    {
+        $user = $request->user();
+
+        if ($user->esSuperAdmin() || $user->esAdministrador()) {
+            return $this->index($request);
         }
 
-        return Excel::download(
-            new InstitucionesTemplateExport(),
-            'plantilla_instituciones.xlsx'
-        );
+        $instituciones = $user->institucionesVigentes()
+            ->withCount('usuarios', 'horarios')
+            ->get();
+
+        return response()->json($instituciones);
     }
 }

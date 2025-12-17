@@ -39,10 +39,8 @@ return new class extends Migration {
                 'idx_usuario_inst_estado'
             );
 
-            $table->index(
-                ['usuario_app_id', 'estado'],
-                'idx_usuario_estado'
-            );
+            // idx_usuario_estado ya existe en la migración original
+            // $table->index(['usuario_app_id', 'estado'], 'idx_usuario_estado');
 
             $table->index(
                 ['horario_institucion_id', 'estado'],
@@ -81,7 +79,8 @@ return new class extends Migration {
         $this->safeDropIndex('asistencias', 'idx_asistencias_situacion');
 
         $this->safeDropIndex('usuario_app_institucion', 'idx_usuario_inst_estado');
-        $this->safeDropIndex('usuario_app_institucion', 'idx_usuario_estado');
+        // idx_usuario_estado ya existe en la migración original, no se elimina aquí
+        // $this->safeDropIndex('usuario_app_institucion', 'idx_usuario_estado');
         $this->safeDropIndex('usuario_app_institucion', 'idx_usuario_horario_estado');
 
         $this->safeDropIndex('usuarios_app', 'idx_usuarios_app_apellido');

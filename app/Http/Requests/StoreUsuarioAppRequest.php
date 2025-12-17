@@ -36,7 +36,7 @@ class StoreUsuarioAppRequest extends FormRequest
             // IMPORTANTE: El cargo NO va en usuarios_app, va en la asignación
             'asignaciones' => 'required|array|min:1',
             'asignaciones.*.institucion_id' => 'required|exists:instituciones,id',
-            'asignaciones.*.horario_institucion_id' => 'required|exists:horarios_institucion,id',
+            'asignaciones.*.horario_institucion_id' => 'nullable|exists:horarios_institucion,id', // ✅ Opcional
             'asignaciones.*.cargo' => 'required|string|max:50', // Campo libre
             'asignaciones.*.estado' => 'nullable|in:ACTIVO,INACTIVO',
             'asignaciones.*.fecha_inicio' => 'nullable|date',
@@ -55,10 +55,10 @@ class StoreUsuarioAppRequest extends FormRequest
             // Datos personales
             'apellido_paterno.required' => 'El apellido paterno es obligatorio',
             'apellido_paterno.max' => 'El apellido paterno no puede exceder :max caracteres',
-            
+
             'apellido_materno.required' => 'El apellido materno es obligatorio',
             'apellido_materno.max' => 'El apellido materno no puede exceder :max caracteres',
-            
+
             'nombres.required' => 'Los nombres son obligatorios',
             'nombres.max' => 'Los nombres no pueden exceder :max caracteres',
 
@@ -76,20 +76,19 @@ class StoreUsuarioAppRequest extends FormRequest
             'asignaciones.required' => 'Debe asignar al menos una institución',
             'asignaciones.min' => 'Debe asignar al menos una institución',
             'asignaciones.array' => 'Las asignaciones deben ser un arreglo',
-            
+
             'asignaciones.*.institucion_id.required' => 'La institución es obligatoria',
             'asignaciones.*.institucion_id.exists' => 'La institución seleccionada no existe',
-            
-            'asignaciones.*.horario_institucion_id.required' => 'El horario es obligatorio',
+
             'asignaciones.*.horario_institucion_id.exists' => 'El horario seleccionado no existe',
-            
+
             'asignaciones.*.cargo.required' => 'El cargo es obligatorio',
             'asignaciones.*.cargo.max' => 'El cargo no puede exceder :max caracteres',
-            
+
             'asignaciones.*.estado.in' => 'El estado debe ser ACTIVO o INACTIVO',
-            
+
             'asignaciones.*.fecha_inicio.date' => 'La fecha de inicio debe ser una fecha válida',
-            
+
             'asignaciones.*.fecha_fin.date' => 'La fecha de fin debe ser una fecha válida',
             'asignaciones.*.fecha_fin.after' => 'La fecha de fin debe ser posterior a la fecha de inicio',
         ];
