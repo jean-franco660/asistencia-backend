@@ -131,6 +131,7 @@ Route::prefix('v1/web')->middleware(['auth:sanctum', 'throttle:api'])->group(fun
 
         // IMPORTACIÓN - THROTTLE: 3 por minuto
         Route::middleware('throttle:importaciones')->group(function () {
+            Route::get('/import/stats', [UsuarioAppImportController::class, 'stats']); // ⭐ NUEVO
             Route::post('/importar', [UsuarioAppImportController::class, 'import']);
             Route::get('/importacion/{id}', [UsuarioAppImportController::class, 'estadoImportacion'])->whereNumber('id');
             Route::get('/importacion/{id}/errores.xlsx', [UsuarioAppImportController::class, 'erroresExcel'])->whereNumber('id');
@@ -152,6 +153,7 @@ Route::prefix('v1/web')->middleware(['auth:sanctum', 'throttle:api'])->group(fun
 
         // IMPORTACIÓN - THROTTLE: 3 por minuto
         Route::middleware('throttle:importaciones')->group(function () {
+            Route::get('/import/stats', [\App\Http\Controllers\Api\InstitucionImportController::class, 'stats']); // ⭐ NUEVO
             Route::post('/importar', [\App\Http\Controllers\Api\InstitucionImportController::class, 'import']);
             Route::get('/importacion/{id}', [\App\Http\Controllers\Api\InstitucionImportController::class, 'estadoImportacion'])->whereNumber('id');
             Route::get('/importacion/{id}/errores.xlsx', [\App\Http\Controllers\Api\InstitucionImportController::class, 'erroresExcel'])->whereNumber('id');
