@@ -30,7 +30,7 @@ class UsuariosAppImport implements
     public function collection(Collection $rows): void
     {
         // Filtrar filas totalmente vacías
-        $rows = $rows->filter(fn ($row) => !empty(array_filter($row->toArray())));
+        $rows = $rows->filter(fn($row) => !empty(array_filter($row->toArray())));
 
         if ($rows->isEmpty()) {
             return;
@@ -58,7 +58,7 @@ class UsuariosAppImport implements
                 'offset' => $this->offset,
                 'error' => $e->getMessage(),
             ]);
-            
+
             throw $e;
         }
     }
@@ -75,6 +75,6 @@ class UsuariosAppImport implements
 
     public function headingRow(): int
     {
-        return 1;
+        return 3;  // ✅ Los encabezados están en la fila 3 (después de 2 filas de instrucciones)
     }
 }

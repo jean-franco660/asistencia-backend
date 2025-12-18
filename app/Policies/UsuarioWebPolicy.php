@@ -11,8 +11,8 @@ class UsuarioWebPolicy
 
     public function before(UsuarioWeb $user, $ability)
     {
-        // Super admin lo puede todo
-        if ($user->rol === UsuarioWeb::ROL_SUPER_ADMIN) {
+        // Super admin puede hacer TODO
+        if ($user->rol === 'super_admin') {  // ← String directo
             return true;
         }
 
@@ -21,42 +21,49 @@ class UsuarioWebPolicy
 
     public function viewAny(UsuarioWeb $user): bool
     {
-        // Admin puede listar, pero SOLO supervisores (el filtro se refuerza en Controller)
-        return $user->rol === UsuarioWeb::ROL_ADMINISTRADOR;
+        return in_array($user->rol, ['super_admin', 'administrador']);  // ← String directo
     }
 
     public function view(UsuarioWeb $user, UsuarioWeb $target): bool
     {
-        // Admin NO puede ver admins, super_admin, ni a sí mismo: SOLO supervisores
-        return $user->rol === UsuarioWeb::ROL_ADMINISTRADOR
-            && $target->rol === UsuarioWeb::ROL_SUPERVISOR;
+        if ($user->rol === 'admin') {  // ← String directo
+            return $target->rol === 'supervisor';
+        }
+
+        return false;
     }
 
     public function create(UsuarioWeb $user): bool
     {
-        // Admin puede crear SOLO supervisores (se valida en controller/request)
-        return $user->rol === UsuarioWeb::ROL_ADMINISTRADOR;
+        // ✅ SOLUCIÓN: Usar strings directos
+        return in_array($user->rol, ['super_admin', 'administrador']);
     }
 
     public function update(UsuarioWeb $user, UsuarioWeb $target): bool
     {
-        // Admin solo actualiza supervisores
-        return $user->rol === UsuarioWeb::ROL_ADMINISTRADOR
-            && $target->rol === UsuarioWeb::ROL_SUPERVISOR;
+        if ($user->rol === 'admin') {
+            return $target->rol === 'supervisor';
+        }
+
+        return false;
     }
 
     public function delete(UsuarioWeb $user, UsuarioWeb $target): bool
     {
-        // Admin solo elimina supervisores
-        return $user->rol === UsuarioWeb::ROL_ADMINISTRADOR
-            && $target->rol === UsuarioWeb::ROL_SUPERVISOR;
+        if ($user->rol === 'admin') {
+            return $target->rol === 'supervisor';
+        }
+
+        return false;
     }
 
     public function autorizar(UsuarioWeb $user, UsuarioWeb $target): bool
     {
-        // Admin autoriza solo supervisores
-        return $user->rol === UsuarioWeb::ROL_ADMINISTRADOR
-            && $target->rol === UsuarioWeb::ROL_SUPERVISOR;
+        if ($user->rol === 'admin') {
+            return $target->rol === 'supervisor';
+        }
+
+        return false;
     }
 
     public function rechazar(UsuarioWeb $user, UsuarioWeb $target): bool

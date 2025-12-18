@@ -127,6 +127,6 @@ class InstitucionesImport implements
 
     public function headingRow(): int
     {
-        return 1;
+        return 3;  // ✅ Los encabezados están en la fila 3 (después de 2 filas de instrucciones)
     }
 }

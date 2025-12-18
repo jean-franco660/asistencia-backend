@@ -11,7 +11,6 @@ use Exception;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
@@ -21,8 +20,6 @@ class ImportUsuariosAppService
 {
     /**
      * Validación y disparo de importación (si lo usas desde controller con UploadedFile).
-     * Importante: Este método NO debería hacer trabajo pesado; idealmente aquí solo guardas
-     * el archivo y despachas el Job. Pero lo dejo funcional para tu caso.
      */
     public function procesarArchivo(UploadedFile $archivo, ImportacionLog $importLog): array
     {
@@ -34,23 +31,20 @@ class ImportUsuariosAppService
             throw new DomainException($validator->errors()->first());
         }
 
-        // Solo marcar metadata. El Job debería marcar processing/iniciado_en
         $importLog->update([
             'archivo_original' => $archivo->getClientOriginalName() ?? $importLog->archivo_original,
         ]);
 
-        // Si insistes en ejecutar aquí (no recomendado para producción), funciona:
         Excel::import(new UsuariosAppImport($importLog, $this), $archivo);
 
         return [
-            'message' => 'Importación ejecutada (recomendado: usar Job + worker).',
+            'message' => 'Importación ejecutada.',
             'import_log_id' => $importLog->id,
         ];
     }
 
     /**
-     * Método pensado para tus Jobs (recibe path relativo en storage y el ImportacionLog).
-     * Recomendado: el Job llama a este método.
+     * Método pensado para Jobs (recibe path relativo en storage).
      */
     public function procesarConProgreso(string $archivoPath, ImportacionLog $importLog): array
     {
@@ -60,7 +54,6 @@ class ImportUsuariosAppService
             throw new Exception("Archivo no encontrado en storage: {$archivoPath}");
         }
 
-        // Job debería marcar iniciado, pero si lo llamas directo, lo dejamos seguro:
         if ($importLog->estado !== 'processing') {
             $importLog->update([
                 'estado' => 'processing',
@@ -72,7 +65,6 @@ class ImportUsuariosAppService
             'archivo_temp' => $archivoPath,
         ]);
 
-        // Import con ruta absoluta (más estable que recrear UploadedFile)
         Excel::import(new UsuariosAppImport($importLog, $this), $absolutePath);
 
         return [
@@ -82,9 +74,7 @@ class ImportUsuariosAppService
     }
 
     /**
-     * Procesar un chunk de docentes (lo llama DocentesImport::collection()).
-     * - Actualiza counters en import_log
-     * - Acumula errores_detalle (merge sin pisar)
+     * Procesar un chunk de docentes.
      */
     public function procesarChunk(Collection $rows, ?ImportacionLog $importLog = null, int $offset = 0): array
     {
@@ -96,7 +86,7 @@ class ImportUsuariosAppService
             'errores_detalle' => [],
         ];
 
-        // Cache de instituciones por chunk (evita N+1 contra instituciones)
+        // Cache de instituciones por chunk
         $instCache = $this->buildInstitucionesCacheFromRows($rows);
 
         foreach ($rows as $index => $row) {
@@ -117,8 +107,9 @@ class ImportUsuariosAppService
             } catch (Exception $e) {
                 $resultados['errores']++;
 
+                // ✅ CORREGIDO: Campos correctos
                 $requeridos = [
-                    'codigo_modular', // ✅ CORREGIDO: nombre de campo correcto
+                    'codigo_modular',  // ← Sin '_docente'
                     'apellido_paterno',
                     'apellido_materno',
                     'nombres',
@@ -128,16 +119,14 @@ class ImportUsuariosAppService
 
                 $faltantes = [];
                 foreach ($requeridos as $k) {
-                    // Verificar tanto el nombre nuevo como los alias legacy
-                    $valor = $rowArray[$k] ?? $rowArray['codigo_modular'] ?? $rowArray['codigo'] ?? null;
-                    if (empty($valor)) {
+                    if (empty($rowArray[$k])) {
                         $faltantes[] = $k;
                     }
                 }
 
                 $resultados['errores_detalle'][] = [
                     'fila' => $numeroFila,
-                    'codigo_docente' => $rowArray['codigo_modular'] ?? ($rowArray['codigo_modular'] ?? ($rowArray['codigo'] ?? null)),
+                    'codigo_docente' => $rowArray['codigo_modular'] ?? null,  // ← Corregido
                     'docente' => trim(
                         ($rowArray['apellido_paterno'] ?? '') . ' ' .
                         ($rowArray['apellido_materno'] ?? '') . ', ' .
@@ -146,8 +135,6 @@ class ImportUsuariosAppService
                     'codigo_modular_ie' => $rowArray['codigo_modular_ie'] ?? null,
                     'motivo' => $e->getMessage(),
                     'faltantes' => $faltantes,
-                    // Si necesitas auditoría completa, puedes guardar la fila:
-                    // 'fila_original' => $rowArray,
                 ];
 
                 Log::warning("Error al importar docente (chunk)", [
@@ -170,8 +157,8 @@ class ImportUsuariosAppService
      */
     protected function procesarFila(array $row, Collection $instCache): string
     {
-        // ✅ CORREGIDO: Usar 'codigo_modular' en lugar de 'codigo_modular_docente'
-        $codigoModular = $row['codigo_modular_docente'] ?? $row['codigo'] ?? $row['codigo_modular'] ?? null;
+        // ✅ CORREGIDO: Campo correcto 'codigo_modular' (sin '_docente')
+        $codigoModular = $row['codigo_modular'] ?? null;
         $apellidoPaterno = $row['apellido_paterno'] ?? null;
         $apellidoMaterno = $row['apellido_materno'] ?? null;
         $nombres = $row['nombres'] ?? null;
@@ -207,60 +194,55 @@ class ImportUsuariosAppService
         }
 
         return DB::transaction(function () use ($codigoDoc, $apellidoPaterno, $apellidoMaterno, $nombres, $sexoSan, $cargoSan, $passwordRaw, $institucion) {
-            // ✅ CORREGIDO: Buscar por 'codigo_modular' (campo correcto)
+            // ✅ Buscar por 'codigo_modular'
             $usuario = UsuarioApp::whereRaw('UPPER(codigo_modular) = ?', [$codigoDoc])->first();
 
             $accion = 'actualizado';
 
             if (!$usuario) {
                 $usuario = new UsuarioApp();
-                // ✅ CORREGIDO: Usar 'codigo_modular' en lugar de 'codigo_modular_docente'
                 $usuario->codigo_modular = $codigoDoc;
-
-                // ✅ CORREGIDO: No hashear si ya viene hasheado, usar mutator del modelo
+                
+                // Password: usar el del Excel o default
                 $usuario->password = !empty($passwordRaw) ? (string) $passwordRaw : '12345678';
-
+                
                 $accion = 'creado';
             }
 
-            // ✅ CORREGIDO: Solo actualizar campos que existen en usuarios_app
+            // Actualizar datos personales
             $usuario->apellido_paterno = trim((string) $apellidoPaterno);
             $usuario->apellido_materno = trim((string) $apellidoMaterno);
             $usuario->nombres = trim((string) $nombres);
             $usuario->sexo = $sexoSan;
-            $usuario->acceso_habilitado = true; // ✅ Campo correcto
-
-            // ✅ ELIMINADO: No asignar campos que no existen (institucion_id, cargo, estado, activo)
+            $usuario->acceso_habilitado = true;
 
             $usuario->save();
 
-            // ✅ CORREGIDO: Crear relación en tabla pivot usuario_app_institucion
-            // El horario se asigna DESPUÉS de importar, no durante la importación
+            // ✅ CORREGIDO: Usar modelo directamente en lugar de clase estática
+            $UsuarioAppInstitucion = \App\Models\UsuarioAppInstitucion::class;
 
             // Verificar si ya existe la asignación
-            $asignacionExistente = \App\Models\UsuarioAppInstitucion::where('usuario_app_id', $usuario->id)
+            $asignacionExistente = $UsuarioAppInstitucion::where('usuario_app_id', $usuario->id)
                 ->where('institucion_id', $institucion->id)
                 ->first();
 
             if (!$asignacionExistente) {
-                // Crear nueva asignación en la tabla pivot (sin horario, estado PENDIENTE)
-                \App\Models\UsuarioAppInstitucion::create([
+                // ✅ CORREGIDO: Usar 'ACTIVO' directamente (string del ENUM)
+                $UsuarioAppInstitucion::create([
                     'usuario_app_id' => $usuario->id,
                     'institucion_id' => $institucion->id,
-                    'horario_institucion_id' => null, // Se asigna después
+                    'horario_institucion_id' => null,
                     'cargo' => $cargoSan,
-                    'estado' => \App\Models\UsuarioAppInstitucion::ESTADO_ACTIVO,
+                    'estado' => 'ACTIVO',  // ← String directo
                     'fecha_inicio' => now(),
                     'fecha_fin' => null,
                 ]);
             } else {
-                // Actualizar asignación existente
+                // ✅ CORREGIDO: Actualizar sin cambiar estado si ya tiene horario
                 $asignacionExistente->update([
                     'cargo' => $cargoSan,
-                    // Mantener estado actual si ya tiene horario asignado
-                    'estado' => $asignacionExistente->horario_institucion_id
-                        ? $asignacionExistente->estado
-                        : \App\Models\UsuarioAppInstitucion::ESTADO_PENDIENTE,
+                    // Mantener ACTIVO siempre que tiene horario, si no tiene horario dejarlo como está
+                    'estado' => $asignacionExistente->horario_institucion_id ? 'ACTIVO' : $asignacionExistente->estado,
                 ]);
             }
 
@@ -312,14 +294,7 @@ class ImportUsuariosAppService
     }
 
     /**
-     * Normaliza el código de institución:
-     * - Si es numérico y tiene menos de 7 dígitos, rellena con ceros a la izquierda
-     * - Si es alfanumérico, lo deja como está (en mayúsculas)
-     * 
-     * Ejemplos:
-     * - "238931" -> "0238931" (6 dígitos numéricos -> 7 dígitos)
-     * - "0238931" -> "0238931" (ya tiene 7 dígitos)
-     * - "P210002" -> "P210002" (alfanumérico, sin cambios)
+     * Normaliza el código de institución.
      */
     private function normalizarCodigoInstitucion(string $codigo): string
     {

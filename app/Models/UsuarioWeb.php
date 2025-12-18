@@ -22,17 +22,17 @@ class UsuarioWeb extends Authenticatable
      * CONSTANTES - ROLES
      * ========================= */
 
-    public const ROL_SUPER_ADMIN   = 'super_admin';
+    public const ROL_SUPER_ADMIN = 'super_admin';
     public const ROL_ADMINISTRADOR = 'administrador';
-    public const ROL_SUPERVISOR    = 'supervisor';
+    public const ROL_SUPERVISOR = 'supervisor';
 
     /* =========================
      * CONSTANTES - ESTADOS
      * ========================= */
 
-    public const ESTADO_PENDIENTE  = 'pendiente';
+    public const ESTADO_PENDIENTE = 'pendiente';
     public const ESTADO_AUTORIZADO = 'autorizado';
-    public const ESTADO_RECHAZADO  = 'rechazado';
+    public const ESTADO_RECHAZADO = 'rechazado';
 
     /* =========================
      * FILLABLE / HIDDEN / CASTS
@@ -56,7 +56,7 @@ class UsuarioWeb extends Authenticatable
     ];
 
     protected $attributes = [
-        'rol'    => self::ROL_SUPERVISOR,
+        'rol' => self::ROL_SUPERVISOR,
         'estado' => self::ESTADO_PENDIENTE,
     ];
 
@@ -87,9 +87,9 @@ class UsuarioWeb extends Authenticatable
 
     protected static function booted()
     {
-        // Auto-autorizar a administradores y super_admin
+        // Auto-autorizar SOLO a super_admin
         static::creating(function ($usuario) {
-            if (in_array($usuario->rol, [self::ROL_ADMINISTRADOR, self::ROL_SUPER_ADMIN])) {
+            if ($usuario->rol === self::ROL_SUPER_ADMIN) {
                 $usuario->estado = self::ESTADO_AUTORIZADO;
             }
         });
@@ -112,8 +112,8 @@ class UsuarioWeb extends Authenticatable
             'usuario_web_id',
             'institucion_id'
         )
-        ->withPivot(['fecha_inicio', 'fecha_fin'])
-        ->withTimestamps();
+            ->withPivot(['fecha_inicio', 'fecha_fin'])
+            ->withTimestamps();
     }
 
     public function justificacionesRevisadas(): HasMany
@@ -129,7 +129,7 @@ class UsuarioWeb extends Authenticatable
     public function auditLogsComoActor(): HasMany
     {
         return $this->hasMany(AuditLog::class, 'actor_id')
-                    ->where('actor_type', AuditLog::ACTOR_USUARIO_WEB);
+            ->where('actor_type', AuditLog::ACTOR_USUARIO_WEB);
     }
 
     /* =========================
@@ -172,14 +172,14 @@ class UsuarioWeb extends Authenticatable
     public function scopeActivos($query)
     {
         return $query->where('estado', self::ESTADO_AUTORIZADO)
-                     ->whereNull('deleted_at');
+            ->whereNull('deleted_at');
     }
 
     public function scopeBuscar($query, string $termino)
     {
         return $query->where(function ($q) use ($termino) {
             $q->where('nombre', 'like', "%{$termino}%")
-              ->orWhere('email', 'like', "%{$termino}%");
+                ->orWhere('email', 'like', "%{$termino}%");
         });
     }
 
@@ -257,14 +257,14 @@ class UsuarioWeb extends Authenticatable
 
         // Supervisores solo a sus instituciones asignadas
         return $this->instituciones()
-                    ->where('institucion_id', $institucionId)
-                    ->exists();
+            ->where('institucion_id', $institucionId)
+            ->exists();
     }
 
     public function puedeGestionarJustificaciones(): bool
     {
-        return $this->estaAutorizado() && 
-               $this->esAdminOSuperAdmin();
+        return $this->estaAutorizado() &&
+            $this->esAdminOSuperAdmin();
     }
 
     public function puedeImportar(): bool
@@ -314,7 +314,7 @@ class UsuarioWeb extends Authenticatable
             ->wherePivot('fecha_inicio', '<=', $hoy)
             ->where(function ($q) use ($hoy) {
                 $q->whereNull('supervisor_institucion.fecha_fin')
-                  ->orWhere('supervisor_institucion.fecha_fin', '>=', $hoy);
+                    ->orWhere('supervisor_institucion.fecha_fin', '>=', $hoy);
             })
             ->first();
     }
@@ -329,11 +329,11 @@ class UsuarioWeb extends Authenticatable
         return $this->instituciones()
             ->where(function ($q) use ($hoy) {
                 $q->whereNull('supervisor_institucion.fecha_inicio')
-                  ->orWhere('supervisor_institucion.fecha_inicio', '<=', $hoy);
+                    ->orWhere('supervisor_institucion.fecha_inicio', '<=', $hoy);
             })
             ->where(function ($q) use ($hoy) {
                 $q->whereNull('supervisor_institucion.fecha_fin')
-                  ->orWhere('supervisor_institucion.fecha_fin', '>=', $hoy);
+                    ->orWhere('supervisor_institucion.fecha_fin', '>=', $hoy);
             })
             ->get();
     }
@@ -373,8 +373,8 @@ class UsuarioWeb extends Authenticatable
      * Asigna una institución al supervisor
      */
     public function asignarInstitucion(
-        int $institucionId, 
-        ?\Carbon\Carbon $fechaInicio = null, 
+        int $institucionId,
+        ?\Carbon\Carbon $fechaInicio = null,
         ?\Carbon\Carbon $fechaFin = null
     ): void {
         $this->instituciones()->attach($institucionId, [
@@ -407,9 +407,9 @@ class UsuarioWeb extends Authenticatable
     public static function getRolesConEtiquetas(): array
     {
         return [
-            self::ROL_SUPER_ADMIN   => 'Super Administrador',
+            self::ROL_SUPER_ADMIN => 'Super Administrador',
             self::ROL_ADMINISTRADOR => 'Administrador',
-            self::ROL_SUPERVISOR    => 'Supervisor',
+            self::ROL_SUPERVISOR => 'Supervisor',
         ];
     }
 
@@ -425,9 +425,9 @@ class UsuarioWeb extends Authenticatable
     public static function getEstadosConEtiquetas(): array
     {
         return [
-            self::ESTADO_PENDIENTE  => 'Pendiente',
+            self::ESTADO_PENDIENTE => 'Pendiente',
             self::ESTADO_AUTORIZADO => 'Autorizado',
-            self::ESTADO_RECHAZADO  => 'Rechazado',
+            self::ESTADO_RECHAZADO => 'Rechazado',
         ];
     }
 

@@ -27,7 +27,7 @@ class SupervisorDashboardController extends Controller
                 'instituciones' => [],
                 'resumen' => [
                     'total_instituciones' => 0,
-                    'total_Usuarios_App' => 0,
+                    'total_usuarios_app' => 0,  // ✅ snake_case
                     'asistencias_hoy' => 0,
                     'ausencias_hoy' => 0,
                     'justificaciones_pendientes' => 0,
@@ -39,8 +39,8 @@ class SupervisorDashboardController extends Controller
            📌 ESTADÍSTICAS AGREGADAS
         ============================================================ */
 
-        // Total de Usuarios_App en todas las instituciones del supervisor
-        $total_UsuariosAPP = \App\Models\UsuarioApp::whereHas(
+        // Total de usuarios app en todas las instituciones del supervisor
+        $totalUsuariosApp = \App\Models\UsuarioApp::whereHas(  // ✅ camelCase
             'instituciones',
             fn($q) => $q->whereIn('instituciones.id', $institucionesIds)
         )->count();
@@ -50,22 +50,22 @@ class SupervisorDashboardController extends Controller
             ->whereDate('fecha_hora', $today)
             ->count();
 
-        // Contar Usuarios_App con asistencia completa hoy
+        // Contar usuarios app con asistencia completa hoy
         $registrosHoy = Asistencia::whereIn('institucion_id', $institucionesIds)
             ->whereDate('fecha_hora', $today)
             ->get()
             ->groupBy('usuario_app_id');
 
-        $usuariosAPP_Presentes = 0;
+        $usuariosAppPresentes = 0;  // ✅ camelCase
         foreach ($registrosHoy as $userId => $registros) {
             $entrada = $registros->firstWhere('tipo', Asistencia::TIPO_ENTRADA);
             $salida = $registros->firstWhere('tipo', Asistencia::TIPO_SALIDA);
             if ($entrada && $salida) {
-                $usuariosAPP_Presentes++;
+                $usuariosAppPresentes++;
             }
         }
 
-        $ausenciasHoy = max(0, $total_UsuariosAPP - $usuariosAPP_Presentes);
+        $ausenciasHoy = max(0, $totalUsuariosApp - $usuariosAppPresentes);
 
         // Justificaciones pendientes
         $justificacionesPendientes = \App\Models\Justificacion::where('estado', 'PENDIENTE')
@@ -77,7 +77,7 @@ class SupervisorDashboardController extends Controller
         ============================================================ */
 
         $institucionesData = $instituciones->map(function ($institucion) use ($today) {
-            $UsuariosAPP_Count = $institucion->Usuarios_App()->count();
+            $usuariosAppCount = $institucion->usuariosApp()->count();  // ✅ camelCase
 
             $asistenciasHoyInst = Asistencia::where('institucion_id', $institucion->id)
                 ->whereDate('fecha_hora', $today)
@@ -87,7 +87,7 @@ class SupervisorDashboardController extends Controller
                 'id' => $institucion->id,
                 'nombre' => $institucion->nombre,
                 'codigo_modular' => $institucion->codigo_modular_ie,
-                'usuarios_APP' => $UsuariosAPP_Count,
+                'usuarios_app' => $usuariosAppCount,  // ✅ snake_case para JSON
                 'asistencias_hoy' => $asistenciasHoyInst,
             ];
         });
@@ -100,11 +100,11 @@ class SupervisorDashboardController extends Controller
             'instituciones' => $institucionesData,
             'resumen' => [
                 'total_instituciones' => $instituciones->count(),
-                'total_Usuarios_App' => $total_UsuariosAPP,
-                'asistencias_hoy' => $usuariosAPP_Presentes,
+                'total_usuarios_app' => $totalUsuariosApp,  // ✅ snake_case
+                'asistencias_hoy' => $usuariosAppPresentes,
                 'ausencias_hoy' => $ausenciasHoy,
                 'justificaciones_pendientes' => $justificacionesPendientes,
-                'registros_asistencia_hoy' => $asistenciasHoy, // Total de marcaciones
+                'registros_asistencia_hoy' => $asistenciasHoy,
             ],
         ]);
     }

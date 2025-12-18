@@ -8,8 +8,8 @@ class StoreInstitucionRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        // solo administrador puede crear instituciones
-        return $this->user()->rol === 'administrador';
+        // ✅ Permitir tanto super_admin como administrador
+        return in_array($this->user()->rol, ['super_admin', 'administrador']);
     }
 
     public function rules(): array
@@ -24,7 +24,7 @@ class StoreInstitucionRequest extends FormRequest
             'latitud' => 'nullable|numeric',
             'longitud' => 'nullable|numeric',
             'radio' => 'nullable|numeric|min:1',
-            'logo' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048', // máx 2MB
+            'logo' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
         ];
     }
 }

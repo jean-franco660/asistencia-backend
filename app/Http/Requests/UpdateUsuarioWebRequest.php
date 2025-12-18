@@ -8,7 +8,7 @@ class UpdateUsuarioWebRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()->rol === 'administrador';
+        return in_array($this->user()->rol, ['super_admin', 'administrador']);
     }
 
     public function rules(): array

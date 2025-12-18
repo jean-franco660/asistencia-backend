@@ -13,9 +13,9 @@ class DatabaseSeeder extends Seeder
         // Seeders deshabilitados temporalmente debido a problemas estructurales
         // SuperAdminSeeder y DevDatosSeeder requieren horario_institucion_id
 
-        // $this->call([
-        //     SuperAdminSeeder::class,
-        // ]);
+        $this->call([
+            SuperAdminSeeder::class,
+        ]);
 
         // if (app()->environment('local')) {
         //     $this->call([

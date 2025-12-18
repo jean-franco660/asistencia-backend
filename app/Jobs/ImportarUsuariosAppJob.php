@@ -2,10 +2,10 @@
 
 namespace App\Jobs;
 
-use App\Imports\InstitucionesImport;
+use App\Imports\UsuariosAppImport; // ⭐ CAMBIO AQUÍ
 use App\Models\ImportacionLog;
-use App\Services\ImportInstitucionesService;
-use App\Traits\GeneraArchivoErrores; // ⭐ NUEVO
+use App\Services\ImportUsuariosAppService; // ⭐ Y AQUÍ
+use App\Traits\GeneraArchivoErrores;
 use Exception;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -19,7 +19,7 @@ use Maatwebsite\Excel\Facades\Excel;
 class ImportarUsuariosAppJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
-    use GeneraArchivoErrores; // ⭐ NUEVO
+    use GeneraArchivoErrores;
 
     public $timeout = 7200;
     public $tries = 3;
@@ -35,39 +35,33 @@ class ImportarUsuariosAppJob implements ShouldQueue
         $this->archivoPath = $archivoPath;
     }
 
-    public function handle(ImportInstitucionesService $service): void
+    public function handle(ImportUsuariosAppService $service): void // ⭐ SERVICIO CORRECTO
     {
         $importLog = ImportacionLog::findOrFail($this->importLogId);
 
         try {
-            Log::info("🚀 Iniciando ImportarInstitucionesJob", [
+            Log::info("🚀 Iniciando ImportarUsuariosAppJob", [
                 'import_log_id' => $importLog->id,
                 'archivo' => $this->archivoPath,
             ]);
 
-            // Marcar como procesando
-            $importLog->marcarComoProcesando(); // ✅ Usar método del modelo
+            $importLog->marcarComoProcesando();
 
-            // Verificar archivo
             if (!Storage::exists($this->archivoPath)) {
                 throw new Exception("Archivo no encontrado: {$this->archivoPath}");
             }
 
             $absolutePath = Storage::path($this->archivoPath);
+            $importLog->update(['total' => 0]);
 
-            // ✅ SIMPLIFICADO: No contar filas aquí, se actualiza en el proceso
-            $importLog->update(['total' => 0]); // Se actualizará durante chunks
-
-            // Procesar importación
+            // ⭐ USAR LA CLASE CORRECTA
             Excel::import(
-                new InstitucionesImport($importLog, $service),
+                new UsuariosAppImport($importLog, $service),
                 $absolutePath
             );
 
-            // Marcar como completado
-            $importLog->marcarComoCompletada(); // ✅ Usar método del modelo
+            $importLog->marcarComoCompletada();
 
-            // ⭐ NUEVO: Generar archivo de errores si hay errores
             if ($importLog->tieneErrores()) {
                 $csvPath = $this->generarArchivoErrores($importLog);
                 
@@ -76,23 +70,22 @@ class ImportarUsuariosAppJob implements ShouldQueue
                 }
             }
 
-            Log::info("✅ ImportarInstitucionesJob completado", [
+            Log::info("✅ ImportarUsuariosAppJob completado", [
                 'import_log_id' => $importLog->id,
                 'resumen' => $importLog->resumen,
             ]);
 
-            // Limpiar archivo temporal
             if (Storage::exists($this->archivoPath)) {
                 Storage::delete($this->archivoPath);
             }
 
         } catch (Exception $e) {
-            Log::error("❌ Error en ImportarInstitucionesJob", [
+            Log::error("❌ Error en ImportarUsuariosAppJob", [
                 'import_log_id' => $importLog->id,
                 'error' => $e->getMessage(),
             ]);
 
-            $importLog->marcarComoFallida($e->getMessage()); // ✅ Usar método del modelo
+            $importLog->marcarComoFallida($e->getMessage());
 
             throw $e;
         }
@@ -100,7 +93,7 @@ class ImportarUsuariosAppJob implements ShouldQueue
 
     public function failed(Exception $exception): void
     {
-        Log::error("💥 ImportarInstitucionesJob falló definitivamente", [
+        Log::error("💥 ImportarUsuariosAppJob falló definitivamente", [
             'import_log_id' => $this->importLogId,
             'error' => $exception->getMessage(),
         ]);

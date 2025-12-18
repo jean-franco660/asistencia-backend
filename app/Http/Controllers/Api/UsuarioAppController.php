@@ -134,31 +134,61 @@ class UsuarioAppController extends Controller
             $query->porSexo($request->sexo);
         }
 
-        if ($request->filled('search')) {
-            $query->buscar($request->search);
+        if ($request->filled('search') || $request->filled('buscar')) {
+            $searchTerm = $request->search ?? $request->buscar;
+            $query->buscar($searchTerm);
         }
 
-        // Ordenamiento
-        $sortBy = $request->input('sort_by', 'apellido_paterno');
-        $sortOrder = $request->input('sort_order', 'asc');
-        $query->orderBy($sortBy, $sortOrder);
+        // ⭐ NUEVO: Ordenamiento dinámico
+        $sortBy = $request->input('sort_by', 'id');  // Por defecto: id (orden de importación)
+        $sortOrder = $request->input('sort_order', 'asc');  // asc o desc
+        
+        // Validar columnas permitidas para ordenar
+        $allowedSortColumns = ['id', 'codigo_modular', 'apellido_paterno', 'apellido_materno', 'nombres', 'sexo', 'created_at'];
+        if (!in_array($sortBy, $allowedSortColumns)) {
+            $sortBy = 'id';
+        }
+        
+        // Validar orden
+        $sortOrder = in_array(strtolower($sortOrder), ['asc', 'desc']) ? strtolower($sortOrder) : 'asc';
 
         $perPage = $request->input('per_page', 20);
-        $usuarios = $query->paginate($perPage);
+        $usuarios = $query->orderBy($sortBy, $sortOrder)->paginate($perPage);
 
         // Transformar datos
         $usuarios->getCollection()->transform(function ($u) {
             return [
                 'id' => $u->id,
                 'codigo_modular' => $u->codigo_modular,
+                'codigo_modular_docente' => $u->codigo_modular, // Alias para compatibilidad
+                'codigo' => $u->codigo_modular, // Alias para compatibilidad
+                'apellido_paterno' => $u->apellido_paterno,
+                'apellido_materno' => $u->apellido_materno,
+                'nombres' => $u->nombres,
                 'nombre_completo' => $u->nombre_completo,
                 'iniciales' => $u->iniciales,
                 'sexo' => $u->sexo,
                 'sexo_formateado' => $u->sexo_formateado,
                 'acceso_habilitado' => $u->acceso_habilitado,
-                'cargo_principal' => $u->getCargoPrincipal(),
+                'activo' => $u->acceso_habilitado, // Alias para el frontend
+                'estado' => $u->asignacionesActivas->first()?->estado ?? 'INACTIVO',
+                'cargo' => $u->getCargoPrincipal(),
                 'institucion_principal' => $u->getInstitucionPrincipal()?->nombre_display,
                 'total_asignaciones' => $u->asignacionesActivas->count(),
+                'instituciones' => $u->asignacionesActivas->map(function ($asig) {
+                    return [
+                        'id' => $asig->institucion->id,
+                        'nombre' => $asig->institucion->nombre,
+                        'nombre_display' => $asig->institucion->nombre_display,
+                        'codigo_modular_ie' => $asig->institucion->codigo_modular_ie,
+                        'pivot' => [
+                            'cargo' => $asig->cargo,
+                            'estado' => $asig->estado,
+                            'fecha_inicio' => $asig->fecha_inicio,
+                            'fecha_fin' => $asig->fecha_fin,
+                        ],
+                    ];
+                }),
             ];
         });
 
@@ -187,12 +217,9 @@ class UsuarioAppController extends Controller
                     UsuarioAppInstitucion::create([
                         'usuario_app_id' => $usuario->id,
                         'institucion_id' => $asig['institucion_id'],
-                        'horario_institucion_id' => $asig['horario_institucion_id'],
+                        'horario_institucion_id' => $asig['horario_institucion_id'] ?? null,
                         'cargo' => $asig['cargo'] ?? null,
-                        // ✅ Estado basado en horario: ACTIVO si tiene horario, PENDIENTE si no
-                        'estado' => $asig['horario_institucion_id']
-                            ? UsuarioAppInstitucion::ESTADO_ACTIVO
-                            : UsuarioAppInstitucion::ESTADO_PENDIENTE,
+                        'estado' => $asig['estado'] ?? UsuarioAppInstitucion::ESTADO_ACTIVO,
                         'fecha_inicio' => $asig['fecha_inicio'] ?? now(),
                         'fecha_fin' => $asig['fecha_fin'] ?? null,
                     ]);
@@ -256,14 +283,14 @@ class UsuarioAppController extends Controller
                             'nombre_display' => $asig->institucion->nombre_display,
                             'distrito' => $asig->institucion->distrito,
                         ],
-                        'horario' => [
+                        'horario' => $asig->horario ? [
                             'id' => $asig->horario->id,
                             'nombre_turno' => $asig->horario->nombre_turno,
                             'turno_formateado' => $asig->horario->turno_formateado,
                             'hora_entrada' => $asig->horario->hora_entrada_formateada,
                             'hora_salida' => $asig->horario->hora_salida_formateada,
                             'dias_laborales' => $asig->horario->dias_laborales_text,
-                        ],
+                        ] : null,
                     ];
                 }),
             ]
@@ -301,9 +328,9 @@ class UsuarioAppController extends Controller
                         [
                             'usuario_app_id' => $usuario->id,
                             'institucion_id' => $asig['institucion_id'],
-                            'horario_institucion_id' => $asig['horario_institucion_id'],
                         ],
                         [
+                            'horario_institucion_id' => $asig['horario_institucion_id'] ?? null,
                             'cargo' => $asig['cargo'] ?? null,
                             'estado' => $asig['estado'] ?? UsuarioAppInstitucion::ESTADO_ACTIVO,
                             'fecha_inicio' => $asig['fecha_inicio'] ?? now(),
@@ -514,7 +541,7 @@ class UsuarioAppController extends Controller
                             'longitud' => $asig->institucion->longitud,
                             'radio' => $asig->institucion->radio,
                         ],
-                        'horario' => [
+                        'horario' => $asig->horario ? [
                             'nombre_turno' => $asig->horario->nombre_turno,
                             'turno_formateado' => $asig->horario->turno_formateado,
                             'hora_entrada' => $asig->horario->hora_entrada_formateada,
@@ -522,7 +549,7 @@ class UsuarioAppController extends Controller
                             'tolerancia_minutos' => $asig->horario->tolerancia_minutos,
                             'dias_laborales' => $asig->horario->dias_laborales,
                             'dias_laborales_text' => $asig->horario->dias_laborales_text,
-                        ],
+                        ] : null,
                     ];
                 }),
             ],

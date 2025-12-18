@@ -8,12 +8,12 @@ class UpdateInstitucionRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        // administrador puede editar cualquier institución
-        // supervisor solo instituciones asignadas
-        if ($this->user()->rol === 'administrador') {
+        // ✅ Super admin y administrador pueden editar cualquier institución
+        if (in_array($this->user()->rol, ['super_admin', 'administrador'])) {
             return true;
         }
 
+        // Supervisor solo puede editar instituciones asignadas
         return $this->user()->instituciones->pluck('id')->contains($this->route('id'));
     }
 
@@ -31,7 +31,7 @@ class UpdateInstitucionRequest extends FormRequest
             'latitud' => 'nullable|numeric',
             'longitud' => 'nullable|numeric',
             'radio' => 'nullable|numeric|min:1',
-            'logo' => 'nullable|image|mimes:jpeg,png,jpg,svg|max:2048',
+            'logo' => 'nullable|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
         ];
     }
 }

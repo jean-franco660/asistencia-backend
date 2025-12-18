@@ -4,21 +4,21 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use App\Models\UsuarioWeb;
-use Illuminate\Support\Facades\Hash;
 
 class SuperAdminSeeder extends Seeder
 {
     public function run(): void
     {
-        $email = 'superadmin@sistema.com';
-
         UsuarioWeb::updateOrCreate(
-            ['email' => $email],
+            ['email' => 'admin@asistencia.com'],
             [
-                'nombre' => 'Super Administrador',
-                'password' => 'SuperAdmin@123',
-                'rol' => UsuarioWeb::ROL_SUPER_ADMIN,
-                'estado' => 'autorizado',
+                'nombre'   => 'Super Admin',
+                // IMPORTANTE: tu mutator setPasswordAttribute() lo hashea
+                'password' => 'SuperAdmin123',
+                'rol'      => UsuarioWeb::ROL_SUPER_ADMIN,
+
+                // Opcional: tu booted()->creating ya lo autoriza si es super_admin
+                // 'estado' => UsuarioWeb::ESTADO_AUTORIZADO,
             ]
         );
     }

@@ -35,24 +35,60 @@ class AsistenciaController extends Controller
     {
         return in_array($user->rol, [
             UsuarioWeb::ROL_SUPER_ADMIN,
-            UsuarioWeb::ROL_ADMINISTRADOR,  // ✅ CORRECTO
+            UsuarioWeb::ROL_ADMINISTRADOR,
         ]);
     }
 
     /**
      * Listar asistencias con filtros y paginación
-     * ✅ CORREGIDO: codigo_modular en lugar de codigo_modular_docente
+     * ✅ CORREGIDO: Supervisor solo ve SUS instituciones
      */
     public function index(Request $request)
     {
         try {
+            $user = $request->user();
+            
             $query = Asistencia::with([
-                'usuario:id,codigo_modular,apellido_paterno,apellido_materno,nombres',  // ✅ CORRECTO
-                'institucion:id,nombre,codigo_modular_ie'
+                'usuario:id,codigo_modular,apellido_paterno,apellido_materno,nombres',
+                'institucion:id,nombre,codigo_modular_ie',
+                'horario:id,nombre_turno,hora_entrada,hora_salida'
             ])
-                ->orderBy('fecha_hora', 'desc');
+            ->orderBy('fecha_hora', 'desc');
 
-            // Filtros
+            // ✅ FILTRO OBLIGATORIO: Supervisores solo ven SUS instituciones
+            if (!$this->esAdministrador($user)) {
+                $institucionesIds = $user->institucionesVigentes()->pluck('id');
+                
+                if ($institucionesIds->isEmpty()) {
+                    return response()->json([
+                        'success' => true,
+                        'data' => [],
+                        'current_page' => 1,
+                        'total' => 0,
+                        'message' => 'No tienes instituciones asignadas'
+                    ]);
+                }
+                
+                $query->whereIn('institucion_id', $institucionesIds);
+            }
+
+            // ✅ FILTROS ADICIONALES CON VALIDACIÓN DE ACCESO
+            if ($request->filled('institucion_id')) {
+                // Validar que el supervisor tenga acceso a esta institución
+                if (!$this->esAdministrador($user)) {
+                    $institucionesIds = $user->institucionesVigentes()->pluck('id');
+                    
+                    if (!$institucionesIds->contains($request->institucion_id)) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'No tienes acceso a esta institución'
+                        ], 403);
+                    }
+                }
+                
+                $query->where('institucion_id', $request->institucion_id);
+            }
+
             if ($request->filled('fecha_inicio')) {
                 $query->whereDate('fecha_hora', '>=', $request->fecha_inicio);
             }
@@ -61,27 +97,42 @@ class AsistenciaController extends Controller
                 $query->whereDate('fecha_hora', '<=', $request->fecha_fin);
             }
 
-            if ($request->filled('institucion_id')) {
-                $query->where('institucion_id', $request->institucion_id);
-            }
-
             if ($request->filled('tipo')) {
                 $query->where('tipo', $request->tipo);
             }
 
-            // Restricción: Supervisor solo ve asistencias de sus instituciones
-            // Super admin y administrador ven todas
-            $user = $request->user();
-            if (!$this->esAdministrador($user)) {
-                $institucionesIds = $user->institucionesVigentes()->pluck('id');  // ✅ USAR institucionesVigentes
-                $query->whereIn('institucion_id', $institucionesIds);
+            if ($request->filled('resultado')) {
+                $query->where('resultado', $request->resultado);
+            }
+            
+            if ($request->filled('situacion')) {
+                $query->where('situacion', $request->situacion);
             }
 
-            $asistencias = $query->paginate(20);
+            // ✅ BÚSQUEDA POR NOMBRE O DNI DEL DOCENTE
+            if ($request->filled('search')) {
+                $search = $request->search;
+                $query->whereHas('usuario', function($q) use ($search) {
+                    $q->where('codigo_modular', 'like', "%{$search}%")
+                    ->orWhere('nombres', 'like', "%{$search}%")
+                    ->orWhere('apellido_paterno', 'like', "%{$search}%")
+                    ->orWhere('apellido_materno', 'like', "%{$search}%")
+                    ->orWhereRaw("CONCAT(apellido_paterno, ' ', apellido_materno, ' ', nombres) LIKE ?", ["%{$search}%"]);
+                });
+            }
 
-            return response()->json($asistencias);
+            $perPage = $request->input('per_page', 20);
+            $asistencias = $query->paginate($perPage);
+
+            return response()->json([
+                'success' => true,
+                'data' => $asistencias
+            ]);
 
         } catch (\Exception $e) {
+            Log::error("Error en AsistenciaController@index: " . $e->getMessage());
+            Log::error($e->getTraceAsString());
+            
             return response()->json([
                 'success' => false,
                 'error' => "Error al obtener asistencias",
@@ -207,15 +258,36 @@ class AsistenciaController extends Controller
 
     /**
      * Ver detalle de asistencia
+     * ✅ AGREGADO: Validar acceso del supervisor
      */
-    public function show($id)
+    public function show(Request $request, $id)
     {
         try {
+            $user = $request->user();
             $asistencia = Asistencia::with(['usuario', 'institucion', 'horario'])->findOrFail($id);
-            return response()->json($asistencia);
+            
+            // ✅ VALIDAR ACCESO: Supervisor solo ve asistencias de SUS instituciones
+            if (!$this->esAdministrador($user)) {
+                $institucionesIds = $user->institucionesVigentes()->pluck('id');
+                
+                if (!$institucionesIds->contains($asistencia->institucion_id)) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'No tienes acceso a esta asistencia'
+                    ], 403);
+                }
+            }
+            
+            return response()->json([
+                'success' => true,
+                'data' => $asistencia
+            ]);
         } catch (\Exception $e) {
             Log::error("Error en show(): " . $e->getMessage());
-            return response()->json(['error' => $e->getMessage()], 500);
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage()
+            ], 500);
         }
     }
 
@@ -432,19 +504,36 @@ class AsistenciaController extends Controller
 
     /**
      * Exportar asistencias (CON AUDITORÍA)
+     * ✅ YA CORRECTO: Filtra por instituciones del supervisor
      */
     public function exportar(Request $request)
     {
+        $user = $request->user();
+        
         $filters = [
             'fecha_inicio' => $request->input('fecha_inicio'),
             'fecha_fin' => $request->input('fecha_fin'),
             'institucion_id' => $request->input('institucion_id'),
             'tipo' => $request->input('tipo'),
-            'user' => $request->user(),
+            'user' => $user,
         ];
 
         // Contar registros a exportar
         $query = Asistencia::query();
+
+        // ✅ FILTRO OBLIGATORIO: Supervisor solo exporta SUS instituciones
+        if (!$this->esAdministrador($user)) {
+            $institucionesIds = $user->institucionesVigentes()->pluck('id');
+            
+            if ($institucionesIds->isEmpty()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No tienes instituciones asignadas'
+                ], 403);
+            }
+            
+            $query->whereIn('institucion_id', $institucionesIds);
+        }
 
         if ($filters['fecha_inicio']) {
             $query->whereDate('fecha_hora', '>=', $filters['fecha_inicio']);
@@ -453,15 +542,22 @@ class AsistenciaController extends Controller
             $query->whereDate('fecha_hora', '<=', $filters['fecha_fin']);
         }
         if ($filters['institucion_id']) {
+            // ✅ VALIDAR ACCESO si es supervisor
+            if (!$this->esAdministrador($user)) {
+                $institucionesIds = $user->institucionesVigentes()->pluck('id');
+                
+                if (!$institucionesIds->contains($filters['institucion_id'])) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'No tienes acceso a esta institución'
+                    ], 403);
+                }
+            }
+            
             $query->where('institucion_id', $filters['institucion_id']);
         }
         if ($filters['tipo']) {
             $query->where('tipo', $filters['tipo']);
-        }
-
-        // Supervisor solo exporta asistencias de sus instituciones
-        if (!$this->esAdministrador($filters['user'])) {
-            $query->whereIn('institucion_id', $filters['user']->institucionesVigentes()->pluck('id'));
         }
 
         $totalRegistros = $query->count();
@@ -470,10 +566,10 @@ class AsistenciaController extends Controller
 
         // AUDITORÍA DE EXPORTACIÓN
         AuditLog::create([
-            'actor_id' => $request->user()->id,
-            'actor_type' => get_class($request->user()),
-            'actor_nombre' => $request->user()->nombre,
-            'actor_rol' => $request->user()->rol,
+            'actor_id' => $user->id,
+            'actor_type' => get_class($user),
+            'actor_nombre' => $user->nombre,
+            'actor_rol' => $user->rol,
             'accion' => 'exportado',
             'descripcion' => "Exportación de reporte de asistencias",
             'modelo' => Asistencia::class,

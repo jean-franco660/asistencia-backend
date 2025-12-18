@@ -32,7 +32,6 @@ class UsuarioWebController extends Controller
             ], 401);
         }
 
-        // Verificar si el usuario fue eliminado (soft delete)
         if ($user->trashed()) {
             return response()->json([
                 'success' => false,
@@ -40,7 +39,6 @@ class UsuarioWebController extends Controller
             ], 403);
         }
 
-        // Supervisor debe estar autorizado
         if ($user->esSupervisor() && !$user->estaAutorizado()) {
             $mensaje = match($user->estado) {
                 UsuarioWeb::ESTADO_PENDIENTE => 'Tu cuenta aún no ha sido autorizada',
@@ -54,16 +52,21 @@ class UsuarioWebController extends Controller
             ], 403);
         }
 
-        // Revocar tokens anteriores
         $user->tokens()->delete();
-
-        // Crear nuevo token
         $token = $user->createToken('web-token', ['web'])->plainTextToken;
 
-        // Obtener instituciones vigentes si es supervisor
-        $instituciones = $user->esSupervisor()
-            ? $user->institucionesVigentes()->select('id', 'nombre', 'codigo_modular_ie')->get()
-            : [];
+        // ✅ CORRECCIÓN
+        $instituciones = [];
+        if ($user->esSupervisor()) {
+            $instituciones = $user->institucionesVigentes()
+                ->map(fn($inst) => [
+                    'id' => $inst->id,
+                    'nombre' => $inst->nombre,
+                    'codigo_modular_ie' => $inst->codigo_modular_ie,
+                ])
+                ->values()
+                ->toArray();
+        }
 
         return response()->json([
             'success' => true,
@@ -84,16 +87,22 @@ class UsuarioWebController extends Controller
         ]);
     }
 
-    /**
-     * Obtiene el usuario autenticado
-     */
     public function me(Request $request): JsonResponse
     {
         $user = $request->user();
 
-        $instituciones = $user->esSupervisor()
-            ? $user->institucionesVigentes()->select('id', 'nombre', 'codigo_modular_ie')->get()
-            : [];
+        // ✅ CORRECCIÓN
+        $instituciones = [];
+        if ($user->esSupervisor()) {
+            $instituciones = $user->institucionesVigentes()
+                ->map(fn($inst) => [
+                    'id' => $inst->id,
+                    'nombre' => $inst->nombre,
+                    'codigo_modular_ie' => $inst->codigo_modular_ie,
+                ])
+                ->values()
+                ->toArray();
+        }
 
         return response()->json([
             'success' => true,
@@ -111,7 +120,6 @@ class UsuarioWebController extends Controller
             ]
         ]);
     }
-
     /**
      * Lista usuarios web
      */
@@ -187,6 +195,10 @@ class UsuarioWebController extends Controller
      */
     public function store(StoreUsuarioWebRequest $request): JsonResponse
     {
+        // 🔍 DEBUG: Ver qué llega
+        \Log::info('=== CREAR ADMINISTRADOR ===');
+        \Log::info('Request data:', $request->except(['password', 'password_confirmation']));
+        
         $this->authorize('create', UsuarioWeb::class);
 
         DB::beginTransaction();
@@ -194,16 +206,35 @@ class UsuarioWebController extends Controller
         try {
             $rol = $request->input('rol', UsuarioWeb::ROL_SUPERVISOR);
             
-            // Admin y super_admin se autorizan automáticamente (booted del modelo)
-            $usuario = UsuarioWeb::create([
+            \Log::info('Rol determinado:', ['rol' => $rol]);
+            
+            // Determinar estado
+            $estado = in_array($rol, [UsuarioWeb::ROL_SUPER_ADMIN, UsuarioWeb::ROL_ADMINISTRADOR])
+                ? UsuarioWeb::ESTADO_AUTORIZADO
+                : UsuarioWeb::ESTADO_PENDIENTE;
+                
+            \Log::info('Estado determinado:', ['estado' => $estado]);
+            
+            // Preparar datos
+            $data = [
                 'nombre' => $request->nombre,
-                'email' => $request->email, // Ya viene normalizado del mutator
-                'password' => $request->password, // Ya viene hasheado del mutator
+                'email' => $request->email,
+                'password' => $request->password,
                 'rol' => $rol,
-            ]);
+                'estado' => $estado,
+            ];
+            
+            \Log::info('Datos a insertar:', array_merge($data, ['password' => '***']));
+            
+            // Crear usuario
+            $usuario = UsuarioWeb::create($data);
+            
+            \Log::info('Usuario creado exitosamente:', ['id' => $usuario->id]);
 
             // Asignar instituciones si es supervisor
             if ($usuario->esSupervisor() && $request->filled('instituciones')) {
+                \Log::info('Asignando instituciones...');
+                
                 $instituciones = collect($request->instituciones)->mapWithKeys(function ($inst) {
                     return [$inst['id'] => [
                         'fecha_inicio' => $inst['fecha_inicio'] ?? now(),
@@ -215,17 +246,27 @@ class UsuarioWebController extends Controller
             }
 
             DB::commit();
+            
+            \Log::info('✅ Transacción completada');
 
             return response()->json([
                 'success' => true,
                 'message' => $usuario->esSupervisor() 
                     ? 'Supervisor creado correctamente' 
                     : 'Administrador creado correctamente',
-                'data' => $usuario->load('instituciones'),
+                'data' => $usuario->fresh()->load('instituciones'),
             ], 201);
             
         } catch (\Exception $e) {
             DB::rollBack();
+            
+            // ❌ LOG DETALLADO DEL ERROR
+            \Log::error('❌ ERROR AL CREAR USUARIO');
+            \Log::error('Mensaje: ' . $e->getMessage());
+            \Log::error('Archivo: ' . $e->getFile());
+            \Log::error('Línea: ' . $e->getLine());
+            \Log::error('Request: ' . json_encode($request->except(['password', 'password_confirmation'])));
+            \Log::error('Stack trace: ' . $e->getTraceAsString());
             
             return response()->json([
                 'success' => false,
