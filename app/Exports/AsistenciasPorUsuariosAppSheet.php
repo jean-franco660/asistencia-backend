@@ -84,7 +84,7 @@ class AsistenciasPorUsuariosAppSheet implements
             return (object) [
                 'codigo' => $usuario->codigo_modular ?? '-',
                 'nombre' => $usuario ? ($usuario->apellido_paterno . ' ' . $usuario->apellido_materno . ' ' . $usuario->nombres) : '-',
-                'dni' => $usuario->numero_documento ?? '-',
+                'dni' => $usuario->dni ?? '-',
                 'total_dias' => $totalDias,
                 'a_tiempo' => $a_tiempo,
                 'tardanzas' => $tardanzas,

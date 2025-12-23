@@ -144,6 +144,7 @@ class JustificacionController extends Controller
         // Validación
         $request->validate([
             'institucion_id' => 'required|exists:instituciones,id',
+            'horario_institucion_id' => 'nullable|exists:horarios_institucion,id', // ✅ Para justificar horario específico
             'tipo' => 'required|in:ENFERMEDAD,PERMISO_PERSONAL,LICENCIA,COMISION_SERVICIO,CAPACITACION,DUELO,MATERNIDAD,PATERNIDAD,OLVIDO_MARCACION,OTRO',
             'fecha_inicio' => 'required|date|before_or_equal:today',  // ✅ No permitir futuro
             'fecha_fin' => 'required|date|after_or_equal:fecha_inicio|before_or_equal:today',
@@ -176,6 +177,7 @@ class JustificacionController extends Controller
             'asistencia_id' => $request->asistencia_id,
             'usuario_app_id' => $user->id,
             'institucion_id' => (int) $request->institucion_id,
+            'horario_institucion_id' => $request->horario_institucion_id, // ✅ NUEVO
             'tipo' => $request->tipo,
             'fecha_inicio' => $request->fecha_inicio,
             'fecha_fin' => $request->fecha_fin,
@@ -249,17 +251,58 @@ class JustificacionController extends Controller
             }
         }
 
+        // Log de depuración
+        \Log::info('🔍 [Justificación] Intentando actualizar asistencias', [
+            'justificacion_id' => $justificacion->id,
+            'usuario_app_id' => $justificacion->usuario_app_id,
+            'institucion_id' => $justificacion->institucion_id,
+            'fecha_inicio' => $justificacion->fecha_inicio->format('Y-m-d'),
+            'fecha_fin' => $justificacion->fecha_fin->format('Y-m-d'),
+        ]);
+
+        // Primero verificar cuántas asistencias existen
+        $queryVerificar = Asistencia::where('usuario_app_id', $justificacion->usuario_app_id)
+            ->where('institucion_id', $justificacion->institucion_id);
+
+        // ✅ FILTRAR POR HORARIO si está presente
+        if ($justificacion->horario_institucion_id) {
+            $queryVerificar->where('horario_institucion_id', $justificacion->horario_institucion_id);
+        }
+
+        $asistenciasEncontradas = $queryVerificar->whereBetween('fecha', [
+            $justificacion->fecha_inicio->format('Y-m-d'),
+            $justificacion->fecha_fin->format('Y-m-d')
+        ])
+            ->get();
+
+        \Log::info('🔍 [Justificación] Asistencias encontradas: ' . $asistenciasEncontradas->count(), [
+            'asistencias' => $asistenciasEncontradas->pluck('id', 'fecha')->toArray()
+        ]);
+
         // Actualizar TODAS las asistencias en el rango de fechas
-        Asistencia::where('usuario_app_id', $justificacion->usuario_app_id)
-            ->where('institucion_id', $justificacion->institucion_id) // Misma institución
-            ->whereBetween('fecha', [
-                $justificacion->fecha_inicio->format('Y-m-d'),
-                $justificacion->fecha_fin->format('Y-m-d')
-            ])
+        $queryActualizar = Asistencia::where('usuario_app_id', $justificacion->usuario_app_id)
+            ->where('institucion_id', $justificacion->institucion_id); // Misma institución
+
+        // ✅ FILTRAR POR HORARIO si está presente en la justificación
+        if ($justificacion->horario_institucion_id) {
+            $queryActualizar->where('horario_institucion_id', $justificacion->horario_institucion_id);
+            \Log::info('✅ [Justificación] Filtrando por horario específico', [
+                'horario_id' => $justificacion->horario_institucion_id
+            ]);
+        } else {
+            \Log::info('⚠️ [Justificación] SIN filtro de horario - actualizará TODOS los horarios de la institución');
+        }
+
+        $actualizadas = $queryActualizar->whereBetween('fecha', [
+            $justificacion->fecha_inicio->format('Y-m-d'),
+            $justificacion->fecha_fin->format('Y-m-d')
+        ])
             ->update([
                 'estado_diario' => 'PRESENTE',
                 'observacion' => 'Justificación Aprobada: ' . $request->observaciones
             ]);
+
+        \Log::info('✅ [Justificación] Asistencias actualizadas a PRESENTE: ' . $actualizadas);
 
         // ✅ ELIMINADO: auditoría manual duplicada
         // El Trait Auditable ya registró automáticamente el 'updated'

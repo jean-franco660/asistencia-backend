@@ -39,7 +39,7 @@ class AsistenciaMaterializationService
         // Insertamos en asistencias seleccionando de usuario_app_institucion (uai)
         // Validamos día de semana con LIKE '%"L"%' (simple, compatible con el formato JSON ["L","M"...])
         $sql = "
-            INSERT INTO asistencias (
+            INSERT IGNORE INTO asistencias (
                 usuario_app_id, 
                 institucion_id, 
                 horario_institucion_id,

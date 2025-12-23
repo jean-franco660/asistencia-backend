@@ -85,7 +85,7 @@ class AsistenciasResumenSheet implements
         return [
             $row->fecha ? $row->fecha->format('d/m/Y') : '-',
             $row->usuario ? ($row->usuario->apellido_paterno . ' ' . $row->usuario->apellido_materno . ' ' . $row->usuario->nombres) : '-',
-            $row->usuario->numero_documento ?? '-',
+            $row->usuario->dni ?? '-',
             $row->institucion->nombre ?? '-',
             $row->horario->nombre_turno ?? '-',
             $row->estado_diario,

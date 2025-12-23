@@ -291,7 +291,7 @@ class InstitucionController extends Controller
         }
 
         // Aplicar withCount
-        $query->withCount('usuariosApp');
+        $query->withCount(['usuariosApp', 'horarios']);
 
         // Soporte para limit (sin paginación)
         $limit = $request->input('limit');

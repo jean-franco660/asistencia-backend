@@ -103,7 +103,7 @@ class AsistenciasDetalleSheet implements
         return [
             $index,
             $usuario ? ($usuario->apellido_paterno . ' ' . $usuario->nombres) : '-',
-            $usuario->numero_documento ?? '-',
+            $usuario->dni ?? '-',
             $institucion->nombre ?? '-',
             $row->marcada_en ? Carbon::parse($row->marcada_en)->setTimezone('America/Lima')->format('d/m/Y') : '-',
             $row->marcada_en ? Carbon::parse($row->marcada_en)->setTimezone('America/Lima')->format('H:i:s') : '-',
