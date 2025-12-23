@@ -61,7 +61,7 @@ class JustificacionController extends Controller
         // Docente (app): solo ve sus justificaciones
         if ($user instanceof UsuarioApp) {
             $query->where('usuario_app_id', $user->id);
-        } 
+        }
         // Usuario web
         else {
             // Super admin y administrador: ven todas las justificaciones
@@ -225,12 +225,41 @@ class JustificacionController extends Controller
             'fecha_revision' => now(),
         ]);
 
-        // Actualizar estado de asistencia si existe
-        if ($justificacion->asistencia_id && $justificacion->asistencia) {
-            $justificacion->asistencia->update([
-                'situacion' => Asistencia::SITUACION_JUSTIFICADO  // ✅ CORRECTO
-            ]);
+        // 1. Asegurar que existan registros de asistencia para las fechas futuras (Materialización On-Demand)
+        $pivot = \App\Models\UsuarioAppInstitucion::where('usuario_app_id', $justificacion->usuario_app_id)
+            ->where('institucion_id', $justificacion->institucion_id)
+            ->where('estado', 'ACTIVO')
+            ->first();
+
+        if ($pivot) {
+            $periodo = \Carbon\CarbonPeriod::create($justificacion->fecha_inicio, $justificacion->fecha_fin);
+            foreach ($periodo as $date) {
+                Asistencia::firstOrCreate(
+                    [
+                        'usuario_app_id' => $justificacion->usuario_app_id,
+                        'institucion_id' => $justificacion->institucion_id,
+                        'fecha' => $date->format('Y-m-d'),
+                    ],
+                    [
+                        'horario_institucion_id' => $pivot->horario_institucion_id,
+                        'estado_diario' => 'FALTA', // Se actualizará a PRESENTE abajo
+                        'observacion' => 'Creado por justificación futura',
+                    ]
+                );
+            }
         }
+
+        // Actualizar TODAS las asistencias en el rango de fechas
+        Asistencia::where('usuario_app_id', $justificacion->usuario_app_id)
+            ->where('institucion_id', $justificacion->institucion_id) // Misma institución
+            ->whereBetween('fecha', [
+                $justificacion->fecha_inicio->format('Y-m-d'),
+                $justificacion->fecha_fin->format('Y-m-d')
+            ])
+            ->update([
+                'estado_diario' => 'PRESENTE',
+                'observacion' => 'Justificación Aprobada: ' . $request->observaciones
+            ]);
 
         // ✅ ELIMINADO: auditoría manual duplicada
         // El Trait Auditable ya registró automáticamente el 'updated'
@@ -281,11 +310,23 @@ class JustificacionController extends Controller
             'fecha_revision' => now(),
         ]);
 
+        // Actualizar TODAS las asistencias en el rango de fechas a FALTA
+        Asistencia::where('usuario_app_id', $justificacion->usuario_app_id)
+            ->where('institucion_id', $justificacion->institucion_id)
+            ->whereBetween('fecha', [
+                $justificacion->fecha_inicio->format('Y-m-d'),
+                $justificacion->fecha_fin->format('Y-m-d')
+            ])
+            ->update([
+                'estado_diario' => 'FALTA',
+                'observacion' => 'Justificación rechazada: ' . $request->observaciones
+            ]);
+
         // ✅ ELIMINADO: auditoría manual duplicada
 
         return response()->json([
             'success' => true,
-            'message' => 'Justificación rechazada',
+            'message' => 'Justificación rechazada y asistencia marcada como FALTA',
             'data' => $justificacion->fresh()->load(['usuario', 'institucion', 'revisor']),
         ]);
     }

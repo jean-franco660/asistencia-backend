@@ -18,35 +18,27 @@ return new class extends Migration {
                 ->constrained('instituciones')
                 ->restrictOnDelete();
 
-            // Turno/horario asignado (nullable - se configura después de importar)
             $table->foreignId('horario_institucion_id')
                 ->nullable()
                 ->constrained('horarios_institucion')
                 ->restrictOnDelete();
 
-            // Cargo del usuario en esta institución
             $table->string('cargo', 50)->nullable();
 
-            // Estado de la asignación
-            $table->enum('estado', ['ACTIVO', 'INACTIVO'])->default('ACTIVO');
+            // 🎯 Se activa automáticamente al asignar horario (via Observer)
+            $table->enum('estado', ['PENDIENTE', 'ACTIVO', 'INACTIVO'])
+                ->default('PENDIENTE')
+                ->comment('ACTIVO automático al asignar horario');
 
-            // Periodo de vigencia
             $table->date('fecha_inicio')->nullable();
             $table->date('fecha_fin')->nullable();
 
             $table->timestamps();
+            $table->softDeletes();
 
-            // Constraint: No duplicar usuario + institución
-            $table->unique(
-                ['usuario_app_id', 'institucion_id'],
-                'uk_usuario_ie'
-            );
-
-            // Índices para consultas frecuentes
+            $table->unique(['usuario_app_id', 'institucion_id'], 'uq_usuario_app_institucion');
             $table->index(['institucion_id', 'estado'], 'idx_ie_estado');
             $table->index(['usuario_app_id', 'estado'], 'idx_usuario_estado');
-            $table->index('cargo', 'idx_cargo');
-            $table->index(['fecha_fin', 'estado'], 'idx_vencimiento');
         });
     }
 

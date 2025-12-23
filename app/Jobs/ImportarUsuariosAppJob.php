@@ -2,9 +2,9 @@
 
 namespace App\Jobs;
 
-use App\Imports\UsuariosAppImport; // ⭐ CAMBIO AQUÍ
+use App\Imports\UsuariosAppImport;
 use App\Models\ImportacionLog;
-use App\Services\ImportUsuariosAppService; // ⭐ Y AQUÍ
+use App\Services\ImportUsuariosAppService;
 use App\Traits\GeneraArchivoErrores;
 use Exception;
 use Illuminate\Bus\Queueable;
@@ -35,12 +35,12 @@ class ImportarUsuariosAppJob implements ShouldQueue
         $this->archivoPath = $archivoPath;
     }
 
-    public function handle(ImportUsuariosAppService $service): void // ⭐ SERVICIO CORRECTO
+    public function handle(ImportUsuariosAppService $service): void
     {
         $importLog = ImportacionLog::findOrFail($this->importLogId);
 
         try {
-            Log::info("🚀 Iniciando ImportarUsuariosAppJob", [
+            Log::info('🚀 Iniciando ImportarUsuariosAppJob', [
                 'import_log_id' => $importLog->id,
                 'archivo' => $this->archivoPath,
             ]);
@@ -52,65 +52,64 @@ class ImportarUsuariosAppJob implements ShouldQueue
             }
 
             $absolutePath = Storage::path($this->archivoPath);
-            $importLog->update(['total' => 0]);
 
-            // ⭐ USAR LA CLASE CORRECTA
+            // 🔹 Importación
             Excel::import(
                 new UsuariosAppImport($importLog, $service),
                 $absolutePath
             );
 
-            $importLog->marcarComoCompletada();
-
+            // 🔹 Generar archivo de errores antes de cerrar
             if ($importLog->tieneErrores()) {
-                $csvPath = $this->generarArchivoErrores($importLog);
-                
-                if ($csvPath) {
-                    $importLog->update(['errores_archivo' => $csvPath]);
+                $pathErrores = $this->generarArchivoErrores($importLog);
+                if ($pathErrores) {
+                    $importLog->update(['errores_archivo' => $pathErrores]);
                 }
             }
 
-            Log::info("✅ ImportarUsuariosAppJob completado", [
+            // 🔹 Normalizar contadores finales
+            $importLog->refresh();
+
+            $exitosos  = (int) $importLog->exitosos;
+            $errores   = (int) $importLog->errores_count;
+            $procesados = (int) $importLog->procesados;
+
+            if ($importLog->total <= 0) {
+                $total = $procesados > 0
+                    ? $procesados
+                    : ($exitosos + $errores);
+
+                $importLog->update([
+                    'total' => $total,
+                    'procesados' => $procesados > 0 ? $procesados : $total,
+                ]);
+            }
+
+            $importLog->marcarComoCompletada();
+
+            Log::info('✅ ImportarUsuariosAppJob completado', [
                 'import_log_id' => $importLog->id,
                 'resumen' => $importLog->resumen,
             ]);
 
-            if (Storage::exists($this->archivoPath)) {
-                Storage::delete($this->archivoPath);
-            }
+            Storage::delete($this->archivoPath);
 
         } catch (Exception $e) {
-            Log::error("❌ Error en ImportarUsuariosAppJob", [
+            Log::error('❌ Error en ImportarUsuariosAppJob', [
                 'import_log_id' => $importLog->id,
                 'error' => $e->getMessage(),
             ]);
 
             $importLog->marcarComoFallida($e->getMessage());
-
             throw $e;
         }
     }
 
     public function failed(Exception $exception): void
     {
-        Log::error("💥 ImportarUsuariosAppJob falló definitivamente", [
+        Log::error('💥 ImportarUsuariosAppJob falló definitivamente', [
             'import_log_id' => $this->importLogId,
             'error' => $exception->getMessage(),
         ]);
-
-        try {
-            $importLog = ImportacionLog::find($this->importLogId);
-            
-            if ($importLog && !$importLog->fallo()) {
-                $importLog->marcarComoFallida($exception->getMessage());
-            }
-
-            if (Storage::exists($this->archivoPath)) {
-                Storage::delete($this->archivoPath);
-            }
-
-        } catch (Exception $e) {
-            Log::error("Error al limpiar", ['error' => $e->getMessage()]);
-        }
     }
 }

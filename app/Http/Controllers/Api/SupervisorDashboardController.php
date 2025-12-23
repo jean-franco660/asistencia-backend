@@ -45,22 +45,21 @@ class SupervisorDashboardController extends Controller
             fn($q) => $q->whereIn('instituciones.id', $institucionesIds)
         )->count();
 
-        // Asistencias de hoy (entrada + salida)
+        // Asistencias de hoy (Headers)
         $asistenciasHoy = Asistencia::whereIn('institucion_id', $institucionesIds)
-            ->whereDate('fecha_hora', $today)
+            ->whereDate('fecha', $today)
             ->count();
 
-        // Contar usuarios app con asistencia completa hoy
+        // Contar usuarios app con asistencia completa hoy (estado PRESENTE o TARDANZA)
         $registrosHoy = Asistencia::whereIn('institucion_id', $institucionesIds)
-            ->whereDate('fecha_hora', $today)
+            ->whereDate('fecha', $today)
             ->get()
             ->groupBy('usuario_app_id');
 
         $usuariosAppPresentes = 0;  // ✅ camelCase
         foreach ($registrosHoy as $userId => $registros) {
-            $entrada = $registros->firstWhere('tipo', Asistencia::TIPO_ENTRADA);
-            $salida = $registros->firstWhere('tipo', Asistencia::TIPO_SALIDA);
-            if ($entrada && $salida) {
+            $registro = $registros->first();
+            if ($registro && in_array($registro->estado_diario, ['PRESENTE', 'TARDANZA'])) {
                 $usuariosAppPresentes++;
             }
         }
@@ -80,7 +79,7 @@ class SupervisorDashboardController extends Controller
             $usuariosAppCount = $institucion->usuariosApp()->count();  // ✅ camelCase
 
             $asistenciasHoyInst = Asistencia::where('institucion_id', $institucion->id)
-                ->whereDate('fecha_hora', $today)
+                ->whereDate('fecha', $today)
                 ->count();
 
             return [

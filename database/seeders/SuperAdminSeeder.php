@@ -14,7 +14,7 @@ class SuperAdminSeeder extends Seeder
             [
                 'nombre'   => 'Super Admin',
                 // IMPORTANTE: tu mutator setPasswordAttribute() lo hashea
-                'password' => 'SuperAdmin123',
+                'password' => 'SuperAdmin123',  
                 'rol'      => UsuarioWeb::ROL_SUPER_ADMIN,
 
                 // Opcional: tu booted()->creating ya lo autoriza si es super_admin

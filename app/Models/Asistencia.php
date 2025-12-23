@@ -9,8 +9,8 @@ use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Support\Facades\Storage;
 
 /**
- * @property \Illuminate\Support\Carbon $fecha_hora
- * @property \Illuminate\Support\Carbon $fecha
+ * @property \Illuminate\Support\Carbon|null $fecha_hora
+ * @property \Illuminate\Support\Carbon|null $fecha
  */
 class Asistencia extends Model
 {
@@ -22,16 +22,18 @@ class Asistencia extends Model
 
     // Tipos (MAYÚSCULAS según migración)
     public const TIPO_ENTRADA = 'ENTRADA';
-    public const TIPO_SALIDA  = 'SALIDA';
+    public const TIPO_SALIDA = 'SALIDA';
+    public const TIPO_FALTA = 'FALTA';
 
     // Resultados de marcación
-    public const RESULTADO_A_TIEMPO      = 'A_TIEMPO';
-    public const RESULTADO_TARDE         = 'TARDE';
-    public const RESULTADO_SALIDA_ANTES  = 'SALIDA_ANTES';
+    public const RESULTADO_PUNTUAL = 'PUNTUAL';
+    public const RESULTADO_A_TIEMPO = 'A_TIEMPO';
+    public const RESULTADO_TARDE = 'TARDE';
+    public const RESULTADO_SALIDA_ANTES = 'SALIDA_ANTES';
 
     // Situación administrativa
-    public const SITUACION_NORMAL      = 'NORMAL';
-    public const SITUACION_FALTA       = 'FALTA';
+    public const SITUACION_NORMAL = 'NORMAL';
+    public const SITUACION_FALTA = 'FALTA';
     public const SITUACION_JUSTIFICADO = 'JUSTIFICADO';
 
     /* =========================
@@ -42,47 +44,43 @@ class Asistencia extends Model
         'usuario_app_id',
         'institucion_id',
         'horario_institucion_id',
-        
+
         // Fechas según migración
         'fecha',
-        'fecha_hora',
-        
-        // Tipo y estado
-        'tipo',
-        'resultado',
-        'situacion',
-        
-        // Geolocalización
-        'dentro_rango',
-        'latitud',
-        'longitud',
-        
-        // Evidencia
-        'foto',
-        
-        // Sync
-        'sincronizado',
+
+        // Estado diario (Header)
+        'estado_diario', // PRESENTE, TARDANZA, FALTA
+
+        // Resumen
+        'hora_entrada',
+        'hora_salida',
+        'minutos_tardanza',
+
+        // Auditoría
+        'observacion',
+        'revisado_por_usuario_web_id',
+        'revisado_at',
     ];
 
     protected $casts = [
-        'fecha'           => 'date',
-        'fecha_hora'      => 'datetime',
-        'dentro_rango'    => 'boolean',
-        'sincronizado'    => 'boolean',
-        'latitud'         => 'decimal:7',
-        'longitud'        => 'decimal:7',
+        'fecha' => 'date',
+        'revisado_at' => 'datetime',
     ];
 
     protected $attributes = [
-        'sincronizado'   => false,
-        'situacion'      => self::SITUACION_NORMAL,
-        'dentro_rango'   => false,
+        'estado_diario' => 'FALTA',
     ];
 
-    protected $appends = [
-        'selfie_url',
-        'fecha_hora_formateada',
-    ];
+    // NOTE: removed appends for selfie_url etc as they belong to details now
+
+    /**
+     * Serialize dates to include explicit timezone offset
+     * Ensures API responses always include timezone information (UTC)
+     */
+    protected function serializeDate(\DateTimeInterface $date): string
+    {
+        return $date->format('Y-m-d\TH:i:sP'); // ISO 8601 with timezone offset
+    }
 
     /* =========================
      * RELACIONES
@@ -90,7 +88,7 @@ class Asistencia extends Model
 
     public function usuario(): BelongsTo
     {
-        return $this->belongsTo(UsuarioApp::class, 'usuario_app_id');
+        return $this->belongsTo(UsuarioApp::class, 'usuario_app_id')->withTrashed();
     }
 
     public function institucion(): BelongsTo
@@ -100,156 +98,20 @@ class Asistencia extends Model
 
     public function horario(): BelongsTo
     {
-        return $this->belongsTo(
-            HorarioInstitucion::class,
-            'horario_institucion_id'
-        );
+        return $this->belongsTo(HorarioInstitucion::class, 'horario_institucion_id');
     }
 
     /**
-     * Justificación asociada (si existe)
-     * 
-     * Una asistencia parcial (solo entrada o solo salida) puede tener justificación.
-     * Las faltas completas (sin asistencia) también tienen justificación, pero no
-     * están vinculadas aquí (asistencia_id = null en justificaciones).
+     * Detalle de marcaciones (Entradas/Salidas)
      */
-    public function justificacion(): HasOne
+    public function marcaciones(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
-        return $this->hasOne(Justificacion::class, 'asistencia_id');
+        return $this->hasMany(AsistenciaDiaria::class, 'asistencia_id');
     }
+
 
     /**
-     * Asistencia complementaria del mismo día
-     * Ejemplo: Si esta es ENTRADA, busca la SALIDA del mismo día
-     */
-    public function asistenciaComplementaria(): ?self
-    {
-        $tipoComplementario = $this->esEntrada() 
-            ? self::TIPO_SALIDA 
-            : self::TIPO_ENTRADA;
-
-        return static::where('usuario_app_id', $this->usuario_app_id)
-                     ->where('institucion_id', $this->institucion_id)
-                     ->where('horario_institucion_id', $this->horario_institucion_id)
-                     ->where('fecha', $this->fecha)
-                     ->where('tipo', $tipoComplementario)
-                     ->first();
-    }
-
-    /* =========================
-     * ACCESSORS
-     * ========================= */
-
-    public function getFechaHoraFormateadaAttribute(): string
-    {
-        return $this->fecha_hora
-            ? $this->fecha_hora->format('d/m/Y H:i:s')
-            : '';
-    }
-
-    public function getFechaFormateadaAttribute(): string
-    {
-        return $this->fecha
-            ? $this->fecha->format('d/m/Y')
-            : '';
-    }
-
-    public function getSelfieUrlAttribute(): ?string
-    {
-        if (!$this->foto) {
-            return null;
-        }
-
-        try {
-            /** @var FilesystemAdapter $disk */
-            $disk = Storage::disk('s3');
-            return $disk->url($this->foto);
-        } catch (\Throwable $e) {
-            \Log::error("Error S3 asistencia {$this->id}: {$e->getMessage()}");
-            return null;
-        }
-    }
-
-    /* =========================
-     * HELPERS DE DOMINIO
-     * ========================= */
-
-    public function esEntrada(): bool
-    {
-        return $this->tipo === self::TIPO_ENTRADA;
-    }
-
-    public function esSalida(): bool
-    {
-        return $this->tipo === self::TIPO_SALIDA;
-    }
-
-    public function estaJustificada(): bool
-    {
-        return $this->situacion === self::SITUACION_JUSTIFICADO;
-    }
-
-    public function esFalta(): bool
-    {
-        return $this->situacion === self::SITUACION_FALTA;
-    }
-
-    public function esATiempo(): bool
-    {
-        return $this->resultado === self::RESULTADO_A_TIEMPO;
-    }
-
-    public function esTarde(): bool
-    {
-        return $this->resultado === self::RESULTADO_TARDE;
-    }
-
-    public function salidaAntes(): bool
-    {
-        return $this->resultado === self::RESULTADO_SALIDA_ANTES;
-    }
-
-    /**
-     * Verifica si la marcación está completa (tiene entrada Y salida)
-     */
-    public function tieneMarcacionCompleta(): bool
-    {
-        return $this->asistenciaComplementaria() !== null;
-    }
-
-    /**
-     * Verifica si requiere justificación
-     */
-    public function requiereJustificacion(): bool
-    {
-        // Si está justificada, no requiere otra
-        if ($this->estaJustificada()) {
-            return false;
-        }
-
-        // Si ya tiene justificación pendiente/aprobada, no requiere otra
-        if ($this->justificacion()->exists()) {
-            return false;
-        }
-
-        // Si es falta, requiere justificación
-        if ($this->esFalta()) {
-            return true;
-        }
-
-        // Si no tiene marcación complementaria (falta entrada o salida)
-        if (!$this->tieneMarcacionCompleta()) {
-            return true;
-        }
-
-        // Opcional: según política institucional, tardanzas pueden requerir justificación
-        // return $this->esTarde();
-
-        return false;
-    }
-
-    /**
-     * Crea una justificación para esta asistencia
+     * Crea una justificación para esta asistencia.
      */
     public function crearJustificacion(string $tipo, string $motivo): Justificacion
     {
@@ -295,7 +157,80 @@ class Asistencia extends Model
         return $query->where('tipo', self::TIPO_SALIDA);
     }
 
+    /**
+     * Faltas completas (registro tipo FALTA).
+     */
     public function scopeFaltas($query)
+    {
+        return $query->where('tipo', self::TIPO_FALTA);
+    }
+
+    /**
+     * Situación administrativa en FALTA (incluye faltas completas y cualquier registro marcado como FALTA).
+     */
+    protected $appends = [
+        'situacion',
+        'resultado',
+        'latitud',
+        'longitud',
+        'dentro_rango',
+        'foto',
+    ];
+
+    /* =========================
+     * ACCESSORS
+     * ========================= */
+
+    public function getSituacionAttribute(): string
+    {
+        return match ($this->estado_diario) {
+            'FALTA' => self::SITUACION_FALTA,
+            'JUSTIFICADO' => self::SITUACION_JUSTIFICADO,
+            default => self::SITUACION_NORMAL,
+        };
+    }
+
+    public function getResultadoAttribute(): ?string
+    {
+        return match ($this->estado_diario) {
+            'TARDANZA' => self::RESULTADO_TARDE,
+            'PRESENTE' => self::RESULTADO_A_TIEMPO,
+            default => null,
+        };
+    }
+
+    // Helper para obtener la marcación relevante (usualmente la primera/entrada)
+    protected function getMarcacionPrincipalAttribute()
+    {
+        return $this->marcaciones->first();
+    }
+
+    public function getLatitudAttribute()
+    {
+        return $this->marcacion_principal?->latitud;
+    }
+
+    public function getLongitudAttribute()
+    {
+        return $this->marcacion_principal?->longitud;
+    }
+
+    public function getDentroRangoAttribute(): bool
+    {
+        return (bool) $this->marcacion_principal?->dentro_rango;
+    }
+
+    public function getFotoAttribute()
+    {
+        return $this->marcaciones->first(fn($m) => !empty($m->foto_url))?->foto_url;
+    }
+
+    public function getTurnoAttribute(): ?string
+    {
+        return $this->horario?->nombre_turno;
+    }
+
+    public function scopeSituacionFalta($query)
     {
         return $query->where('situacion', self::SITUACION_FALTA);
     }

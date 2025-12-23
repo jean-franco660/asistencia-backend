@@ -4,8 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration
-{
+return new class extends Migration {
     public function up(): void
     {
         Schema::create('horarios_institucion', function (Blueprint $table) {
@@ -15,10 +14,11 @@ return new class extends Migration
                 ->constrained('instituciones')
                 ->cascadeOnDelete();
 
-            $table->enum('nombre_turno', ['MAÑANA','TARDE','NOCHE']);
+            $table->enum('nombre_turno', ['MAÑANA', 'TARDE', 'NOCHE']);
             $table->time('hora_entrada');
             $table->time('hora_salida');
-            $table->unsignedTinyInteger('tolerancia_minutos')->default(5);
+            $table->unsignedTinyInteger('tolerancia_entrada_minutos')->default(5);
+            $table->unsignedTinyInteger('tolerancia_salida_minutos')->default(5);
 
             // Días laborales: ["L","M","X","J","V"]
             $table->json('dias_semana')->nullable();
@@ -28,9 +28,9 @@ return new class extends Migration
             $table->timestamps();
 
             // Evita duplicados de turnos por IE
-            $table->unique(['institucion_id','nombre_turno'], 'uk_ie_turno');
+            $table->unique(['institucion_id', 'nombre_turno'], 'uk_ie_turno');
 
-            $table->index(['institucion_id','activo']);
+            $table->index(['institucion_id', 'activo']);
         });
     }
 

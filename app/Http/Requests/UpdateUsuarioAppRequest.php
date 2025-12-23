@@ -26,6 +26,13 @@ class UpdateUsuarioAppRequest extends FormRequest
                 Rule::unique('usuarios_app', 'codigo_modular')->ignore($userId)
             ],
 
+            'dni' => [
+                'sometimes',
+                'string',
+                'max:15',
+                Rule::unique('usuarios_app', 'dni')->ignore($userId)
+            ],
+
             // Datos personales
             'apellido_paterno' => 'sometimes|string|max:100',
             'apellido_materno' => 'sometimes|string|max:100',
@@ -56,6 +63,10 @@ class UpdateUsuarioAppRequest extends FormRequest
             // Código modular
             'codigo_modular.unique' => 'Este código modular ya está registrado',
             'codigo_modular.max' => 'El código modular no puede exceder :max caracteres',
+
+            // DNI
+            'dni.unique' => 'Este DNI ya está registrado',
+            'dni.max' => 'El DNI no puede exceder :max caracteres',
 
             // Datos personales
             'apellido_paterno.max' => 'El apellido paterno no puede exceder :max caracteres',

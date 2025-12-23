@@ -20,20 +20,20 @@ class HorarioInstitucion extends Model
      * ========================= */
 
     public const TURNO_MANANA = 'MAÑANA';
-    public const TURNO_TARDE  = 'TARDE';
-    public const TURNO_NOCHE  = 'NOCHE';
+    public const TURNO_TARDE = 'TARDE';
+    public const TURNO_NOCHE = 'NOCHE';
 
     /* =========================
      * CONSTANTES - DÍAS
      * ========================= */
 
-    public const DIA_LUNES     = 'L';
-    public const DIA_MARTES    = 'M';
+    public const DIA_LUNES = 'L';
+    public const DIA_MARTES = 'M';
     public const DIA_MIERCOLES = 'X';
-    public const DIA_JUEVES    = 'J';
-    public const DIA_VIERNES   = 'V';
-    public const DIA_SABADO    = 'S';
-    public const DIA_DOMINGO   = 'D';
+    public const DIA_JUEVES = 'J';
+    public const DIA_VIERNES = 'V';
+    public const DIA_SABADO = 'S';
+    public const DIA_DOMINGO = 'D';
 
     /* =========================
      * FILLABLE / CASTS
@@ -44,20 +44,25 @@ class HorarioInstitucion extends Model
         'nombre_turno',
         'hora_entrada',
         'hora_salida',
-        'tolerancia_minutos',
+        'tolerancia_entrada_minutos',
+        'tolerancia_salida_minutos',
         'dias_semana',
         'activo',
     ];
 
     protected $casts = [
-        'dias_semana'         => 'array',
-        'activo'              => 'boolean',
-        'tolerancia_minutos'  => 'integer',
+        'dias_semana' => 'array',
+        'activo' => 'boolean',
+        'tolerancia_entrada_minutos' => 'integer',
+        'tolerancia_salida_minutos' => 'integer',
     ];
 
+    protected $appends = ['dias_laborales_text'];
+
     protected $attributes = [
-        'activo'             => true,
-        'tolerancia_minutos' => 5,
+        'activo' => true,
+        'tolerancia_entrada_minutos' => 5,
+        'tolerancia_salida_minutos' => 5,
     ];
 
     /* =========================
@@ -156,7 +161,7 @@ class HorarioInstitucion extends Model
      */
     public function scopeParaHoy($query)
     {
-        $diaHoy = static::getDiaAbreviado(now());
+        $diaHoy = static::getDiaAbreviado(now('America/Lima'));
         return $query->whereJsonContains('dias_semana', $diaHoy);
     }
 
@@ -178,19 +183,35 @@ class HorarioInstitucion extends Model
     {
         $entrada = Carbon::parse($this->hora_entrada);
         $salida = Carbon::parse($this->hora_salida);
-        
+
         return $entrada->diffInMinutes($salida) / 60;
     }
 
     public function getDiasLaboralesAttribute(): array
     {
-        return $this->dias_semana ?? [];
+        $dias = $this->dias_semana ?? [];
+        if (is_string($dias)) {
+            return explode(',', $dias);
+        }
+        return $dias;
     }
 
     public function getDiasLaboralesTextAttribute(): string
     {
         $dias = $this->dias_semana ?? [];
-        
+
+        // Convertir string a array si es necesario
+        if (is_string($dias)) {
+            $dias = explode(',', $dias);
+        }
+
+        if (empty($dias))
+            return 'No especificado';
+
+        // Mapa de días a índices para ordenar y comparar
+        $orden = ['L' => 1, 'M' => 2, 'X' => 3, 'J' => 4, 'V' => 5, 'S' => 6, 'D' => 7];
+
+        // Mapeo inverso para nombres cortos
         $nombres = [
             'L' => 'Lun',
             'M' => 'Mar',
@@ -201,12 +222,39 @@ class HorarioInstitucion extends Model
             'D' => 'Dom',
         ];
 
+        // Ordenar los días
+        usort($dias, fn($a, $b) => ($orden[$a] ?? 0) <=> ($orden[$b] ?? 0));
+
+        // Verificar si son consecutivos
+        $esConsecutivo = true;
+        $count = count($dias);
+
+        if ($count > 2) { // Solo vale la pena agrupar si son más de 2 días
+            for ($i = 0; $i < $count - 1; $i++) {
+                $actual = $orden[$dias[$i]] ?? 0;
+                $siguiente = $orden[$dias[$i + 1]] ?? 0;
+
+                if ($siguiente !== $actual + 1) {
+                    $esConsecutivo = false;
+                    break;
+                }
+            }
+
+            if ($esConsecutivo) {
+                // Si son consecutivos, mostrar rango: "Lun - Vie"
+                $primero = $nombres[$dias[0]] ?? $dias[0];
+                $ultimo = $nombres[$dias[$count - 1]] ?? $dias[$count - 1];
+                return "$primero - $ultimo";
+            }
+        }
+
+        // Si no son consecutivos o son pocos, mostrar lista separada por comas
         return implode(', ', array_map(fn($d) => $nombres[$d] ?? $d, $dias));
     }
 
     public function getTurnoFormateadoAttribute(): string
     {
-        return match($this->nombre_turno) {
+        return match ($this->nombre_turno) {
             self::TURNO_MANANA => 'Mañana',
             self::TURNO_TARDE => 'Tarde',
             self::TURNO_NOCHE => 'Noche',
@@ -228,7 +276,7 @@ class HorarioInstitucion extends Model
         }
 
         $diaAbreviado = static::getDiaAbreviado($fecha);
-        
+
         return in_array($diaAbreviado, $this->dias_semana ?? [], true);
     }
 
@@ -238,8 +286,8 @@ class HorarioInstitucion extends Model
     public function estaEnRangoEntrada(Carbon $horaActual): bool
     {
         $horaEntrada = Carbon::parse($this->hora_entrada);
-        $horaLimite = $horaEntrada->copy()->addMinutes($this->tolerancia_minutos);
-        
+        $horaLimite = $horaEntrada->copy()->addMinutes($this->tolerancia_entrada_minutos);
+
         return $horaActual->between($horaEntrada, $horaLimite);
     }
 
@@ -249,19 +297,20 @@ class HorarioInstitucion extends Model
     public function esEntradaTarde(Carbon $horaActual): bool
     {
         $horaEntrada = Carbon::parse($this->hora_entrada);
-        $horaLimite = $horaEntrada->copy()->addMinutes($this->tolerancia_minutos);
-        
+        $horaLimite = $horaEntrada->copy()->addMinutes($this->tolerancia_entrada_minutos);
+
         return $horaActual->greaterThan($horaLimite);
     }
 
     /**
-     * Verifica si salió antes de tiempo
+     * Verifica si salió antes de tiempo (considerando tolerancia)
      */
     public function esSalidaAnticipada(Carbon $horaActual): bool
     {
         $horaSalida = Carbon::parse($this->hora_salida);
-        
-        return $horaActual->lessThan($horaSalida);
+        $horaLimite = $horaSalida->copy()->subMinutes($this->tolerancia_salida_minutos);
+
+        return $horaActual->lessThan($horaLimite);
     }
 
     /**
@@ -270,12 +319,12 @@ class HorarioInstitucion extends Model
     public function calcularMinutosTardanza(Carbon $horaActual): int
     {
         $horaEntrada = Carbon::parse($this->hora_entrada);
-        $horaLimite = $horaEntrada->copy()->addMinutes($this->tolerancia_minutos);
-        
+        $horaLimite = $horaEntrada->copy()->addMinutes($this->tolerancia_entrada_minutos);
+
         if ($horaActual->lessThanOrEqualTo($horaLimite)) {
             return 0;
         }
-        
+
         return $horaActual->diffInMinutes($horaLimite);
     }
 
@@ -285,12 +334,13 @@ class HorarioInstitucion extends Model
     public function calcularMinutosSalidaAnticipada(Carbon $horaActual): int
     {
         $horaSalida = Carbon::parse($this->hora_salida);
-        
-        if ($horaActual->greaterThanOrEqualTo($horaSalida)) {
+        $horaLimite = $horaSalida->copy()->subMinutes($this->tolerancia_salida_minutos);
+
+        if ($horaActual->greaterThanOrEqualTo($horaLimite)) {
             return 0;
         }
-        
-        return $horaSalida->diffInMinutes($horaActual);
+
+        return $horaLimite->diffInMinutes($horaActual);
     }
 
     /**
@@ -301,7 +351,7 @@ class HorarioInstitucion extends Model
         if ($this->estaEnRangoEntrada($horaActual)) {
             return Asistencia::RESULTADO_A_TIEMPO;
         }
-        
+
         return Asistencia::RESULTADO_TARDE;
     }
 
@@ -313,7 +363,7 @@ class HorarioInstitucion extends Model
         if ($this->esSalidaAnticipada($horaActual)) {
             return Asistencia::RESULTADO_SALIDA_ANTES;
         }
-        
+
         return Asistencia::RESULTADO_A_TIEMPO;
     }
 
@@ -364,7 +414,7 @@ class HorarioInstitucion extends Model
      */
     public static function getDiaAbreviado(Carbon $fecha): string
     {
-        return match($fecha->dayOfWeek) {
+        return match ($fecha->dayOfWeek) {
             0 => self::DIA_DOMINGO,
             1 => self::DIA_LUNES,
             2 => self::DIA_MARTES,
@@ -394,8 +444,8 @@ class HorarioInstitucion extends Model
     {
         return [
             self::TURNO_MANANA => 'Mañana',
-            self::TURNO_TARDE  => 'Tarde',
-            self::TURNO_NOCHE  => 'Noche',
+            self::TURNO_TARDE => 'Tarde',
+            self::TURNO_NOCHE => 'Noche',
         ];
     }
 
@@ -421,13 +471,13 @@ class HorarioInstitucion extends Model
     public static function getDiasConEtiquetas(): array
     {
         return [
-            self::DIA_LUNES     => 'Lunes',
-            self::DIA_MARTES    => 'Martes',
+            self::DIA_LUNES => 'Lunes',
+            self::DIA_MARTES => 'Martes',
             self::DIA_MIERCOLES => 'Miércoles',
-            self::DIA_JUEVES    => 'Jueves',
-            self::DIA_VIERNES   => 'Viernes',
-            self::DIA_SABADO    => 'Sábado',
-            self::DIA_DOMINGO   => 'Domingo',
+            self::DIA_JUEVES => 'Jueves',
+            self::DIA_VIERNES => 'Viernes',
+            self::DIA_SABADO => 'Sábado',
+            self::DIA_DOMINGO => 'Domingo',
         ];
     }
 

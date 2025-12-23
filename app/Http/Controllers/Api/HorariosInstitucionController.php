@@ -67,7 +67,8 @@ class HorariosInstitucionController extends Controller
             'nombre_turno' => 'required|string|max:50',
             'hora_entrada' => 'required|date_format:H:i',
             'hora_salida' => 'required|date_format:H:i|after:hora_entrada',
-            'tolerancia_minutos' => 'required|integer|min:0|max:60',
+            'tolerancia_entrada_minutos' => 'required|integer|min:0|max:60',
+            'tolerancia_salida_minutos' => 'required|integer|min:0|max:60',
             'dias_semana' => 'required|array|min:1',
             'dias_semana.*' => 'in:L,M,X,J,V,S,D',
         ]);
@@ -94,12 +95,42 @@ class HorariosInstitucionController extends Controller
             'nombre_turno' => $request->nombre_turno,
             'hora_entrada' => $request->hora_entrada,
             'hora_salida' => $request->hora_salida,
-            'tolerancia_minutos' => $request->tolerancia_minutos,
+            'tolerancia_entrada_minutos' => $request->tolerancia_entrada_minutos,
+            'tolerancia_salida_minutos' => $request->tolerancia_salida_minutos,
             'dias_semana' => $request->dias_semana,
             'activo' => true,
         ]);
 
-        return response()->json($horario, 201);
+        // ✅ IMPORTANTE: Asignar automáticamente este horario a usuarios que no tienen uno
+        $this->asignarHorarioAUsuariosSinHorario($request->institucion_id, $horario->id);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Horario creado correctamente',
+            'data' => $horario,
+        ], 201);
+    }
+
+    /**
+     * ✅ Asigna un horario a todos los usuarios de una institución que no tienen horario
+     */
+    protected function asignarHorarioAUsuariosSinHorario(int $institucionId, int $horarioId): void
+    {
+        // Buscar todas las asignaciones activas sin horario para esta institución
+        $asignacionesSinHorario = \App\Models\UsuarioAppInstitucion::where('institucion_id', $institucionId)
+            ->whereNull('horario_institucion_id')
+            ->where('estado', \App\Models\UsuarioAppInstitucion::ESTADO_ACTIVO)
+            ->get();
+
+        $count = $asignacionesSinHorario->count();
+
+        foreach ($asignacionesSinHorario as $asignacion) {
+            $asignacion->update(['horario_institucion_id' => $horarioId]);
+        }
+
+        if ($count > 0) {
+            \Log::info("Horario {$horarioId} asignado automáticamente a {$count} usuario(s) de la institución {$institucionId}");
+        }
     }
 
     public function update(Request $request, $id)
@@ -118,7 +149,8 @@ class HorariosInstitucionController extends Controller
             'nombre_turno' => 'sometimes|string|max:50',
             'hora_entrada' => 'sometimes|date_format:H:i',
             'hora_salida' => 'sometimes|date_format:H:i|after:hora_entrada',
-            'tolerancia_minutos' => 'sometimes|integer|min:0|max:60',
+            'tolerancia_entrada_minutos' => 'sometimes|integer|min:0|max:60',
+            'tolerancia_salida_minutos' => 'sometimes|integer|min:0|max:60',
             'activo' => 'sometimes|boolean',
             'dias_semana' => 'sometimes|array|min:1',
             'dias_semana.*' => 'in:L,M,X,J,V,S,D',
@@ -137,7 +169,8 @@ class HorariosInstitucionController extends Controller
             'nombre_turno',
             'hora_entrada',
             'hora_salida',
-            'tolerancia_minutos',
+            'tolerancia_entrada_minutos',
+            'tolerancia_salida_minutos',
             'dias_semana',
             'activo',
         ]));
@@ -167,6 +200,10 @@ class HorariosInstitucionController extends Controller
      */
     protected function validarCoherenciaTurno(string $nombreTurno, string $horaEntrada, string $horaSalida): void
     {
+        // Restricción de horarios desactivada temporalmente
+        return;
+
+        /*
         // Normalizar nombre del turno (minúsculas, sin espacios)
         $turnoNormalizado = strtolower(trim($nombreTurno));
 
@@ -185,7 +222,7 @@ class HorariosInstitucionController extends Controller
         }
 
         $rango = $this->rangosTurnos[$turnoDetectado];
-        
+
         $entrada = Carbon::createFromFormat('H:i', $horaEntrada);
         $salida = Carbon::createFromFormat('H:i', $horaSalida);
         $min = Carbon::createFromFormat('H:i', $rango['min']);
@@ -204,7 +241,7 @@ class HorariosInstitucionController extends Controller
         // Validar que la hora de salida esté dentro del rango (con tolerancia)
         // Permitir que la salida se extienda 1 hora después del max
         $maxConTolerancia = $max->copy()->addHour();
-        
+
         if ($salida->lt($min) || $salida->gt($maxConTolerancia)) {
             throw ValidationException::withMessages([
                 'hora_salida' => [
@@ -213,6 +250,7 @@ class HorariosInstitucionController extends Controller
                 ]
             ]);
         }
+        */
     }
 
 

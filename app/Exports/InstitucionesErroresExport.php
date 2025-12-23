@@ -13,10 +13,10 @@ use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 
-class InstitucionesErroresExport implements 
-    FromArray, 
-    WithHeadings, 
-    WithStyles, 
+class InstitucionesErroresExport implements
+    FromArray,
+    WithHeadings,
+    WithStyles,
     WithColumnWidths,
     WithEvents
 {
@@ -30,7 +30,7 @@ class InstitucionesErroresExport implements
     public function array(): array
     {
         $rows = [];
-        
+
         // Fila de instrucciones
         $rows[] = [
             '📋 INSTRUCCIONES',
@@ -39,34 +39,21 @@ class InstitucionesErroresExport implements
             '',
             '',
             '',
-            '',
-            '',
-            '',
-            '',
-            '',
-            '',
         ];
-        
+
         // Fila vacía
         $rows[] = [];
-        
+
         foreach ($this->errores as $error) {
             $rows[] = [
                 $error['fila'] ?? 'N/A',
-                $error['codigo'] ?? 'N/A',
-                implode(' | ', $error['errores'] ?? []),
-                $error['datos']['codigo_modular_ie'] ?? '',
-                $error['datos']['nombre'] ?? '',
-                $error['datos']['distrito'] ?? '',
-                $error['datos']['nivel_educativo'] ?? '',
-                $error['datos']['centro_poblado'] ?? '',
-                $error['datos']['direccion'] ?? '',
-                $error['datos']['latitud'] ?? '',
-                $error['datos']['longitud'] ?? '',
-                $error['datos']['radio'] ?? '',
+                $error['codigo_modular_ie'] ?? '',
+                $error['institucion'] ?? '',
+                $error['distrito'] ?? '',
+                $error['motivo'] ?? '',
             ];
         }
-        
+
         return $rows;
     }
 
@@ -74,17 +61,10 @@ class InstitucionesErroresExport implements
     {
         return [
             'Fila Excel',
-            'Código IE',
-            'Errores',
-            'codigo_modular_ie',
-            'nombre',
-            'distrito',
-            'nivel_educativo',
-            'centro_poblado',
-            'direccion',
-            'latitud',
-            'longitud',
-            'radio',
+            'Código Modular IE',
+            'Nombre Institución',
+            'Distrito',
+            'Motivo del Error',
         ];
     }
 
@@ -125,38 +105,31 @@ class InstitucionesErroresExport implements
     public function columnWidths(): array
     {
         return [
-            'A' => 12,
-            'B' => 15,
-            'C' => 50,
-            'D' => 20,
-            'E' => 35,
-            'F' => 18,
-            'G' => 18,
-            'H' => 20,
-            'I' => 30,
-            'J' => 12,
-            'K' => 12,
-            'L' => 10,
+            'A' => 12,  // Fila Excel
+            'B' => 20,  // Código Modular IE
+            'C' => 40,  // Nombre Institución
+            'D' => 20,  // Distrito
+            'E' => 60,  // Motivo del Error
         ];
     }
 
     public function registerEvents(): array
     {
         return [
-            AfterSheet::class => function(AfterSheet $event) {
+            AfterSheet::class => function (AfterSheet $event) {
                 // Merge de la fila de instrucciones
                 $event->sheet->mergeCells('A1:L1');
-                
+
                 // Altura de filas
                 $event->sheet->getDelegate()->getRowDimension(1)->setRowHeight(30);
                 $event->sheet->getDelegate()->getRowDimension(3)->setRowHeight(25);
-                
+
                 // Wrap text en columna de errores
                 $event->sheet->getDelegate()->getStyle('C:C')->getAlignment()->setWrapText(true);
-                
+
                 // Auto-filtro en los headers
                 $event->sheet->getDelegate()->setAutoFilter('A3:L3');
-                
+
                 // Congelar primera fila
                 $event->sheet->getDelegate()->freezePane('A4');
             },

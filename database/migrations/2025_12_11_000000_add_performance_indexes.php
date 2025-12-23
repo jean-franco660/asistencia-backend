@@ -9,27 +9,21 @@ return new class extends Migration {
     public function up(): void
     {
         // ASISTENCIAS
+        // ASISTENCIAS - Indices moved to base table for clean setup
         Schema::table('asistencias', function (Blueprint $table) {
-            // Consultas por día e institución
-            $table->index(
-                ['institucion_id', 'fecha'],
-                'idx_asistencias_inst_fecha'
-            );
+            // idx_asistencias_usuario_fecha -> Already in base
+            // idx_asistencias_inst_fecha -> Base has idx_asistencias_institucion_fecha
 
-            // Consultas por usuario
-            $table->index(
-                ['usuario_app_id', 'fecha'],
-                'idx_asistencias_usuario_fecha'
-            );
-
-            // Validaciones por horario
+            // Validaciones por horario (Adding this one as it matches the new column)
+            // Check if base has it? Base does NOT have index on horario.
             $table->index(
                 ['horario_institucion_id', 'fecha'],
                 'idx_asistencias_horario_fecha'
             );
 
-            $table->index('tipo', 'idx_asistencias_tipo');
-            $table->index('situacion', 'idx_asistencias_situacion');
+            // tipo and situacion removed from base table
+            // $table->index('tipo', 'idx_asistencias_tipo');
+            // $table->index('situacion', 'idx_asistencias_situacion');
         });
 
         // ASIGNACIONES USUARIO - INSTITUCIÓN

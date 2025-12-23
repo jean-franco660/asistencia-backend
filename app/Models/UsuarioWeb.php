@@ -44,6 +44,7 @@ class UsuarioWeb extends Authenticatable
         'password',
         'rol',
         'estado',
+        'usuario_app_id', // Enlace con Usuario App
     ];
 
     protected $hidden = [
@@ -103,6 +104,11 @@ class UsuarioWeb extends Authenticatable
     /* =========================
      * RELACIONES
      * ========================= */
+
+    public function usuarioApp(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(UsuarioApp::class, 'usuario_app_id');
+    }
 
     public function instituciones(): BelongsToMany
     {

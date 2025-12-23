@@ -16,7 +16,9 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class UsuarioAppImportController extends Controller
 {
-    public function __construct() {}
+    public function __construct()
+    {
+    }
 
     private function esAdministrador($user): bool
     {
@@ -42,45 +44,63 @@ class UsuarioAppImportController extends Controller
         }
 
         try {
-            $total = UsuarioApp::count();
+            $totalUsuarios = UsuarioApp::count();
 
-            // ✅ USAR CONSTANTE CORRECTA
             $ultimaImportacion = ImportacionLog::tipo(ImportacionLog::TIPO_USUARIOS_APP)
-                ->completadas()
-                ->latest('completado_en')
+                ->recientesCompletadas(1)
                 ->first();
 
             $ultimaImportData = null;
+
             if ($ultimaImportacion) {
+                $errores = (int) $ultimaImportacion->errores_count;
+
+                $totalImport = (int) $ultimaImportacion->total;
+                if ($totalImport <= 0) {
+                    $procesados = (int) $ultimaImportacion->procesados;
+                    $exitosos = (int) $ultimaImportacion->exitosos;
+                    $totalImport = $procesados > 0
+                        ? $procesados
+                        : ($exitosos + $errores);
+                }
+
+                // Parse fecha en fecha y hora separadas
+                $fechaCompleta = $ultimaImportacion->completado_en;
+                $fecha = $fechaCompleta ? $fechaCompleta->format('Y-m-d') : null;
+                $hora = $fechaCompleta ? $fechaCompleta->format('H:i:s') : null;
+
                 $ultimaImportData = [
-                    'total' => $ultimaImportacion->total,
-                    'exitosos' => $ultimaImportacion->exitosos,
-                    'errores' => $ultimaImportacion->errores_count,
-                    'fecha' => $ultimaImportacion->completado_en?->toIso8601String(),
+                    'id' => (int) $ultimaImportacion->id,  // ✅ Changed from 'import_id'
+                    'estado' => $ultimaImportacion->estado,  // ✅ Added
+                    'total' => $totalImport,
+                    'exitosos' => (int) $ultimaImportacion->exitosos,
+
+                    // 🔹 ambos para evitar errores en frontend
+                    'errores' => $errores,
+                    'errores_count' => $errores,
+
+                    'fecha' => $fecha,  // ✅ Changed to formatted date
+                    'hora' => $hora,    // ✅ Added
                 ];
             }
 
-            $ultimasImportaciones = ImportacionLog::tipo(ImportacionLog::TIPO_USUARIOS_APP)
-                ->completadas()
-                ->recientes(10)
+            $ultimas = ImportacionLog::tipo(ImportacionLog::TIPO_USUARIOS_APP)
+                ->recientesCompletadas(10)
                 ->get();
 
-            $tasaExitoPromedio = $ultimasImportaciones->isNotEmpty()
-                ? round($ultimasImportaciones->avg('tasa_exito'), 2)
+            $tasaPromedio = $ultimas->isNotEmpty()
+                ? round($ultimas->avg('tasa_exito'), 2)
                 : 0.0;
 
-            $erroresPendientes = ImportacionLog::tipo(ImportacionLog::TIPO_USUARIOS_APP)
-                ->completadas()
-                ->where('errores_count', '>', 0)
-                ->sum('errores_count');
+            $erroresAcumulados = $ultimas->sum('errores_count');
 
             return response()->json([
                 'success' => true,
                 'data' => [
-                    'total' => $total,
+                    'total' => $totalUsuarios,
                     'ultima_importacion' => $ultimaImportData,
-                    'tasa_exito_promedio' => $tasaExitoPromedio,
-                    'errores_pendientes' => $erroresPendientes,
+                    'tasa_exito_promedio' => $tasaPromedio,
+                    'errores_pendientes' => $erroresAcumulados,
                 ],
             ]);
 
@@ -95,6 +115,7 @@ class UsuarioAppImportController extends Controller
             ], 500);
         }
     }
+
 
     /**
      * Importar usuarios app desde archivo Excel/CSV
@@ -213,7 +234,7 @@ class UsuarioAppImportController extends Controller
                 'iniciado_en' => $importLog->iniciado_en?->toIso8601String(),
                 'completado_en' => $importLog->completado_en?->toIso8601String(),
                 'duracion' => $importLog->duracion_formateada,
-                'errores' => $importLog->errores_detalle ?? [],
+                // 'errores' => $importLog->errores_detalle ?? [], // 🚫 OPTIMIZACIÓN: No enviar detalles en polling
             ],
         ]);
     }
@@ -248,8 +269,8 @@ class UsuarioAppImportController extends Controller
             ], 400);
         }
 
-        $nombreArchivo = 'usuarios_app_errores_' . $importLog->id . '_' . 
-                         now()->format('YmdHis') . '.xlsx';
+        $nombreArchivo = 'usuarios_app_errores_' . $importLog->id . '_' .
+            now()->format('YmdHis') . '.xlsx';
 
         return Excel::download(
             new UsuariosAppErroresExport($importLog->errores_detalle),

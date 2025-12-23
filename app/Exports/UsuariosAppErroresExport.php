@@ -13,10 +13,10 @@ use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 
-class UsuariosAppErroresExport implements 
-    FromArray, 
-    WithHeadings, 
-    WithStyles, 
+class UsuariosAppErroresExport implements
+    FromArray,
+    WithHeadings,
+    WithStyles,
     WithColumnWidths,
     WithEvents // ⭐ NUEVO
 {
@@ -30,41 +30,29 @@ class UsuariosAppErroresExport implements
     public function array(): array
     {
         $rows = [];
-        
-        // ⭐ NUEVO: Fila de instrucciones
+
+        // ⭐ Fila de instrucciones
         $rows[] = [
             '📋 INSTRUCCIONES',
-            'Corrija los errores en las columnas correspondientes y vuelva a importar este archivo.',
-            '',
-            '',
-            '',
-            '',
-            '',
-            '',
+            'Corrija los errores indicados y vuelva a importar este archivo.',
             '',
             '',
             '',
         ];
-        
-        // ⭐ NUEVO: Fila vacía
+
+        // ⭐ Fila vacía
         $rows[] = [];
-        
+
         foreach ($this->errores as $error) {
             $rows[] = [
                 $error['fila'] ?? 'N/A',
-                $error['codigo'] ?? 'N/A',
-                implode(' | ', $error['errores'] ?? []),
-                $error['datos']['codigo_modular_docente'] ?? '',
-                $error['datos']['apellido_paterno'] ?? '',
-                $error['datos']['apellido_materno'] ?? '',
-                $error['datos']['nombres'] ?? '',
-                $error['datos']['sexo'] ?? '',
-                $error['datos']['cargo'] ?? '',
-                $error['datos']['password'] ?? '',
-                $error['datos']['codigo_modular_ie'] ?? '',
+                $error['codigo_docente'] ?? '',
+                $error['docente'] ?? '',
+                $error['codigo_modular_ie'] ?? '',
+                $error['motivo'] ?? '',
             ];
         }
-        
+
         return $rows;
     }
 
@@ -73,15 +61,9 @@ class UsuariosAppErroresExport implements
         return [
             'Fila Excel',
             'Código Docente',
-            'Errores',
-            'codigo_modular_docente',
-            'apellido_paterno',
-            'apellido_materno',
-            'nombres',
-            'sexo',
-            'cargo',
-            'password',
-            'codigo_modular_ie',
+            'Nombre Completo',
+            'Código IE',
+            'Motivo del Error',
         ];
     }
 
@@ -140,20 +122,20 @@ class UsuariosAppErroresExport implements
     public function registerEvents(): array
     {
         return [
-            AfterSheet::class => function(AfterSheet $event) {
+            AfterSheet::class => function (AfterSheet $event) {
                 // Merge de la fila de instrucciones
                 $event->sheet->mergeCells('A1:K1');
-                
+
                 // Altura de filas
                 $event->sheet->getDelegate()->getRowDimension(1)->setRowHeight(30);
                 $event->sheet->getDelegate()->getRowDimension(3)->setRowHeight(25);
-                
+
                 // Wrap text en columna de errores
                 $event->sheet->getDelegate()->getStyle('C:C')->getAlignment()->setWrapText(true);
-                
+
                 // Auto-filtro en los headers
                 $event->sheet->getDelegate()->setAutoFilter('A3:K3');
-                
+
                 // Congelar primera fila
                 $event->sheet->getDelegate()->freezePane('A4');
             },

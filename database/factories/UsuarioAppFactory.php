@@ -14,30 +14,28 @@ class UsuarioAppFactory extends Factory
         return [
             // Código modular genérico
             'codigo_modular' => 'CM' . $this->faker->unique()->numberBetween(100000, 999999),
+            'dni' => $this->faker->unique()->numerify('########'),
 
             'apellido_paterno' => strtoupper($this->faker->lastName),
             'apellido_materno' => strtoupper($this->faker->lastName),
             'nombres' => strtoupper($this->faker->firstName),
 
             'sexo' => $this->faker->randomElement(['M', 'F']),
-            'estado' => 'ACTIVO',
-            // Cargo genérico por defecto
-            'cargo' => 'PERSONAL',
+            'acceso_habilitado' => true,
             'password' => 'password',
-            'activo' => true,
         ];
     }
 
     public function inactive(): static
     {
-        return $this->state(fn () => [
+        return $this->state(fn() => [
             'activo' => false,
         ]);
     }
 
     public function withCargo(string $cargo): static
     {
-        return $this->state(fn () => [
+        return $this->state(fn() => [
             'cargo' => strtoupper($cargo),
         ]);
     }

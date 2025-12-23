@@ -3,6 +3,7 @@
 namespace App\Exports;
 
 use App\Models\Asistencia;
+use App\Models\AsistenciaDiaria;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
@@ -12,6 +13,7 @@ use Maatwebsite\Excel\Concerns\WithTitle;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use Carbon\Carbon;
 
 class AsistenciasDetalleSheet implements
     FromCollection,
@@ -30,27 +32,39 @@ class AsistenciasDetalleSheet implements
 
     public function collection()
     {
-        $query = Asistencia::with(['usuario', 'institucion'])
-            ->orderBy('fecha_hora', 'desc');
+        // Consultamos Marcaciones Individuales
+        $query = AsistenciaDiaria::with(['asistencia.usuario', 'asistencia.institucion'])
+            ->orderBy('marcada_en', 'desc');
 
+        // Filtros
         if (!empty($this->filters['fecha_inicio'])) {
-            $query->whereDate('fecha_hora', '>=', $this->filters['fecha_inicio']);
+            // Filtramos por el momento exacto de la marcación
+            $query->whereDate('marcada_en', '>=', $this->filters['fecha_inicio']);
         }
         if (!empty($this->filters['fecha_fin'])) {
-            $query->whereDate('fecha_hora', '<=', $this->filters['fecha_fin']);
+            $query->whereDate('marcada_en', '<=', $this->filters['fecha_fin']);
         }
+
+        // Filtros via relación Asistencia (Cabecera)
         if (!empty($this->filters['institucion_id'])) {
-            $query->where('institucion_id', $this->filters['institucion_id']);
+            $query->whereHas('asistencia', function ($q) {
+                $q->where('institucion_id', $this->filters['institucion_id']);
+            });
         }
+
         if (!empty($this->filters['tipo'])) {
             $query->where('tipo', $this->filters['tipo']);
         }
 
+        // Filtro Supervisor
         if (!empty($this->filters['user'])) {
             $user = $this->filters['user'];
-            if ($user->rol === 'director') {
-                $institucionIds = $user->instituciones->pluck('id');
-                $query->whereIn('institucion_id', $institucionIds);
+            if (!$user->esAdministrador()) {
+                $institucionesIds = $user->institucionesVigentes()->pluck('id');
+
+                $query->whereHas('asistencia', function ($q) use ($institucionesIds) {
+                    $q->whereIn('institucion_id', $institucionesIds);
+                });
             }
         }
 
@@ -62,51 +76,46 @@ class AsistenciasDetalleSheet implements
         return [
             'N°',
             'Docente',
-            'Código',
             'DNI',
             'Institución',
             'Fecha',
             'Hora',
             'Tipo',
-            'Estado',
-            'Ubicación',
+            'Estado Marcación', // VALIDA, OBSERVADA
+            'Estado Revisión',  // PENDIENTE, APROBADA
+            'Dentro Rango',
+            'Motivo',
             'Latitud',
             'Longitud',
+            'Revisado Por'
         ];
     }
 
-    public function map($asistencia): array
+    public function map($row): array
     {
         static $index = 0;
         $index++;
 
+        $header = $row->asistencia;
+        $usuario = $header ? $header->usuario : null;
+        $institucion = $header ? $header->institucion : null;
+
         return [
             $index,
-            $asistencia->usuario->nombre ?? '-',
-            $asistencia->usuario->codigo ?? '-',
-            $asistencia->usuario->dni ?? '-',
-            $asistencia->institucion->nombre ?? '-',
-            $asistencia->fecha_hora ? $asistencia->fecha_hora->format('d/m/Y') : '-',
-            $asistencia->fecha_hora ? $asistencia->fecha_hora->format('H:i:s') : '-',
-            $asistencia->tipo === Asistencia::TIPO_ENTRADA ? 'Entrada' : 'Salida',
-            $this->getEstadoTexto($asistencia),
-            $asistencia->dentro_rango ? 'En rango' : 'Fuera de rango',
-            number_format($asistencia->latitud ?? 0, 6),
-            number_format($asistencia->longitud ?? 0, 6),
+            $usuario ? ($usuario->apellido_paterno . ' ' . $usuario->nombres) : '-',
+            $usuario->numero_documento ?? '-',
+            $institucion->nombre ?? '-',
+            $row->marcada_en ? Carbon::parse($row->marcada_en)->setTimezone('America/Lima')->format('d/m/Y') : '-',
+            $row->marcada_en ? Carbon::parse($row->marcada_en)->setTimezone('America/Lima')->format('H:i:s') : '-',
+            $row->tipo,
+            $row->estado_marcacion,
+            $row->estado_revision ?? '-',
+            $row->dentro_rango ? 'SÍ' : 'NO',
+            $row->motivo ?? '-',
+            number_format($row->latitud ?? 0, 6),
+            number_format($row->longitud ?? 0, 6),
+            $row->revisadoPor ? $row->revisadoPor->email : '-'
         ];
-    }
-
-    private function getEstadoTexto($asistencia): string
-    {
-        if ($asistencia->situacion === Asistencia::SITUACION_FALTA)
-            return 'Ausente';
-        if ($asistencia->resultado === Asistencia::RESULTADO_A_TIEMPO)
-            return 'A Tiempo';
-        if ($asistencia->resultado === Asistencia::RESULTADO_TARDE)
-            return 'Tarde';
-        if ($asistencia->resultado === Asistencia::RESULTADO_SALIDA_ANTES)
-            return 'Salida Anticipada';
-        return '-';
     }
 
     public function styles(Worksheet $sheet)
@@ -116,7 +125,7 @@ class AsistenciasDetalleSheet implements
                 'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
                 'fill' => [
                     'fillType' => Fill::FILL_SOLID,
-                    'startColor' => ['rgb' => '4472C4']
+                    'startColor' => ['rgb' => 'EA580C'] // Naranja quemado para diferenciar
                 ],
                 'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
             ],
@@ -126,23 +135,25 @@ class AsistenciasDetalleSheet implements
     public function columnWidths(): array
     {
         return [
-            'A' => 5,
-            'B' => 30,
-            'C' => 12,
-            'D' => 12,
-            'E' => 35,
-            'F' => 12,
-            'G' => 10,
-            'H' => 10,
-            'I' => 18,
-            'J' => 15,
-            'K' => 12,
-            'L' => 12,
+            'A' => 5,  // N
+            'B' => 30, // Docente
+            'C' => 12, // DNI
+            'D' => 30, // Inst
+            'E' => 12, // Fecha
+            'F' => 10, // Hora
+            'G' => 10, // Tipo
+            'H' => 15, // Est Marc
+            'I' => 15, // Est Rev
+            'J' => 10, // Rango
+            'K' => 20, // Motivo
+            'L' => 12, // Lat
+            'M' => 12, // Lon
+            'N' => 25  // Revisado Por
         ];
     }
 
     public function title(): string
     {
-        return 'Detalle';
+        return 'Marcaciones (Detalle)';
     }
 }

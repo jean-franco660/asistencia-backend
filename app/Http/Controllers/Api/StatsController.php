@@ -102,9 +102,9 @@ class StatsController extends Controller
            📌 LÓGICA REAL DE ASISTENCIAS Y FALTAS HOY
         ============================================================ */
 
-        // Obtener registros de hoy
+        // Obtener registros de hoy (Headers)
         $registrosHoy = Asistencia::whereIn('institucion_id', $institucionIds)
-            ->whereDate('fecha_hora', $today)
+            ->whereDate('fecha', $today)
             ->get()
             ->groupBy('usuario_app_id');
 
@@ -119,14 +119,10 @@ class StatsController extends Controller
         )->pluck('id');
 
         foreach ($docentesDelAmbito as $docenteId) {
+            $registro = $registrosHoy->get($docenteId, collect())->first();
 
-            $registros = $registrosHoy->get($docenteId, collect());
-
-            $entrada = $registros->firstWhere('tipo', Asistencia::TIPO_ENTRADA);
-            $salida = $registros->firstWhere('tipo', Asistencia::TIPO_SALIDA);
-
-            // Asistencia válida: entrada y salida
-            if ($entrada && $salida) {
+            // Si existe registro y estado_diario es PRESENTE o TARDANZA
+            if ($registro && in_array($registro->estado_diario, ['PRESENTE', 'TARDANZA'])) {
                 $asistenciasHoy++;
             } else {
                 $faltasHoy++;
@@ -144,16 +140,16 @@ class StatsController extends Controller
 
         // Docentes activos (que han marcado asistencia en los últimos 30 días)
         $docentesActivos = UsuarioApp::whereHas('asistencias', function ($q) {
-            $q->where('fecha_hora', '>=', Carbon::now()->subDays(30));
+            $q->where('fecha', '>=', Carbon::now()->subDays(30));
         })
             ->whereHas('instituciones', fn($q) => $q->whereIn('instituciones.id', $institucionIds))
             ->count();
 
-        // Asistencias del mes actual
+        // Asistencias del mes actual (Headers con estado PRESENTE o TARDANZA)
         $asistenciasMesActual = Asistencia::whereIn('institucion_id', $institucionIds)
-            ->whereYear('fecha_hora', $today->year)
-            ->whereMonth('fecha_hora', $today->month)
-            ->where('tipo', Asistencia::TIPO_ENTRADA)
+            ->whereYear('fecha', $today->year)
+            ->whereMonth('fecha', $today->month)
+            ->whereIn('estado_diario', ['PRESENTE', 'TARDANZA'])
             ->count();
 
         // Promedio de asistencia (basado en últimos 30 días)

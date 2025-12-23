@@ -3,13 +3,14 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\Pivot;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use App\Traits\Auditable;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
-class UsuarioAppInstitucion extends Model
+class UsuarioAppInstitucion extends Pivot
 {
-    use HasFactory, Auditable;
+    use HasFactory, Auditable, SoftDeletes;
 
     protected $table = 'usuario_app_institucion';
 
@@ -48,17 +49,19 @@ class UsuarioAppInstitucion extends Model
         'horario_institucion_id',
         'cargo',
         'estado',
-        'fecha_inicio',
-        'fecha_fin',
     ];
+
+    // ✅ Proteger fechas de asignación masiva - solo el Observer las modifica
+    protected $guarded = ['id', 'fecha_inicio', 'fecha_fin'];
 
     protected $casts = [
-        'fecha_inicio' => 'datetime',  // ✅ Cambiado de 'date' a 'datetime'
-        'fecha_fin' => 'datetime',      // ✅ Esto elimina las advertencias del analizador
+        'fecha_inicio' => 'datetime',
+        'fecha_fin' => 'datetime',
     ];
 
+
     protected $attributes = [
-        'estado' => self::ESTADO_ACTIVO,
+        'estado' => self::ESTADO_PENDIENTE,
     ];
 
     /* =========================
@@ -144,18 +147,22 @@ class UsuarioAppInstitucion extends Model
     /**
      * ✅ CORREGIDO: Usar objetos Carbon en lugar de strings
      */
-    public function scopeVigentes($query)
+    /**
+     * ✅ CORREGIDO: fecha_fin es EXCLUSIVA
+     * Un vínculo es vigente si estado=ACTIVO y fecha_inicio <= D < fecha_fin
+     */
+    public function scopeVigentes($query, $fecha = null)
     {
-        $hoy = today(); // ✅ Carbon object
+        $fecha = $fecha ?? today();
 
         return $query->where('estado', self::ESTADO_ACTIVO)
-            ->where(function ($q) use ($hoy) {
+            ->where(function ($q) use ($fecha) {
                 $q->whereNull('fecha_inicio')
-                    ->orWhereDate('fecha_inicio', '<=', $hoy);
+                    ->orWhereDate('fecha_inicio', '<=', $fecha);
             })
-            ->where(function ($q) use ($hoy) {
+            ->where(function ($q) use ($fecha) {
                 $q->whereNull('fecha_fin')
-                    ->orWhereDate('fecha_fin', '>=', $hoy);
+                    ->orWhereDate('fecha_fin', '>', $fecha); // EXCLUSIVE
             });
     }
 
@@ -239,21 +246,34 @@ class UsuarioAppInstitucion extends Model
     /**
      * ✅ CORREGIDO: Usar métodos Carbon para comparaciones
      */
+    /**
+     * ✅ CORREGIDO: fecha_fin es EXCLUSIVA
+     */
     public function estaVigente(): bool
+    {
+        return $this->esVigenteEn(today());
+    }
+
+    /**
+     * Verifica si el vínculo es vigente para una fecha específica
+     * @param string|\Carbon\Carbon $fecha
+     * @return bool
+     */
+    public function esVigenteEn($fecha): bool
     {
         if ($this->estado !== self::ESTADO_ACTIVO) {
             return false;
         }
 
-        $hoy = today();
+        $fecha = is_string($fecha) ? \Carbon\Carbon::parse($fecha) : $fecha;
 
-        // Verificar fecha inicio
-        if ($this->fecha_inicio && $this->fecha_inicio->isAfter($hoy)) {
+        // Verificar fecha inicio (inclusive)
+        if ($this->fecha_inicio && $this->fecha_inicio->isAfter($fecha)) {
             return false;
         }
 
-        // Verificar fecha fin
-        if ($this->fecha_fin && $this->fecha_fin->isBefore($hoy)) {
+        // Verificar fecha fin (EXCLUSIVE: válido hasta D < fecha_fin)
+        if ($this->fecha_fin && $fecha->isSameOrAfter($this->fecha_fin)) {
             return false;
         }
 
@@ -304,21 +324,19 @@ class UsuarioAppInstitucion extends Model
      * ========================= */
 
     /**
-     * Activa la asignación
+     * Activa la asignación (Observer maneja fecha_inicio y fecha_fin automáticamente)
      */
     public function activar(): bool
     {
-        $this->estado = self::ESTADO_ACTIVO;
-        return $this->save();
+        return $this->update(['estado' => self::ESTADO_ACTIVO]);
     }
 
     /**
-     * Desactiva la asignación
+     * Desactiva la asignación (Observer establece fecha_fin automáticamente)
      */
     public function desactivar(): bool
     {
-        $this->estado = self::ESTADO_INACTIVO;
-        return $this->save();
+        return $this->update(['estado' => self::ESTADO_INACTIVO]);
     }
 
     /**

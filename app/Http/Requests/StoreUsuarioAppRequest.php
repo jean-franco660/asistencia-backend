@@ -18,6 +18,7 @@ class StoreUsuarioAppRequest extends FormRequest
         return [
             // Identificación (según migración real)
             'codigo_modular' => 'required|string|max:20|unique:usuarios_app,codigo_modular',
+            'dni' => 'required|string|max:15|unique:usuarios_app,dni',
 
             // Datos personales
             'apellido_paterno' => 'required|string|max:100',
@@ -51,6 +52,11 @@ class StoreUsuarioAppRequest extends FormRequest
             'codigo_modular.required' => 'El código modular es obligatorio',
             'codigo_modular.unique' => 'Este código modular ya está registrado',
             'codigo_modular.max' => 'El código modular no puede exceder :max caracteres',
+
+            // DNI
+            'dni.required' => 'El DNI es obligatorio',
+            'dni.unique' => 'Este DNI ya está registrado',
+            'dni.max' => 'El DNI no puede exceder :max caracteres',
 
             // Datos personales
             'apellido_paterno.required' => 'El apellido paterno es obligatorio',

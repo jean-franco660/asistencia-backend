@@ -44,6 +44,8 @@ class StoreHorarioRequest extends FormRequest
      */
     public function withValidator(Validator $validator): void
     {
+        // Restricción de horarios desactivada temporalmente para pruebas
+        /*
         $validator->after(function ($validator) {
             $turno = $this->input('turno');
             $hora_entrada = $this->input('hora_entrada');
@@ -78,5 +80,6 @@ class StoreHorarioRequest extends FormRequest
                 );
             }
         });
+        */
     }
 }

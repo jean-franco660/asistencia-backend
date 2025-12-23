@@ -12,12 +12,12 @@ class UsuarioAppTest extends TestCase
     public function test_login_docente_exitoso()
     {
         $docente = $this->createUsuarioApp([
-            'codigo_modular_docente' => 'DOC123',
+            'codigo_modular' => 'DOC123',
             'password' => 'password123',
         ]);
 
         $response = $this->postJson('/api/v1/app/login', [
-            'codigo_modular_docente' => 'DOC123',
+            'codigo_modular' => 'DOC123',
             'password' => 'password123',
         ]);
 
@@ -32,7 +32,7 @@ class UsuarioAppTest extends TestCase
     public function test_login_docente_falla_con_credenciales_invalidas()
     {
         $response = $this->postJson('/api/v1/app/login', [
-            'codigo_modular_docente' => 'NOEXISTE',
+            'codigo_modular' => 'NOEXISTE',
             'password' => 'wrongpassword',
         ]);
 
@@ -47,7 +47,7 @@ class UsuarioAppTest extends TestCase
         $institucion2 = $this->createInstitucion();
 
         $response = $this->postJson('/api/v1/web/usuarios-app', [
-            'codigo_modular_docente' => 'DOCTEST',
+            'codigo_modular' => 'DOCTEST',
             'apellido_paterno' => 'APELLIDO',
             'apellido_materno' => 'MATERNO',
             'nombres' => 'DOCENTE',
@@ -60,7 +60,7 @@ class UsuarioAppTest extends TestCase
 
         $response->assertStatus(201);
 
-        $docente = UsuarioApp::where('codigo_modular_docente', 'DOCTEST')->first();
+        $docente = UsuarioApp::where('codigo_modular', 'DOCTEST')->first();
         $this->assertCount(2, $docente->instituciones);
     }
 
@@ -125,7 +125,7 @@ class UsuarioAppTest extends TestCase
         $this->actingAsAdmin();
 
         $this->postJson('/api/v1/web/usuarios-app', [
-            'codigo_modular_docente' => 'DOCENCRYPT',
+            'codigo_modular' => 'DOCENCRYPT',
             'apellido_paterno' => 'APELLIDO',
             'apellido_materno' => 'MATERNO',
             'nombres' => 'DOCENTE',
@@ -135,7 +135,7 @@ class UsuarioAppTest extends TestCase
             'activo' => true,
         ]);
 
-        $docente = UsuarioApp::where('codigo_modular_docente', 'DOCENCRYPT')->first();
+        $docente = UsuarioApp::where('codigo_modular', 'DOCENCRYPT')->first();
 
         $this->assertNotEquals('password123', $docente->password);
         $this->assertTrue(\Hash::check('password123', $docente->password));

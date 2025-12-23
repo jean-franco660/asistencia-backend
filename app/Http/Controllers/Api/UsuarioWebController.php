@@ -40,12 +40,12 @@ class UsuarioWebController extends Controller
         }
 
         if ($user->esSupervisor() && !$user->estaAutorizado()) {
-            $mensaje = match($user->estado) {
+            $mensaje = match ($user->estado) {
                 UsuarioWeb::ESTADO_PENDIENTE => 'Tu cuenta aún no ha sido autorizada',
                 UsuarioWeb::ESTADO_RECHAZADO => 'Tu cuenta ha sido rechazada',
                 default => 'No tienes acceso al sistema',
             };
-            
+
             return response()->json([
                 'success' => false,
                 'message' => $mensaje
@@ -75,6 +75,7 @@ class UsuarioWebController extends Controller
                 'id' => $user->id,
                 'nombre' => $user->nombre,
                 'email' => $user->email,
+                'codigo' => $user->usuarioApp?->codigo_modular, // ✅ Código modular del usuario app
                 'rol' => $user->rol,
                 'estado' => $user->estado,
                 'puede_gestionar_justificaciones' => $user->puedeGestionarJustificaciones(),
@@ -82,6 +83,7 @@ class UsuarioWebController extends Controller
                 'puede_gestionar_usuarios' => $user->puedeGestionarUsuarios(),
                 'puede_ver_todas_instituciones' => $user->puedeVerTodasInstituciones(),
                 'instituciones' => $instituciones,
+                'created_at' => $user->created_at,
             ],
             'token' => $token,
         ]);
@@ -90,6 +92,9 @@ class UsuarioWebController extends Controller
     public function me(Request $request): JsonResponse
     {
         $user = $request->user();
+
+        // Cargar relación con usuario app si existe
+        $user->load('usuarioApp');
 
         // ✅ CORRECCIÓN
         $instituciones = [];
@@ -110,6 +115,7 @@ class UsuarioWebController extends Controller
                 'id' => $user->id,
                 'nombre' => $user->nombre,
                 'email' => $user->email,
+                'codigo' => $user->usuarioApp?->codigo_modular, // ✅ Código modular del usuario app
                 'rol' => $user->rol,
                 'estado' => $user->estado,
                 'puede_gestionar_justificaciones' => $user->puedeGestionarJustificaciones(),
@@ -117,6 +123,7 @@ class UsuarioWebController extends Controller
                 'puede_gestionar_usuarios' => $user->puedeGestionarUsuarios(),
                 'puede_ver_todas_instituciones' => $user->puedeVerTodasInstituciones(),
                 'instituciones' => $instituciones,
+                'created_at' => $user->created_at,
             ]
         ]);
     }
@@ -177,9 +184,9 @@ class UsuarioWebController extends Controller
         $this->authorize('viewAny', UsuarioWeb::class);
 
         $query = UsuarioWeb::supervisores()
-                          ->pendientes()
-                          ->with('instituciones')
-                          ->orderBy('created_at', 'asc'); // Más antiguos primero
+            ->pendientes()
+            ->with('instituciones')
+            ->orderBy('created_at', 'asc'); // Más antiguos primero
 
         $pendientes = $query->get();
 
@@ -198,23 +205,23 @@ class UsuarioWebController extends Controller
         // 🔍 DEBUG: Ver qué llega
         \Log::info('=== CREAR ADMINISTRADOR ===');
         \Log::info('Request data:', $request->except(['password', 'password_confirmation']));
-        
+
         $this->authorize('create', UsuarioWeb::class);
 
         DB::beginTransaction();
-        
+
         try {
             $rol = $request->input('rol', UsuarioWeb::ROL_SUPERVISOR);
-            
+
             \Log::info('Rol determinado:', ['rol' => $rol]);
-            
+
             // Determinar estado
             $estado = in_array($rol, [UsuarioWeb::ROL_SUPER_ADMIN, UsuarioWeb::ROL_ADMINISTRADOR])
                 ? UsuarioWeb::ESTADO_AUTORIZADO
                 : UsuarioWeb::ESTADO_PENDIENTE;
-                
+
             \Log::info('Estado determinado:', ['estado' => $estado]);
-            
+
             // Preparar datos
             $data = [
                 'nombre' => $request->nombre,
@@ -223,43 +230,45 @@ class UsuarioWebController extends Controller
                 'rol' => $rol,
                 'estado' => $estado,
             ];
-            
+
             \Log::info('Datos a insertar:', array_merge($data, ['password' => '***']));
-            
+
             // Crear usuario
             $usuario = UsuarioWeb::create($data);
-            
+
             \Log::info('Usuario creado exitosamente:', ['id' => $usuario->id]);
 
             // Asignar instituciones si es supervisor
             if ($usuario->esSupervisor() && $request->filled('instituciones')) {
                 \Log::info('Asignando instituciones...');
-                
+
                 $instituciones = collect($request->instituciones)->mapWithKeys(function ($inst) {
-                    return [$inst['id'] => [
-                        'fecha_inicio' => $inst['fecha_inicio'] ?? now(),
-                        'fecha_fin' => $inst['fecha_fin'] ?? null,
-                    ]];
+                    return [
+                        $inst['id'] => [
+                            'fecha_inicio' => $inst['fecha_inicio'] ?? now(),
+                            'fecha_fin' => $inst['fecha_fin'] ?? null,
+                        ]
+                    ];
                 });
-                
+
                 $usuario->instituciones()->sync($instituciones);
             }
 
             DB::commit();
-            
+
             \Log::info('✅ Transacción completada');
 
             return response()->json([
                 'success' => true,
-                'message' => $usuario->esSupervisor() 
-                    ? 'Supervisor creado correctamente' 
+                'message' => $usuario->esSupervisor()
+                    ? 'Supervisor creado correctamente'
                     : 'Administrador creado correctamente',
                 'data' => $usuario->fresh()->load('instituciones'),
             ], 201);
-            
+
         } catch (\Exception $e) {
             DB::rollBack();
-            
+
             // ❌ LOG DETALLADO DEL ERROR
             \Log::error('❌ ERROR AL CREAR USUARIO');
             \Log::error('Mensaje: ' . $e->getMessage());
@@ -267,7 +276,7 @@ class UsuarioWebController extends Controller
             \Log::error('Línea: ' . $e->getLine());
             \Log::error('Request: ' . json_encode($request->except(['password', 'password_confirmation'])));
             \Log::error('Stack trace: ' . $e->getTraceAsString());
-            
+
             return response()->json([
                 'success' => false,
                 'message' => 'Error al crear usuario: ' . $e->getMessage()
@@ -298,7 +307,7 @@ class UsuarioWebController extends Controller
         $this->authorize('update', $usuario);
 
         DB::beginTransaction();
-        
+
         try {
             $data = $request->only(['nombre', 'email', 'estado']);
 
@@ -311,12 +320,14 @@ class UsuarioWebController extends Controller
             // Actualizar instituciones si es supervisor
             if ($usuario->esSupervisor() && $request->has('instituciones')) {
                 $instituciones = collect($request->instituciones)->mapWithKeys(function ($inst) {
-                    return [$inst['id'] => [
-                        'fecha_inicio' => $inst['fecha_inicio'] ?? now(),
-                        'fecha_fin' => $inst['fecha_fin'] ?? null,
-                    ]];
+                    return [
+                        $inst['id'] => [
+                            'fecha_inicio' => $inst['fecha_inicio'] ?? now(),
+                            'fecha_fin' => $inst['fecha_fin'] ?? null,
+                        ]
+                    ];
                 });
-                
+
                 $usuario->instituciones()->sync($instituciones);
             }
 
@@ -327,10 +338,10 @@ class UsuarioWebController extends Controller
                 'message' => 'Usuario actualizado correctamente',
                 'data' => $usuario->fresh()->load('instituciones'),
             ]);
-            
+
         } catch (\Exception $e) {
             DB::rollBack();
-            
+
             return response()->json([
                 'success' => false,
                 'message' => 'Error al actualizar usuario: ' . $e->getMessage()
@@ -349,7 +360,7 @@ class UsuarioWebController extends Controller
         try {
             // Revocar todos los tokens
             $usuario->tokens()->delete();
-            
+
             // Soft delete (desvincula instituciones automáticamente por el evento)
             $usuario->delete();
 
@@ -357,7 +368,7 @@ class UsuarioWebController extends Controller
                 'success' => true,
                 'message' => 'Usuario eliminado correctamente',
             ]);
-            
+
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -382,7 +393,7 @@ class UsuarioWebController extends Controller
         }
 
         DB::beginTransaction();
-        
+
         try {
             $usuario->autorizar();
 
@@ -404,10 +415,10 @@ class UsuarioWebController extends Controller
                 'message' => 'Supervisor autorizado correctamente',
                 'data' => $usuario->fresh()->load('instituciones'),
             ]);
-            
+
         } catch (\Exception $e) {
             DB::rollBack();
-            
+
             return response()->json([
                 'success' => false,
                 'message' => 'Error al autorizar supervisor: ' . $e->getMessage()
@@ -435,7 +446,7 @@ class UsuarioWebController extends Controller
         ]);
 
         DB::beginTransaction();
-        
+
         try {
             $usuario->rechazar();
 
@@ -458,10 +469,10 @@ class UsuarioWebController extends Controller
                 'message' => 'Supervisor rechazado',
                 'data' => $usuario->fresh()->load('instituciones'),
             ]);
-            
+
         } catch (\Exception $e) {
             DB::rollBack();
-            
+
             return response()->json([
                 'success' => false,
                 'message' => 'Error al rechazar supervisor: ' . $e->getMessage()

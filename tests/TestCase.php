@@ -111,7 +111,7 @@ abstract class TestCase extends BaseTestCase
     protected function createUsuarioApp($attributes = [])
     {
         return \App\Models\UsuarioApp::create(array_merge([
-            'codigo_modular_docente' => 'DOC' . rand(100000, 999999),
+            'codigo_modular' => 'DOC' . rand(100000, 999999),
             'apellido_paterno' => 'APELLIDO',
             'apellido_materno' => 'MATERNO',
             'nombres' => 'DOCENTE',

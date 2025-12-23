@@ -9,10 +9,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Support\Facades\Hash;
 use Laravel\Sanctum\HasApiTokens;
 use App\Traits\Auditable;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class UsuarioApp extends Authenticatable
 {
-    use HasFactory, HasApiTokens, Auditable;
+    use HasFactory, HasApiTokens, Auditable, SoftDeletes;
 
     protected $table = 'usuarios_app';
 
@@ -21,7 +22,7 @@ class UsuarioApp extends Authenticatable
      * ========================= */
 
     public const SEXO_MASCULINO = 'M';
-    public const SEXO_FEMENINO  = 'F';
+    public const SEXO_FEMENINO = 'F';
 
     /* =========================
      * FILLABLE / HIDDEN / CASTS
@@ -29,6 +30,7 @@ class UsuarioApp extends Authenticatable
 
     protected $fillable = [
         'codigo_modular',
+        'dni',
         'apellido_paterno',
         'apellido_materno',
         'nombres',
@@ -62,16 +64,16 @@ class UsuarioApp extends Authenticatable
     {
         $ap = mb_substr($this->apellido_paterno ?? '', 0, 1, 'UTF-8');
         $am = mb_substr($this->apellido_materno ?? '', 0, 1, 'UTF-8');
-        
+
         $nombres = explode(' ', $this->nombres ?? '');
         $n = mb_substr($nombres[0] ?? '', 0, 1, 'UTF-8');
-        
+
         return mb_strtoupper($ap . $am . $n, 'UTF-8') ?: 'N/A';
     }
 
     public function getSexoFormateadoAttribute(): string
     {
-        return match($this->sexo) {
+        return match ($this->sexo) {
             self::SEXO_MASCULINO => 'Masculino',
             self::SEXO_FEMENINO => 'Femenino',
             default => 'No especificado',
@@ -127,6 +129,11 @@ class UsuarioApp extends Authenticatable
      * RELACIONES
      * ========================= */
 
+    public function usuarioWeb(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(UsuarioWeb::class, 'usuario_app_id');
+    }
+
     public function asignaciones(): HasMany
     {
         return $this->hasMany(UsuarioAppInstitucion::class, 'usuario_app_id');
@@ -145,20 +152,21 @@ class UsuarioApp extends Authenticatable
             'usuario_app_id',
             'institucion_id'
         )
-        ->withPivot([
-            'horario_institucion_id',
-            'cargo',
-            'estado',
-            'fecha_inicio',
-            'fecha_fin',
-        ])
-        ->withTimestamps();
+            ->using(UsuarioAppInstitucion::class)
+            ->withPivot([
+                'horario_institucion_id',
+                'cargo',
+                'estado',
+                'fecha_inicio',
+                'fecha_fin',
+            ])
+            ->withTimestamps();
     }
 
     public function institucionesActivas(): BelongsToMany
     {
         return $this->instituciones()
-                    ->wherePivot('estado', UsuarioAppInstitucion::ESTADO_ACTIVO);
+            ->wherePivot('estado', UsuarioAppInstitucion::ESTADO_ACTIVO);
     }
 
     public function asistencias(): HasMany
@@ -174,7 +182,7 @@ class UsuarioApp extends Authenticatable
     public function auditLogsComoActor(): HasMany
     {
         return $this->hasMany(AuditLog::class, 'actor_id')
-                    ->where('actor_type', AuditLog::ACTOR_USUARIO_APP);
+            ->where('actor_type', AuditLog::ACTOR_USUARIO_APP);
     }
 
     /* =========================
@@ -201,7 +209,7 @@ class UsuarioApp extends Authenticatable
         if (is_numeric($institucionIdOCodigo)) {
             return $query->whereHas('asignaciones', function ($q) use ($institucionIdOCodigo) {
                 $q->where('institucion_id', $institucionIdOCodigo)
-                  ->where('estado', UsuarioAppInstitucion::ESTADO_ACTIVO);
+                    ->where('estado', UsuarioAppInstitucion::ESTADO_ACTIVO);
             });
         }
 
@@ -221,9 +229,9 @@ class UsuarioApp extends Authenticatable
     {
         return $query->where(function ($q) use ($termino) {
             $q->where('nombres', 'like', "%{$termino}%")
-              ->orWhere('apellido_paterno', 'like', "%{$termino}%")
-              ->orWhere('apellido_materno', 'like', "%{$termino}%")
-              ->orWhere('codigo_modular', 'like', "%{$termino}%");
+                ->orWhere('apellido_paterno', 'like', "%{$termino}%")
+                ->orWhere('apellido_materno', 'like', "%{$termino}%")
+                ->orWhere('codigo_modular', 'like', "%{$termino}%");
         });
     }
 
@@ -238,7 +246,7 @@ class UsuarioApp extends Authenticatable
     {
         return $query->whereHas('asignaciones', function ($q) use ($cargo) {
             $q->where('cargo', $cargo)
-              ->where('estado', UsuarioAppInstitucion::ESTADO_ACTIVO);
+                ->where('estado', UsuarioAppInstitucion::ESTADO_ACTIVO);
         });
     }
 
@@ -254,15 +262,15 @@ class UsuarioApp extends Authenticatable
     public function tieneAsignacionEnInstitucion(int $institucionId): bool
     {
         return $this->asignacionesActivas()
-                    ->where('institucion_id', $institucionId)
-                    ->exists();
+            ->where('institucion_id', $institucionId)
+            ->exists();
     }
 
     public function getAsignacionActiva(int $institucionId): ?UsuarioAppInstitucion
     {
         return $this->asignacionesActivas()
-                    ->where('institucion_id', $institucionId)
-                    ->first();
+            ->where('institucion_id', $institucionId)
+            ->first();
     }
 
     /**
@@ -271,17 +279,17 @@ class UsuarioApp extends Authenticatable
     public function getAsignacionesVigentes()
     {
         $hoy = now()->toDateString();
-        
+
         return $this->asignacionesActivas()
-                    ->where(function ($q) use ($hoy) {
-                        $q->whereNull('fecha_inicio')
-                          ->orWhere('fecha_inicio', '<=', $hoy);
-                    })
-                    ->where(function ($q) use ($hoy) {
-                        $q->whereNull('fecha_fin')
-                          ->orWhere('fecha_fin', '>=', $hoy);
-                    })
-                    ->get();
+            ->where(function ($q) use ($hoy) {
+                $q->whereNull('fecha_inicio')
+                    ->orWhere('fecha_inicio', '<=', $hoy);
+            })
+            ->where(function ($q) use ($hoy) {
+                $q->whereNull('fecha_fin')
+                    ->orWhere('fecha_fin', '>=', $hoy);
+            })
+            ->get();
     }
 
     /**
@@ -290,8 +298,8 @@ class UsuarioApp extends Authenticatable
     public function getInstitucionesVigentesIds(): array
     {
         return $this->getAsignacionesVigentes()
-                    ->pluck('institucion_id')
-                    ->toArray();
+            ->pluck('institucion_id')
+            ->toArray();
     }
 
     /**
@@ -299,7 +307,7 @@ class UsuarioApp extends Authenticatable
      */
     public function tieneAsignacionVigente(): bool
     {
-        return $this->getAsignacionesVigentes()->isNotEmpty();
+        return $this->asignacionesActivas()->exists();
     }
 
     /**
@@ -353,7 +361,7 @@ class UsuarioApp extends Authenticatable
     {
         return [
             self::SEXO_MASCULINO => 'Masculino',
-            self::SEXO_FEMENINO  => 'Femenino',
+            self::SEXO_FEMENINO => 'Femenino',
         ];
     }
 

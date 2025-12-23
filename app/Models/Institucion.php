@@ -21,10 +21,11 @@ class Institucion extends Model
     protected $fillable = [
         'codigo_modular_ie',
         'nombre',
-        'distrito',
         'nivel_educativo',
-        'centro_poblado',
-        'direccion',
+        'tipo_gestion',
+        'departamento',
+        'provincia',
+        'distrito',
         'latitud',
         'longitud',
         'radio',
@@ -183,9 +184,9 @@ class Institucion extends Model
      */
     public function getNombreDisplayAttribute(): string
     {
-        // Si el nombre es solo numérico, mostrar con prefijo IE y código modular
-        if (preg_match('/^\d+$/', $this->nombre)) {
-            return "IE {$this->codigo_modular_ie}";
+        // Si el nombre es solo numérico (permitiendo espacios), mostrar con prefijo IE y el número (nombre)
+        if (preg_match('/^\s*\d+\s*$/', $this->nombre)) {
+            return "IE " . trim($this->nombre);
         }
         return $this->nombre;
     }

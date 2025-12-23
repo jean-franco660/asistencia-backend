@@ -14,12 +14,19 @@ return new class extends Migration {
             $table->string('codigo_modular', 20)->unique();
 
             // Datos personales
-            $table->string('apellido_paterno', 100);
-            $table->string('apellido_materno', 100);
-            $table->string('nombres', 100);
-            $table->char('sexo', 1)->nullable()->comment('M=Masculino, F=Femenino');
+            $table->string('dni', 15)->unique();            // DOCUMENTO DE IDENTIDAD
 
-            // Acceso general a la app
+            // Identidad
+            $table->string('apellido_paterno', 100);
+            $table->string('apellido_materno', 100)->nullable();
+            $table->string('nombres', 150);
+            $table->char('sexo', 1)->nullable();
+
+            // Operativo (app)
+            $table->string('telefono', 20)->nullable()->index(); // CELULAR (login/contacto)
+
+            // Estado
+            $table->string('estado', 20)->default('ACTIVO')->index(); // ACTIVO / INACTIVO
             $table->boolean('acceso_habilitado')->default(true);
 
             // Credenciales
@@ -27,11 +34,10 @@ return new class extends Migration {
             $table->rememberToken();
 
             $table->timestamps();
+            $table->softDeletes();
 
             // Índices para consultas frecuentes
-            $table->index('apellido_paterno', 'idx_apellido_paterno');
-            $table->index('acceso_habilitado', 'idx_acceso');
-            $table->index(['apellido_paterno', 'apellido_materno'], 'idx_apellidos');
+            $table->index(['apellido_paterno', 'apellido_materno', 'nombres'], 'idx_usuarios_app_nombre');
         });
     }
 

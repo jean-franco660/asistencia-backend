@@ -10,31 +10,38 @@ use Illuminate\Support\Facades\Log;
 use Maatwebsite\Excel\Concerns\ToCollection;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
 use Maatwebsite\Excel\Concerns\WithChunkReading;
-use Maatwebsite\Excel\Concerns\WithValidation;
 
 class InstitucionesImport implements
     ToCollection,
     WithHeadingRow,
-    WithChunkReading,
-    WithValidation
+    WithChunkReading
 {
     protected ImportacionLog $importLog;
     protected ImportInstitucionesService $service;
+
+    /**
+     * Offset lógico de filas procesadas (para reportes/errores).
+     * NO es el número real de fila en Excel.
+     */
     protected int $offset = 0;
+
     protected bool $headersValidated = false;
 
-    // Columnas requeridas en el orden esperado
+    /**
+     * Columnas requeridas (mínimas)
+     */
     protected array $requiredHeaders = [
         'codigo_modular_ie',
         'nombre',
         'distrito',
+        'nivel_educativo',
     ];
 
-    // Columnas opcionales
+    /**
+     * Columnas opcionales
+     */
     protected array $optionalHeaders = [
-        'direccion',
-        'nivel_educativo',
-        'centro_poblado',
+        'tipo_gestion',
         'latitud',
         'longitud',
         'radio',
@@ -48,31 +55,54 @@ class InstitucionesImport implements
 
     public function collection(Collection $rows): void
     {
-        // Validar headers en el primer chunk
+        // 1️⃣ Validar headers solo una vez (primer chunk)
         if (!$this->headersValidated && $rows->isNotEmpty()) {
             $this->validateHeaders($rows->first());
             $this->headersValidated = true;
         }
 
-        // Filtrar filas vacías
-        $rows = $rows->filter(fn($row) => !empty(array_filter($row->toArray())));
+        // 2️⃣ Filtrar filas realmente vacías
+        $rows = $rows->filter(function ($row) {
+            $arr = is_array($row) ? $row : $row->toArray();
+
+            foreach ($arr as $v) {
+                if (is_string($v)) {
+                    if (trim($v) !== '')
+                        return true;
+                } elseif (!is_null($v)) {
+                    return true;
+                }
+            }
+            return false;
+        });
 
         if ($rows->isEmpty()) {
             return;
         }
 
         try {
+            // 3️⃣ Delegar todo al service (lógica + BD)
             $resultado = $this->service->procesarChunk(
                 $rows,
                 $this->importLog,
                 $this->offset
             );
 
-            // Avanza offset según lo realmente procesado
-            $this->offset += (int) ($resultado['procesados'] ?? $rows->count());
+            // 4️⃣ Avanzar offset lógico (filas leídas)
+            $this->offset += $rows->count();
+
+            // 5️⃣ Log compacto por chunk (opcional)
+            Log::info('Chunk instituciones procesado', [
+                'import_log_id' => $this->importLog->id,
+                'leidos_chunk' => $rows->count(),
+                'offset' => $this->offset,
+                'procesados_chunk' => $resultado['procesados_chunk'] ?? null,
+                'exitosos_chunk' => $resultado['exitosos_chunk'] ?? null,
+                'errores_chunk' => $resultado['errores_chunk'] ?? null,
+            ]);
 
         } catch (Exception $e) {
-            Log::error("Error procesando chunk de instituciones", [
+            Log::error('Error procesando chunk de instituciones', [
                 'import_log_id' => $this->importLog->id,
                 'offset' => $this->offset,
                 'error' => $e->getMessage(),
@@ -83,50 +113,52 @@ class InstitucionesImport implements
     }
 
     /**
-     * Valida que el archivo tenga las columnas requeridas
+     * Valida que el archivo tenga las columnas mínimas requeridas
      */
     protected function validateHeaders($firstRow): void
     {
         $headers = array_keys($firstRow->toArray());
-        $missingHeaders = [];
+        $missing = [];
 
         foreach ($this->requiredHeaders as $required) {
-            if (!in_array($required, $headers)) {
-                $missingHeaders[] = $required;
+            if (!in_array($required, $headers, true)) {
+                $missing[] = $required;
             }
         }
 
-        if (!empty($missingHeaders)) {
-            $message = 'El archivo no contiene las columnas requeridas: ' . implode(', ', $missingHeaders) . '. ' .
-                'Por favor, descargue la plantilla oficial y asegúrese de que los encabezados coincidan exactamente.';
+        if (!empty($missing)) {
+            $message = 'El archivo no contiene las columnas requeridas: ' .
+                implode(', ', $missing) .
+                '. Descargue la plantilla oficial y asegúrese de que los encabezados coincidan exactamente.';
 
-            Log::error("Validación de headers falló", [
+            Log::error('Validación de headers falló', [
                 'import_log_id' => $this->importLog->id,
                 'headers_encontrados' => $headers,
-                'headers_faltantes' => $missingHeaders,
+                'headers_faltantes' => $missing,
             ]);
 
             throw new Exception($message);
         }
 
-        Log::info("Headers validados correctamente", [
+        Log::info('Headers de instituciones validados correctamente', [
             'import_log_id' => $this->importLog->id,
             'headers' => $headers,
         ]);
     }
 
-    public function rules(): array
-    {
-        return [];
-    }
-
+    /**
+     * Tamaño de chunk recomendado para producción
+     */
     public function chunkSize(): int
     {
-        return 100;
+        return 1000;
     }
 
+    /**
+     * Encabezados en fila 3 (2 filas de instrucciones)
+     */
     public function headingRow(): int
     {
-        return 3;  // ✅ Los encabezados están en la fila 3 (después de 2 filas de instrucciones)
+        return 3;
     }
 }

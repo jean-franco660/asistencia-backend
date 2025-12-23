@@ -30,73 +30,69 @@ class AsistenciasResumenSheet implements
 
     public function collection()
     {
-        $query = Asistencia::query();
+        $query = Asistencia::with(['usuario', 'institucion', 'horario'])
+            ->orderBy('fecha', 'desc');
 
         // Aplicar filtros
         if (!empty($this->filters['fecha_inicio'])) {
-            $query->whereDate('fecha_hora', '>=', $this->filters['fecha_inicio']);
+            $query->whereDate('fecha', '>=', $this->filters['fecha_inicio']);
         }
         if (!empty($this->filters['fecha_fin'])) {
-            $query->whereDate('fecha_hora', '<=', $this->filters['fecha_fin']);
+            $query->whereDate('fecha', '<=', $this->filters['fecha_fin']);
         }
         if (!empty($this->filters['institucion_id'])) {
             $query->where('institucion_id', $this->filters['institucion_id']);
         }
-        if (!empty($this->filters['tipo'])) {
-            $query->where('tipo', $this->filters['tipo']);
-        }
 
-        // Director → filtrar por sus instituciones
+        // El filtro 'tipo' (ENTRADA/SALIDA) no aplica bien a cabeceras diarias, 
+        // pero podríamos filtrar si tiene hora_entrada o hora_salida si fuera necesario.
+        // Lo ignoraremos para el resumen diario o lo usamos para checkear marcaciones.
+
+        // Filtrar por supervisor
         if (!empty($this->filters['user'])) {
             $user = $this->filters['user'];
-            if ($user->rol === 'director') {
-                $institucionIds = $user->instituciones->pluck('id');
-                $query->whereIn('institucion_id', $institucionIds);
+            if (!$user->esAdministrador()) {
+                $institucionesIds = $user->institucionesVigentes()->pluck('id');
+                if ($institucionesIds->isNotEmpty()) {
+                    $query->whereIn('institucion_id', $institucionesIds);
+                } else {
+                    $query->whereRaw('1 = 0'); // No results
+                }
             }
         }
 
-        $asistencias = $query->get();
-
-        $total = $asistencias->count();
-        $a_tiempo = $asistencias->where('resultado', Asistencia::RESULTADO_A_TIEMPO)->count();
-        $tarde = $asistencias->where('resultado', Asistencia::RESULTADO_TARDE)->count();
-        $ausente = $asistencias->where('situacion', Asistencia::SITUACION_FALTA)->count();
-
-        return collect([
-            (object) [
-                'estado' => 'A Tiempo',
-                'cantidad' => $a_tiempo,
-                'porcentaje' => $total > 0 ? round(($a_tiempo / $total) * 100, 1) : 0,
-            ],
-            (object) [
-                'estado' => 'Tarde',
-                'cantidad' => $tarde,
-                'porcentaje' => $total > 0 ? round(($tarde / $total) * 100, 1) : 0,
-            ],
-            (object) [
-                'estado' => 'Ausente',
-                'cantidad' => $ausente,
-                'porcentaje' => $total > 0 ? round(($ausente / $total) * 100, 1) : 0,
-            ],
-            (object) [
-                'estado' => 'TOTAL',
-                'cantidad' => $total,
-                'porcentaje' => 100,
-            ],
-        ]);
+        return $query->get();
     }
 
     public function headings(): array
     {
-        return ['Estado', 'Cantidad', 'Porcentaje (%)'];
+        return [
+            'Fecha',
+            'Docente',
+            'DNI',
+            'Institución',
+            'Turno',
+            'Estado Diario',
+            'H. Entrada',
+            'H. Salida',
+            'Min Tardanza',
+            'Observación'
+        ];
     }
 
     public function map($row): array
     {
         return [
-            $row->estado,
-            $row->cantidad,
-            $row->porcentaje . '%',
+            $row->fecha ? $row->fecha->format('d/m/Y') : '-',
+            $row->usuario ? ($row->usuario->apellido_paterno . ' ' . $row->usuario->apellido_materno . ' ' . $row->usuario->nombres) : '-',
+            $row->usuario->numero_documento ?? '-',
+            $row->institucion->nombre ?? '-',
+            $row->horario->nombre_turno ?? '-',
+            $row->estado_diario,
+            $row->hora_entrada ?? '-',
+            $row->hora_salida ?? '-',
+            $row->minutos_tardanza > 0 ? $row->minutos_tardanza : '0',
+            $row->observacion ?? '-'
         ];
     }
 
@@ -117,14 +113,21 @@ class AsistenciasResumenSheet implements
     public function columnWidths(): array
     {
         return [
-            'A' => 20,
-            'B' => 15,
-            'C' => 18,
+            'A' => 12, // Fecha
+            'B' => 35, // Docente
+            'C' => 12, // DNI
+            'D' => 35, // Institución
+            'E' => 15, // Turno
+            'F' => 15, // Estado
+            'G' => 12, // Entrada
+            'H' => 12, // Salida
+            'I' => 12, // Min Tadanza
+            'J' => 30, // Observacion
         ];
     }
 
     public function title(): string
     {
-        return 'Resumen';
+        return 'Resumen Diario';
     }
 }

@@ -38,19 +38,22 @@ class InstitucionController extends Controller
 
         if ($limit) {
             $instituciones = $query->limit($limit)->get();
-            return response()->json($instituciones);
+            return response()->json([
+                'success' => true,
+                'data' => $instituciones
+            ]);
         }
 
         // ⭐ NUEVO: Ordenamiento dinámico
         $sortBy = $request->input('sort_by', 'id');  // Por defecto: id (orden de importación)
         $sortOrder = $request->input('sort_order', 'asc');  // asc o desc
-        
+
         // Validar columnas permitidas para ordenar
         $allowedSortColumns = ['id', 'codigo_modular_ie', 'nombre', 'distrito', 'created_at'];
         if (!in_array($sortBy, $allowedSortColumns)) {
             $sortBy = 'id';
         }
-        
+
         // Validar orden
         $sortOrder = in_array(strtolower($sortOrder), ['asc', 'desc']) ? strtolower($sortOrder) : 'asc';
 
@@ -158,24 +161,24 @@ class InstitucionController extends Controller
         Log::info("🗑️ DELETE - Método HTTP: " . request()->method());
         Log::info("🗑️ DELETE - Request completo: " . json_encode(request()->all()));
         Log::info("🗑️ DELETE - Headers: " . json_encode(request()->headers->all()));
-        
+
         try {
             $institucion = Institucion::findOrFail($id);
             Log::info("✅ DELETE - Institución encontrada: {$institucion->nombre} (ID: {$institucion->id})");
-            
+
             // Verificar si tiene relaciones que impidan eliminarla
             $tieneUsuarios = $institucion->usuarios()->count();
             $tieneHorarios = $institucion->horarios()->count();
-            
+
             Log::info("📊 DELETE - Relaciones: {$tieneUsuarios} usuarios, {$tieneHorarios} horarios");
-            
+
             // Opción: Permitir eliminación forzada desvinculando relaciones
             // Descomenta estas líneas si quieres permitir eliminar instituciones con relaciones
             // $institucion->usuarios()->detach();
             // $institucion->horarios()->delete();
-            
+
             $deleted = $institucion->delete();
-            
+
             Log::info("✅ DELETE - Resultado delete(): " . ($deleted ? 'TRUE' : 'FALSE'));
             Log::info("✅ DELETE - Institución eliminada exitosamente de la DB");
 
@@ -183,18 +186,18 @@ class InstitucionController extends Controller
                 'success' => true,
                 'message' => 'Institución eliminada correctamente',
             ], 200);
-            
+
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
             Log::error("❌ DELETE - Institución no encontrada con ID: {$id}");
             return response()->json([
                 'success' => false,
                 'message' => 'Institución no encontrada',
             ], 404);
-            
+
         } catch (\Illuminate\Database\QueryException $e) {
             Log::error("❌ DELETE - Error de base de datos: " . $e->getMessage());
             Log::error("❌ DELETE - SQL Error Code: " . $e->getCode());
-            
+
             // Error de restricción de llave foránea
             if ($e->getCode() == '23000') {
                 return response()->json([
@@ -203,17 +206,17 @@ class InstitucionController extends Controller
                     'hint' => 'Primero elimina los registros relacionados o usa eliminación forzada.',
                 ], 409);
             }
-            
+
             return response()->json([
                 'success' => false,
                 'message' => 'Error de base de datos al eliminar',
                 'error' => $e->getMessage(),
             ], 500);
-            
+
         } catch (\Exception $e) {
             Log::error("❌ DELETE - Error general: " . $e->getMessage());
             Log::error("❌ DELETE - Trace: " . $e->getTraceAsString());
-            
+
             return response()->json([
                 'success' => false,
                 'message' => 'Error al eliminar: ' . $e->getMessage(),
@@ -228,7 +231,7 @@ class InstitucionController extends Controller
     {
         Log::info("🗑️ DELETE MULTIPLE - Intento de eliminar múltiples instituciones");
         Log::info("🗑️ DELETE MULTIPLE - IDs recibidos: " . json_encode($request->ids));
-        
+
         $validated = $request->validate([
             'ids' => 'required|array',
             'ids.*' => 'integer|exists:instituciones,id',
@@ -236,7 +239,7 @@ class InstitucionController extends Controller
 
         try {
             $count = Institucion::whereIn('id', $validated['ids'])->delete();
-            
+
             Log::info("✅ DELETE MULTIPLE - Eliminadas {$count} instituciones");
 
             return response()->json([
@@ -244,10 +247,10 @@ class InstitucionController extends Controller
                 'message' => "{$count} instituciones eliminadas correctamente",
                 'eliminados' => $count,
             ], 200);
-            
+
         } catch (\Exception $e) {
             Log::error("❌ DELETE MULTIPLE - Error: " . $e->getMessage());
-            
+
             return response()->json([
                 'success' => false,
                 'message' => 'Error al eliminar instituciones: ' . $e->getMessage(),
@@ -261,21 +264,48 @@ class InstitucionController extends Controller
     public function misInstituciones(Request $request)
     {
         $user = $request->user();
-        
+
         if ($user->esSuperAdmin() || $user->esAdministrador()) {
             // Admin y super_admin ven todas las instituciones
-            $query = \App\Models\Institucion::query();
+            $query = Institucion::query();
         } else {
             // Supervisores solo ven sus instituciones
             $institucionesIds = $user->institucionesVigentes()->pluck('id');
-            $query = \App\Models\Institucion::whereIn('id', $institucionesIds);
+            $query = Institucion::whereIn('id', $institucionesIds);
         }
-        
-        // ✅ Aplicar withCount ANTES de ejecutar la query
-        $instituciones = $query
-            ->withCount('usuariosApp')  // Esto funciona en Query Builder
-            ->get();  // Ahora sí ejecutar
-        
+
+        // Aplicar filtro de búsqueda si existe
+        if ($request->filled('q') || $request->filled('search')) {
+            $searchTerm = $request->input('q') ?? $request->input('search');
+
+            Log::debug('🔍 Búsqueda de instituciones', [
+                'search_term' => $searchTerm,
+                'user_id' => $user->id,
+                'user_rol' => $user->rol,
+            ]);
+
+            $query->where(function ($q) use ($searchTerm) {
+                $q->where('nombre', 'like', '%' . $searchTerm . '%')
+                    ->orWhere('codigo_modular_ie', 'like', '%' . $searchTerm . '%');
+            });
+        }
+
+        // Aplicar withCount
+        $query->withCount('usuariosApp');
+
+        // Soporte para limit (sin paginación)
+        $limit = $request->input('limit');
+        if ($limit) {
+            $instituciones = $query->limit($limit)->get();
+        } else {
+            $instituciones = $query->get();
+        }
+
+        Log::debug('🔍 Resultados de búsqueda', [
+            'count' => $instituciones->count(),
+            'search_term' => $request->input('search') ?? $request->input('q'),
+        ]);
+
         return response()->json([
             'success' => true,
             'data' => $instituciones

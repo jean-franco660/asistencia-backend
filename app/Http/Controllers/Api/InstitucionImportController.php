@@ -16,7 +16,9 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class InstitucionImportController extends Controller
 {
-    public function __construct() {}
+    public function __construct()
+    {
+    }
 
     private function esAdministrador($user): bool
     {
@@ -27,7 +29,7 @@ class InstitucionImportController extends Controller
     }
 
     /**
-     * ✅ NUEVO: Estadísticas para la vista de importaciones
+     * Estadísticas para la vista de importaciones
      * GET /api/instituciones/import/stats
      */
     public function stats(Request $request)
@@ -42,37 +44,39 @@ class InstitucionImportController extends Controller
         }
 
         try {
-            // Total de instituciones en el sistema
             $total = Institucion::count();
 
-            // Última importación completada
             $ultimaImportacion = ImportacionLog::tipo(ImportacionLog::TIPO_INSTITUCIONES)
                 ->completadas()
                 ->latest('completado_en')
                 ->first();
 
             $ultimaImportData = null;
+
             if ($ultimaImportacion) {
+                $completadoEn = $ultimaImportacion->completado_en;
+
                 $ultimaImportData = [
-                    'total' => $ultimaImportacion->total,
-                    'exitosos' => $ultimaImportacion->exitosos,
-                    'errores' => $ultimaImportacion->errores_count,
-                    'fecha' => $ultimaImportacion->completado_en?->toIso8601String(),
+                    'id' => $ultimaImportacion->id,
+                    'total' => (int) $ultimaImportacion->total,
+                    'exitosos' => (int) $ultimaImportacion->exitosos,
+                    'errores_count' => (int) $ultimaImportacion->errores_count,
+                    'estado' => $ultimaImportacion->estado,
+                    'fecha' => $completadoEn ? $completadoEn->format('d/m/Y') : null,
+                    'hora' => $completadoEn ? $completadoEn->format('H:i') : null,
                 ];
             }
 
-            // Tasa de éxito promedio (últimas 10 importaciones)
             $ultimasImportaciones = ImportacionLog::tipo(ImportacionLog::TIPO_INSTITUCIONES)
                 ->completadas()
                 ->recientes(10)
                 ->get();
 
             $tasaExitoPromedio = $ultimasImportaciones->isNotEmpty()
-                ? round($ultimasImportaciones->avg('tasa_exito'), 2)
+                ? round((float) $ultimasImportaciones->avg('tasa_exito'), 2)
                 : 0.0;
 
-            // Errores pendientes de revisar (suma de todas las importaciones con errores)
-            $erroresPendientes = ImportacionLog::tipo(ImportacionLog::TIPO_INSTITUCIONES)
+            $erroresPendientes = (int) ImportacionLog::tipo(ImportacionLog::TIPO_INSTITUCIONES)
                 ->completadas()
                 ->where('errores_count', '>', 0)
                 ->sum('errores_count');
@@ -80,7 +84,7 @@ class InstitucionImportController extends Controller
             return response()->json([
                 'success' => true,
                 'data' => [
-                    'total' => $total,
+                    'total' => (int) $total,
                     'ultima_importacion' => $ultimaImportData,
                     'tasa_exito_promedio' => $tasaExitoPromedio,
                     'errores_pendientes' => $erroresPendientes,
@@ -130,7 +134,6 @@ class InstitucionImportController extends Controller
             $archivoPath = $archivo->store('temp/importaciones');
             $archivoNombre = $archivo->getClientOriginalName();
 
-            // ✅ USAR CONSTANTES
             $importLog = ImportacionLog::create([
                 'usuario_id' => $user->id,
                 'tipo' => ImportacionLog::TIPO_INSTITUCIONES,
@@ -150,8 +153,8 @@ class InstitucionImportController extends Controller
             return response()->json([
                 'success' => true,
                 'data' => [
-                    'import_id' => $importLog->id,
-                    'estado' => $importLog->estado,
+                    'import_id' => (int) $importLog->id,
+                    'estado' => (string) $importLog->estado,
                     'mensaje' => 'La importación fue encolada y se procesará en segundo plano',
                 ],
                 'message' => 'Importación iniciada correctamente',
@@ -201,22 +204,30 @@ class InstitucionImportController extends Controller
             ], 404);
         }
 
+        // ✅ Asegurar tipo correcto (evita mezclar importaciones)
+        if ($importLog->tipo !== ImportacionLog::TIPO_INSTITUCIONES) {
+            return response()->json([
+                'success' => false,
+                'message' => 'La importación no corresponde a instituciones',
+            ], 400);
+        }
+
         return response()->json([
             'success' => true,
             'data' => [
-                'import_id' => $importLog->id,
-                'tipo' => $importLog->tipo,
-                'estado' => $importLog->estado,
+                'import_id' => (int) $importLog->id,
+                'tipo' => (string) $importLog->tipo,
+                'estado' => (string) $importLog->estado,
                 'total' => (int) $importLog->total,
                 'procesados' => (int) $importLog->procesados,
                 'exitosos' => (int) $importLog->exitosos,
                 'errores_count' => (int) $importLog->errores_count,
-                'porcentaje' => $importLog->porcentaje,
-                'tasa_exito' => $importLog->tasa_exito,
+                'porcentaje' => (int) $importLog->porcentaje,
+                'tasa_exito' => (float) $importLog->tasa_exito,
                 'iniciado_en' => $importLog->iniciado_en?->toIso8601String(),
                 'completado_en' => $importLog->completado_en?->toIso8601String(),
                 'duracion' => $importLog->duracion_formateada,
-                'errores' => $importLog->errores_detalle ?? [],
+                // 'errores' => $importLog->errores_detalle ?? [], // 🚫 OPTIMIZACIÓN: No enviar detalles en polling
             ],
         ]);
     }
@@ -225,8 +236,18 @@ class InstitucionImportController extends Controller
      * Descargar Excel de errores
      * GET /api/instituciones/import/{id}/errores
      */
-    public function erroresExcel($id)
+    public function erroresExcel(Request $request, int $id)
     {
+        $user = $request->user();
+
+        // ✅ Seguridad: solo admin
+        if (!$this->esAdministrador($user)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No autorizado',
+            ], 403);
+        }
+
         $importLog = ImportacionLog::find($id);
 
         if (!$importLog) {
@@ -236,7 +257,6 @@ class InstitucionImportController extends Controller
             ], 404);
         }
 
-        // ✅ USAR CONSTANTE
         if ($importLog->tipo !== ImportacionLog::TIPO_INSTITUCIONES) {
             return response()->json([
                 'success' => false,
@@ -251,8 +271,7 @@ class InstitucionImportController extends Controller
             ], 400);
         }
 
-        $nombreArchivo = 'instituciones_errores_' . $importLog->id . '_' . 
-                         now()->format('YmdHis') . '.xlsx';
+        $nombreArchivo = 'instituciones_errores_' . $importLog->id . '_' . now()->format('YmdHis') . '.xlsx';
 
         return Excel::download(
             new InstitucionesErroresExport($importLog->errores_detalle),

@@ -106,7 +106,20 @@ Route::prefix('v1/web')->middleware(['auth:sanctum', 'throttle:api'])->group(fun
             Route::post('/autorizar/{id}', [UsuarioWebController::class, 'autorizar']);
             Route::post('/rechazar/{id}', [UsuarioWebController::class, 'rechazar']);
         });
+
     });
+
+    /*
+    |--------------------------------------------------------------------------
+    | PROVISIONES (Crear Supervisor desde Usuario App)
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('supervisores/provisioning')->group(function () {
+        Route::get('/search', [\App\Http\Controllers\Api\Web\ProvisioningController::class, 'search']);
+        Route::get('/usuario-app/{usuarioApp}', [\App\Http\Controllers\Api\Web\ProvisioningController::class, 'show']);
+        Route::post('/', [\App\Http\Controllers\Api\Web\ProvisioningController::class, 'store']);
+    });
+
 
     /*
     |--------------------------------------------------------------------------
@@ -140,6 +153,13 @@ Route::prefix('v1/web')->middleware(['auth:sanctum', 'throttle:api'])->group(fun
 
     /*
     |--------------------------------------------------------------------------
+    | ASIGNACIONES (Usuario App - Institución)
+    |--------------------------------------------------------------------------
+    */
+    Route::post('/usuario-app-institucion/{id}/inactivar', [\App\Http\Controllers\Api\UsuarioAppInstitucionController::class, 'inactivar'])->whereNumber('id');
+
+    /*
+    |--------------------------------------------------------------------------
     | INSTITUCIONES
     |--------------------------------------------------------------------------
     */
@@ -157,7 +177,6 @@ Route::prefix('v1/web')->middleware(['auth:sanctum', 'throttle:api'])->group(fun
             Route::post('/importar', [\App\Http\Controllers\Api\InstitucionImportController::class, 'import']);
             Route::get('/importacion/{id}', [\App\Http\Controllers\Api\InstitucionImportController::class, 'estadoImportacion'])->whereNumber('id');
             Route::get('/importacion/{id}/errores.xlsx', [\App\Http\Controllers\Api\InstitucionImportController::class, 'erroresExcel'])->whereNumber('id');
-
         });
 
         // CRUD básico
@@ -201,13 +220,21 @@ Route::prefix('v1/web')->middleware(['auth:sanctum', 'throttle:api'])->group(fun
     */
     Route::prefix('asistencias')->group(function () {
         // Rutas específicas primero
+        Route::get('/cabeceras', [AsistenciaController::class, 'listCabeceras']); // ⭐ NUEVO - Fase 5
         Route::get('/semana', [AsistenciaController::class, 'resumenSemanal']);
         Route::get('/mes-grafico', [AsistenciaController::class, 'resumenMensualGrafico']);
         Route::get('/exportar', [AsistenciaController::class, 'exportar'])->name('asistencias.exportar');
+        Route::get('/exportar-institucion/{id}', [AsistenciaController::class, 'exportarInstitucion'])->whereNumber('id');
 
-        // CRUD básico
+        // ⭐ NUEVO - Obtener marcación individual por ID
+        Route::get('/marcaciones/{id}', [AsistenciaController::class, 'getMarcacion'])->whereNumber('id');
+
+        // CRUD básico (marcaciones individuales)
         Route::get('/', [AsistenciaController::class, 'index']);
         Route::get('/{id}', [AsistenciaController::class, 'show'])->whereNumber('id');
+
+        // Revisión de marcaciones (ID es AsistenciaDiaria)
+        Route::put('/marcaciones/{id}/review', [AsistenciaController::class, 'updateReview'])->whereNumber('id');
     });
 
     // Foto de asistencia (fuera del prefix para mantener la ruta original)

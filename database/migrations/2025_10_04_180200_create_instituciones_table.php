@@ -16,16 +16,16 @@ return new class extends Migration
 
             // Datos básicos
             $table->string('nombre', 255);
-            $table->string('nivel_educativo', 100)->nullable();
-
-            // Ubicación
-            $table->string('distrito', 100);
-            $table->string('centro_poblado', 150)->nullable();
-            $table->string('direccion', 255)->nullable();
+            // Clasificación
+            $table->string('nivel_educativo', 50)->index(); // NIVEL_MOD
+            $table->string('tipo_gestion', 50)->nullable()->index();
+            // Ejemplos: PUBLICA, PRIVADA, PUBLICA_CONVENIO
+            // Ubicación administrativa
+            $table->string('distrito', 100)->index();
 
             // Geolocalización (precisión de 7 decimales = ~1.1cm)
-            $table->decimal('latitud', 10, 7)->nullable();
-            $table->decimal('longitud', 10, 7)->nullable();
+            $table->decimal('latitud', 11, 7)->nullable();
+            $table->decimal('longitud', 11, 7)->nullable();
             $table->unsignedInteger('radio')->default(30)->comment('Radio en metros');
 
             // Logo
@@ -38,6 +38,7 @@ return new class extends Migration
             $table->index('nivel_educativo', 'idx_nivel');
             $table->index(['distrito', 'nivel_educativo'], 'idx_distrito_nivel');
             $table->index('codigo_modular_ie', 'idx_codigo');
+            $table->index('tipo_gestion', 'idx_gestion');
             
             // Índice espacial si usas MySQL 8+ (opcional para búsquedas por coordenadas)
             // $table->spatialIndex(['latitud', 'longitud'], 'idx_coordenadas');

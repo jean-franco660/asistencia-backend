@@ -216,6 +216,16 @@ class ImportacionLog extends Model
         };
     }
 
+    public function scopeRecientesCompletadas($query, int $limite = 10)
+    {
+        return $query
+            ->where('estado', self::ESTADO_COMPLETED)
+            ->orderByDesc('completado_en')
+            ->orderByDesc('id')
+            ->limit($limite);
+    }
+
+
     /**
      * Tipo formateado
      */

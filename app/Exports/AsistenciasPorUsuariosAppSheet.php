@@ -30,47 +30,66 @@ class AsistenciasPorUsuariosAppSheet implements
 
     public function collection()
     {
+        // Consultamos Cabeceras Diarias para sacar estadísticas
         $query = Asistencia::with('usuario');
 
         if (!empty($this->filters['fecha_inicio'])) {
-            $query->whereDate('fecha_hora', '>=', $this->filters['fecha_inicio']);
+            $query->whereDate('fecha', '>=', $this->filters['fecha_inicio']);
         }
         if (!empty($this->filters['fecha_fin'])) {
-            $query->whereDate('fecha_hora', '<=', $this->filters['fecha_fin']);
+            $query->whereDate('fecha', '<=', $this->filters['fecha_fin']);
         }
         if (!empty($this->filters['institucion_id'])) {
             $query->where('institucion_id', $this->filters['institucion_id']);
         }
-        if (!empty($this->filters['tipo'])) {
-            $query->where('tipo', $this->filters['tipo']);
-        }
+        // El filtro 'tipo' (ENTRADA/SALIDA) no tiene sentido en resumen global por docente, lo ignoramos
 
         if (!empty($this->filters['user'])) {
             $user = $this->filters['user'];
-            if ($user->rol === 'director') {
-                $institucionIds = $user->instituciones->pluck('id');
-                $query->whereIn('institucion_id', $institucionIds);
+            // Validar si es admin o supervisor
+            if (!$user->esAdministrador()) {
+                $institucionesIds = $user->institucionesVigentes()->pluck('id');
+                if ($institucionesIds->isNotEmpty()) {
+                    $query->whereIn('institucion_id', $institucionesIds);
+                } else {
+                    $query->whereRaw('1 = 0');
+                }
             }
         }
 
         $asistencias = $query->get();
 
         $agrupado = $asistencias->groupBy('usuario_app_id')->map(function ($group) {
-            $usuario = $group->first()->usuario;
-            $total = $group->count();
-            $a_tiempo = $group->where('resultado', Asistencia::RESULTADO_A_TIEMPO)->count();
-            $tarde = $group->where('resultado', Asistencia::RESULTADO_TARDE)->count();
-            $ausente = $group->where('situacion', Asistencia::SITUACION_FALTA)->count();
+            $first = $group->first();
+            $usuario = $first->usuario;
+
+            $totalDias = $group->count();
+
+            // Lógica basada en nuevos campos
+            $faltas = $group->where('estado_diario', 'FALTA')->count();
+
+            // Tardanza: si tiene minutos de tardanza > 0
+            $tardanzas = $group->filter(function ($a) {
+                return $a->minutos_tardanza > 0;
+            })->count();
+
+            // Presente y puntual
+            $a_tiempo = $group->filter(function ($a) {
+                return $a->estado_diario === 'PRESENTE' && $a->minutos_tardanza == 0;
+            })->count();
+
+            // Total asistidos (Presente o tardanza, NO falta)
+            $totalAsistidos = $totalDias - $faltas;
 
             return (object) [
-                'codigo' => $usuario->codigo ?? '-',
-                'nombre' => $usuario->nombre ?? '-',
-                'dni' => $usuario->dni ?? '-',
-                'total' => $total,
+                'codigo' => $usuario->codigo_modular ?? '-',
+                'nombre' => $usuario ? ($usuario->apellido_paterno . ' ' . $usuario->apellido_materno . ' ' . $usuario->nombres) : '-',
+                'dni' => $usuario->numero_documento ?? '-',
+                'total_dias' => $totalDias,
                 'a_tiempo' => $a_tiempo,
-                'tarde' => $tarde,
-                'ausente' => $ausente,
-                'puntualidad' => $total > 0 ? round(($a_tiempo / $total) * 100, 1) : 0,
+                'tardanzas' => $tardanzas,
+                'faltas' => $faltas,
+                'puntualidad' => $totalAsistidos > 0 ? round(($a_tiempo / $totalAsistidos) * 100, 1) : 0,
             ];
         });
 
@@ -80,14 +99,14 @@ class AsistenciasPorUsuariosAppSheet implements
     public function headings(): array
     {
         return [
-            'Código',
+            'Código Modular',
             'Docente',
             'DNI',
-            'Total Registros',
-            'A Tiempo',
-            'Tarde',
-            'Ausente',
-            '% Puntualidad'
+            'Días Reportados',
+            'Puntuales',
+            'Tardanzas',
+            'Faltas',
+            '% Puntualidad (sobre asistencias)'
         ];
     }
 
@@ -97,10 +116,10 @@ class AsistenciasPorUsuariosAppSheet implements
             $row->codigo,
             $row->nombre,
             $row->dni,
-            $row->total,
+            $row->total_dias,
             $row->a_tiempo,
-            $row->tarde,
-            $row->ausente,
+            $row->tardanzas,
+            $row->faltas,
             $row->puntualidad . '%',
         ];
     }
@@ -122,19 +141,19 @@ class AsistenciasPorUsuariosAppSheet implements
     public function columnWidths(): array
     {
         return [
-            'A' => 12,
-            'B' => 30,
-            'C' => 12,
-            'D' => 15,
-            'E' => 12,
-            'F' => 12,
-            'G' => 12,
-            'H' => 15,
+            'A' => 15, // Codigo
+            'B' => 35, // Docente
+            'C' => 12, // DNI
+            'D' => 15, // Total Dias
+            'E' => 12, // Puntuales
+            'F' => 12, // Tardanzas
+            'G' => 12, // Faltas
+            'H' => 20, // %
         ];
     }
 
     public function title(): string
     {
-        return 'Por UsuariosApp';
+        return 'Estadísticas por Docente';
     }
 }
