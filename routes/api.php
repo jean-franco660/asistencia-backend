@@ -275,6 +275,18 @@ Route::prefix('v1/web')->middleware(['auth:sanctum', 'throttle:api'])->group(fun
         Route::get('/modelo/{modelo}/{id}', [\App\Http\Controllers\Api\AuditLogController::class, 'historialModelo']);
         Route::get('/{id}', [\App\Http\Controllers\Api\AuditLogController::class, 'show']);
     });
+    /*
+    |--------------------------------------------------------------------------
+    | REPORTES AVANZADOS (Excel)
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('reportes')->group(function () {
+        Route::get('/periodo', [\App\Http\Controllers\Api\ReporteController::class, 'periodo']);
+        Route::get('/docente-historial', [\App\Http\Controllers\Api\ReporteController::class, 'docenteHistorial']);
+        Route::get('/institucion-consolidado', [\App\Http\Controllers\Api\ReporteController::class, 'institucionConsolidado']);
+        Route::get('/mensual', [\App\Http\Controllers\Api\ReporteController::class, 'mensual']);
+    });
+
 });
 
 /*

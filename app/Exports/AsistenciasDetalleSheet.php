@@ -57,9 +57,10 @@ class AsistenciasDetalleSheet implements
         }
 
         // Filtro Supervisor
+        // Filtro Supervisor
         if (!empty($this->filters['user'])) {
             $user = $this->filters['user'];
-            if (!$user->esAdministrador()) {
+            if (!$user->esAdminOSuperAdmin()) {
                 $institucionesIds = $user->institucionesVigentes()->pluck('id');
 
                 $query->whereHas('asistencia', function ($q) use ($institucionesIds) {

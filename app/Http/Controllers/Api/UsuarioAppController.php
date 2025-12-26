@@ -352,6 +352,8 @@ class UsuarioAppController extends Controller
      */
     public function update(UpdateUsuarioAppRequest $request, $id): JsonResponse
     {
+        \Log::info("🔄 [UsuarioApp] Iniciando actualización de usuario ID: {$id}", ['request' => $request->all()]);
+
         $usuario = UsuarioApp::findOrFail($id);
         $this->authorize('update', $usuario);
 
@@ -366,14 +368,23 @@ class UsuarioAppController extends Controller
             }
 
             $usuario->update($data);
+            \Log::info("✅ [UsuarioApp] Datos básicos actualizados usuario ID: {$id}");
 
             // Actualizar asignaciones si se envían
             if ($request->has('asignaciones')) {
+                \Log::info("🔄 [UsuarioApp] Procesando asignaciones para usuario ID: {$id}", ['asignaciones' => $request->asignaciones]);
+
                 // Desactivar asignaciones actuales
-                $usuario->asignaciones()->update(['estado' => UsuarioAppInstitucion::ESTADO_INACTIVO]);
+                $usuario->asignaciones()->update([
+                    'estado' => UsuarioAppInstitucion::ESTADO_INACTIVO,
+                    'fecha_fin' => now()
+                ]);
+                \Log::info("ℹ️ [UsuarioApp] Asignaciones previas marcadas como INACTIVO");
 
                 // Crear/actualizar nuevas asignaciones
-                foreach ($request->asignaciones as $asig) {
+                foreach ($request->asignaciones as $index => $asig) {
+                    \Log::info("➡️ [UsuarioApp] Procesando asignación #{$index}", ['datos' => $asig]);
+
                     // ✅ NUEVO: Si no se especifica horario, buscar uno automáticamente
                     $horarioId = $asig['horario_institucion_id'] ?? null;
 
@@ -384,26 +395,61 @@ class UsuarioAppController extends Controller
 
                         if ($horario) {
                             $horarioId = $horario->id;
+                            \Log::info("ℹ️ [UsuarioApp] Horario auto-asignado: {$horario->id}");
                         }
                     }
 
-                    UsuarioAppInstitucion::updateOrCreate(
-                        [
-                            'usuario_app_id' => $usuario->id,
-                            'institucion_id' => $asig['institucion_id'],
-                        ],
-                        [
-                            'horario_institucion_id' => $horarioId, // ✅ Asignado automáticamente
-                            'cargo' => $asig['cargo'] ?? null,
-                            'estado' => $asig['estado'] ?? UsuarioAppInstitucion::ESTADO_ACTIVO,
-                            'fecha_inicio' => $asig['fecha_inicio'] ?? now(),
-                            'fecha_fin' => $asig['fecha_fin'] ?? null,
-                        ]
-                    );
+                    // ✅ Robustez: Buscar asignación existente (incluso eliminada/soft-deleted) para evitar duplicados
+                    $asignacion = UsuarioAppInstitucion::withTrashed()
+                        ->where('usuario_app_id', $usuario->id)
+                        ->where('institucion_id', $asig['institucion_id'])
+                        ->first();
+
+                    if ($asignacion) {
+                        \Log::info("⚠️ [UsuarioApp] Asignación existente encontrada ID: {$asignacion->id} (Trashed: {$asignacion->trashed()})");
+
+                        // Limpiar duplicados extra si existen (para corregir inconsistencias antiguas)
+                        $duplicados = UsuarioAppInstitucion::withTrashed()
+                            ->where('usuario_app_id', $usuario->id)
+                            ->where('institucion_id', $asig['institucion_id'])
+                            ->where('id', '!=', $asignacion->id)
+                            ->get(); // Obtener para loggear antes de borrar
+
+                        if ($duplicados->count() > 0) {
+                            \Log::warning("🚨 [UsuarioApp] Eliminando {$duplicados->count()} duplicados encontrados", ['ids' => $duplicados->pluck('id')]);
+
+                            UsuarioAppInstitucion::withTrashed()
+                                ->where('usuario_app_id', $usuario->id)
+                                ->where('institucion_id', $asig['institucion_id'])
+                                ->where('id', '!=', $asignacion->id)
+                                ->forceDelete();
+                        }
+
+                        if ($asignacion->trashed()) {
+                            $asignacion->restore();
+                            \Log::info("♻️ [UsuarioApp] Asignación restaurada ID: {$asignacion->id}");
+                        }
+                    } else {
+                        $asignacion = new UsuarioAppInstitucion();
+                        $asignacion->usuario_app_id = $usuario->id;
+                        $asignacion->institucion_id = $asig['institucion_id'];
+                        \Log::info("✨ [UsuarioApp] Creando NUEVA asignación para Institución ID: {$asig['institucion_id']}");
+                    }
+
+                    $asignacion->fill([
+                        'horario_institucion_id' => $horarioId, // ✅ Asignado automáticamente
+                        'cargo' => $asig['cargo'] ?? null,
+                        'estado' => $asig['estado'] ?? UsuarioAppInstitucion::ESTADO_ACTIVO,
+                        'fecha_inicio' => $asig['fecha_inicio'] ?? now(),
+                        'fecha_fin' => $asig['fecha_fin'] ?? null,
+                    ]);
+                    $asignacion->save();
+                    \Log::info("✅ [UsuarioApp] Asignación guardada/actualizada ID: {$asignacion->id}", ['estado' => $asignacion->estado]);
                 }
             }
 
             DB::commit();
+            \Log::info("🏁 [UsuarioApp] Transacción completada exitosamente para usuario ID: {$id}");
 
             return response()->json([
                 'success' => true,
@@ -413,6 +459,7 @@ class UsuarioAppController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
+            \Log::error("❌ [UsuarioApp] Error en transacción update: " . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
 
             return response()->json([
                 'success' => false,

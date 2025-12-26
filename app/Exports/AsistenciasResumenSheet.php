@@ -49,14 +49,17 @@ class AsistenciasResumenSheet implements
         // Lo ignoraremos para el resumen diario o lo usamos para checkear marcaciones.
 
         // Filtrar por supervisor
+        // Filtrar por supervisor
         if (!empty($this->filters['user'])) {
             $user = $this->filters['user'];
-            if (!$user->esAdministrador()) {
+            // Corregido: Usar esAdminOSuperAdmin para incluir al super_admin
+            if (!$user->esAdminOSuperAdmin()) {
                 $institucionesIds = $user->institucionesVigentes()->pluck('id');
                 if ($institucionesIds->isNotEmpty()) {
                     $query->whereIn('institucion_id', $institucionesIds);
                 } else {
-                    $query->whereRaw('1 = 0'); // No results
+                    // Si es supervisor y no tiene instituciones, no ve nada
+                    $query->whereRaw('1 = 0');
                 }
             }
         }

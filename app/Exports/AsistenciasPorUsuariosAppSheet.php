@@ -47,7 +47,7 @@ class AsistenciasPorUsuariosAppSheet implements
         if (!empty($this->filters['user'])) {
             $user = $this->filters['user'];
             // Validar si es admin o supervisor
-            if (!$user->esAdministrador()) {
+            if (!$user->esAdminOSuperAdmin()) {
                 $institucionesIds = $user->institucionesVigentes()->pluck('id');
                 if ($institucionesIds->isNotEmpty()) {
                     $query->whereIn('institucion_id', $institucionesIds);

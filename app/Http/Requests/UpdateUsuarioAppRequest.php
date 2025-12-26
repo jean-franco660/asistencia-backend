@@ -47,7 +47,16 @@ class UpdateUsuarioAppRequest extends FormRequest
             'acceso_habilitado' => 'sometimes|boolean',
 
             // Asignaciones (opcional, si se envía se reemplaza todo)
-            'asignaciones' => 'sometimes|array',
+            'asignaciones' => [
+                'sometimes',
+                'array',
+                function ($attribute, $value, $fail) {
+                    $institucionIds = array_column($value, 'institucion_id');
+                    if (count($institucionIds) !== count(array_unique($institucionIds))) {
+                        $fail('No puede asignar la misma institución más de una vez a un mismo usuario.');
+                    }
+                }
+            ],
             'asignaciones.*.institucion_id' => 'required|exists:instituciones,id',
             'asignaciones.*.horario_institucion_id' => 'nullable|exists:horarios_institucion,id', // ✅ Opcional
             'asignaciones.*.cargo' => 'required|string|max:50',

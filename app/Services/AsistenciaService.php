@@ -141,7 +141,8 @@ class AsistenciaService
                 ];
             } else {
                 // Salió tarde (después de hora + tolerancia)
-                $minutosTardeSalida = $horaMarcada->diffInMinutes($salidaMaxima);
+                // Convertir a entero y usar valor absoluto para evitar decimales/negativos confusos
+                $minutosTardeSalida = (int) abs($horaMarcada->diffInMinutes($salidaMaxima));
                 return [
                     'resultado' => Asistencia::RESULTADO_TARDE,
                     'minutos_tardanza' => 0, // No se suma tardanza de salida al header
