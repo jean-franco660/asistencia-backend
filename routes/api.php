@@ -61,6 +61,10 @@ Route::prefix('v1/app')->group(function () {
         Route::post('/justificaciones', [JustificacionController::class, 'store']);
         Route::get('/justificaciones/{id}', [JustificacionController::class, 'show']);
         Route::delete('/justificaciones/{id}', [JustificacionController::class, 'destroy']);
+
+        // Gestión de Horarios (Auto-asignación)
+        Route::get('/mis-horarios', [\App\Http\Controllers\Api\App\ScheduleController::class, 'getMisHorarios']);
+        Route::post('/actualizar-horarios', [\App\Http\Controllers\Api\App\ScheduleController::class, 'actualizarHorarios']);
     });
 });
 
@@ -81,6 +85,8 @@ Route::prefix('v1/web')->middleware(['auth:sanctum', 'throttle:api'])->group(fun
 
     // Perfil
     Route::get('/me', [UsuarioWebController::class, 'me']);
+    Route::post('/perfil/cambiar-password', [\App\Http\Controllers\Api\Web\PerfilController::class, 'cambiarPassword']);
+    Route::post('/perfil/cambiar-email', [\App\Http\Controllers\Api\Web\PerfilController::class, 'cambiarEmail']);
 
     // Logout
     Route::post('/logout', function (Request $request) {
@@ -274,6 +280,25 @@ Route::prefix('v1/web')->middleware(['auth:sanctum', 'throttle:api'])->group(fun
         Route::get('/stats', [\App\Http\Controllers\Api\AuditLogController::class, 'stats']);
         Route::get('/modelo/{modelo}/{id}', [\App\Http\Controllers\Api\AuditLogController::class, 'historialModelo']);
         Route::get('/{id}', [\App\Http\Controllers\Api\AuditLogController::class, 'show']);
+    });
+    /*
+    |--------------------------------------------------------------------------
+    | AUDITORÍA
+    |--------------------------------------------------------------------------
+    */
+    // Route::prefix('auditoria')->group(function () {
+    //     Route::get('/logs', [\App\Http\Controllers\Api\AuditoriaController::class, 'logs']);
+    // });
+
+    /*
+    |--------------------------------------------------------------------------
+    | GESTIÓN DE HORARIOS (Auto-asignación)
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('horarios-gestion')->group(function () { // Changed prefix to avoid conflict with existing 'horarios'
+        Route::get('/asignaciones', [\App\Http\Controllers\Api\Web\ScheduleManagementController::class, 'index']);
+        Route::get('/historial', [\App\Http\Controllers\Api\Web\ScheduleManagementController::class, 'historial']);
+        Route::post('/modificar', [\App\Http\Controllers\Api\Web\ScheduleManagementController::class, 'modificarHorarios']);
     });
     /*
     |--------------------------------------------------------------------------

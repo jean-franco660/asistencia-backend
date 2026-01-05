@@ -1,329 +1,233 @@
-# Sistema de Asistencia - Backend API
+# 📘 Manual de Despliegue a Producción - Backend
+## Sistema de Control de Asistencias
 
-Sistema backend para gestión de asistencias de docentes en instituciones educativas. Desarrollado con Laravel 11, proporciona una API REST completa para la aplicación móvil Flutter y el panel web administrativo Vue.js.
+> Este README contiene las instrucciones completas para desplegar el backend Laravel en producción, especialmente en servidores con cPanel.
 
-## 🚀 Características
+---
 
-- ✅ **API REST** completa con autenticación Laravel Sanctum
-- ✅ **Gestión de Usuarios**: Super Admin, Administradores, Supervisores y Docentes
-- ✅ **Control de Asistencias**: Registro con geolocalización GPS, fotos y validación de geofencing
-- ✅ **Asistencias Diarias Materializadas**: Sistema eficiente de cálculo diario de estados
-- ✅ **Múltiples Horarios**: Soporte para hasta 3 horarios por día
-- ✅ **Justificaciones**: Sistema de creación, aprobación y rechazo de ausencias
-- ✅ **Feriados**: Gestión de feriados nacionales e institucionales
-- ✅ **Importación Masiva**: Excel para docentes e instituciones con validación robusta
-- ✅ **Exportación**: Reportes detallados en Excel con múltiples hojas
-- ✅ **Auditoría Completa**: Registro de todos los cambios críticos del sistema
-- ✅ **Rate Limiting**: Protección contra abuso de API
-- ✅ **Provisioning de Supervisores**: Conversión de usuarios app a supervisores
-- ✅ **Queue Jobs**: Procesamiento asíncrono de importaciones
+## 🚀 Despliegue Rápido en cPanel
 
-## 📋 Requisitos
+### Paso 1: Crear Base de Datos MySQL
 
-- PHP >= 8.2
-- Composer 2.x
-- MySQL >= 8.0 o MariaDB >= 10.3
-- Extensiones PHP: PDO, mbstring, openssl, tokenizer, xml, ctype, json, bcmath, gd, fileinfo
+1. En cPanel → **MySQL® Databases**
+2. Crear base de datos: `asistencia_db`
+3. Crear usuario: `asistencia_user` con contraseña segura
+4. Asignar usuario a la base de datos con **todos los privilegios**
 
-## 🔧 Instalación
+### Paso 2: Subir Archivos
 
-### 1. Clonar el repositorio
+1. Comprimir todo el contenido de esta carpeta en `backend.zip`
+2. En cPanel → **Administrador de Archivos**
+3. Crear carpeta `public_html/api`
+4. Subir y extraer `backend.zip` en esa carpeta
 
-```bash
-git clone https://github.com/jean-franco660/asistencia-backend.git
-cd asistencia-backend
-```
+### Paso 3: Configurar .env
 
-### 2. Instalar dependencias
-
-```bash
-composer install
-```
-
-### 3. Configurar variables de entorno
-
-```bash
-cp .env.example .env
-php artisan key:generate
-```
-
-Editar `.env` con tus configuraciones:
+1. Copiar `.env.example` a `.env`
+2. Editar `.env` con estos valores:
 
 ```env
 APP_NAME="Sistema de Asistencia"
 APP_ENV=production
 APP_DEBUG=false
-APP_URL=https://tu-dominio.com
-APP_TIMEZONE=America/Lima
+APP_URL=https://api.sudominio.com
 
 DB_CONNECTION=mysql
-DB_HOST=127.0.0.1
+DB_HOST=localhost
 DB_PORT=3306
 DB_DATABASE=asistencia_db
-DB_USERNAME=tu_usuario
-DB_PASSWORD=tu_password
+DB_USERNAME=asistencia_user
+DB_PASSWORD=tu_contraseña_segura
 
-# Queue (Background Jobs)
-QUEUE_CONNECTION=database
-
-# Almacenamiento de fotos
-FILESYSTEM_DISK=public
+CORS_ALLOWED_ORIGINS="https://admin.sudominio.com,https://api.sudominio.com"
 ```
 
-### 4. Ejecutar migraciones
+### Paso 4: Ejecutar Comandos de Instalación
+
+En Terminal de cPanel o SSH:
 
 ```bash
-php artisan migrate --seed
-```
+cd public_html/api
 
-Esto creará:
-- Todas las tablas necesarias
-- Un super administrador: `superadmin@sistema.com` / `SuperAdmin@123`
-
-### 5. Crear enlace simbólico para almacenamiento
-
-```bash
-php artisan storage:link
-```
-
-### 6. Iniciar queue worker (Background Jobs)
-
-```bash
-php artisan queue:work --tries=3 --timeout=600
-```
-
-### 7. Iniciar servidor (desarrollo)
-
-```bash
-php artisan serve --host=0.0.0.0 --port=8000
-```
-
-La API estará disponible en `http://localhost:8000`
-
-## 📚 Documentación de API
-
-### Autenticación
-
-Todos los endpoints (excepto login) requieren autenticación con token Bearer.
-
-#### Login App Móvil
-
-```http
-POST /api/v1/app/login
-Content-Type: application/json
-
-{
-  "codigo_modular": "DOC123456",
-  "password": "password123"
-}
-```
-
-#### Login Web (Admin/Supervisor)
-
-```http
-POST /api/v1/web/login
-Content-Type: application/json
-
-{
-  "email": "admin@sistema.com",
-  "password": "password123"
-}
-```
-
-### Endpoints Principales
-
-**App Móvil**: `/api/v1/app/*`
-- `/login` - Autenticación
-- `/perfil` - Datos del usuario
-- `/asistencia` - Marcar asistencia
-- `/asistencia/{usuarioId}` - Historial
-- `/justificaciones` - CRUD de justificaciones
-
-**Panel Web**: `/api/v1/web/*`
-- `/login` - Autenticación
-- `/me` - Datos del usuario logueado
-- `/usuarios-app` - Gestión de docentes
-- `/instituciones` - Gestión de instituciones
-- `/horarios` - Gestión de horarios
-- `/feriados` - Gestión de feriados
-- `/asistencias` - Visualización y reportes
-- `/justificaciones` - Aprobación/rechazo
-
-Ver documentación completa en: `routes/api.php`
-
-## 🗄️ Estructura de Base de Datos
-
-### Tablas Principales
-
-- `usuarios_web` - Administradores y Supervisores
-- `usuarios_app` - Docentes
-- `instituciones` - Instituciones educativas
-- `usuario_app_institucion` - Asignaciones de docentes a instituciones
-- `asistencias` - Registro de marcaciones (entrada/salida)
-- `asistencias_diarias` - Estados diarios materializados
-- `horarios_institucion` - Horarios laborales por institución
-- `feriados` - Feriados nacionales e institucionales
-- `justificaciones` - Justificaciones de ausencias
-- `importacion_logs` - Seguimiento de importaciones masivas
-- `audit_logs` - Auditoría de cambios críticos
-
-## 🔐 Roles y Permisos
-
-### Super Admin
-- Acceso completo al sistema
-- Gestión de administradores
-- Acceso a logs de auditoría
-- Gestión de todos los usuarios
-
-### Administrador
-- Gestión de supervisores y docentes
-- Gestión de instituciones
-- Configuración de horarios y feriados
-- Importación/Exportación masiva
-- Visualización de reportes globales
-
-### Supervisor (Director)
-- Visualización de datos de sus instituciones asignadas
-- Gestión de docentes de sus instituciones
-- Aprobación/rechazo de justificaciones
-- Reportes de asistencias de sus instituciones
-- Vista de perfil personal
-
-### Docente (App Móvil)
-- Registro de asistencias con GPS y foto
-- Visualización de historial personal
-- Creación de justificaciones
-- Sincronización offline de marcaciones
-
-## 📊 Rate Limiting
-
-El sistema implementa rate limiting para proteger la API:
-
-- **Login**: 5 intentos por minuto
-- **API General**: 60 peticiones por minuto
-- **Acciones Críticas**: 30 por minuto
-- **Importaciones**: 3 por minuto
-
-## 🧪 Tests
-
-Ejecutar la suíte de tests:
-
-```bash
-php artisan test
-```
-
-Ejecutar tests específicos:
-
-```bash
-php artisan test --filter=AsistenciaTest
-php artisan test --filter=UsuarioAppTest
-```
-
-## 🔧 Comandos Artisan Personalizados
-
-```bash
-# Materializar asistencias diarias
-php artisan asistencias:materializar
-
-# Corregir estados de asignaciones
-php artisan asignaciones:corregir-estados
-```
-
-## 🚀 Despliegue a Producción
-
-### 1. Optimizar aplicación
-
-```bash
+# Instalar dependencias
 composer install --optimize-autoloader --no-dev
+
+# Generar clave de aplicación
+php artisan key:generate
+
+# Ejecutar migraciones
+php artisan migrate --force
+
+# Cargar datos iniciales
+php artisan db:seed --force
+
+# Crear enlace de almacenamiento
+php artisan storage:link
+
+# Configurar permisos
+chmod -R 755 storage bootstrap/cache
+
+# Optimizar
 php artisan config:cache
 php artisan route:cache
 php artisan view:cache
-php artisan event:cache
 ```
 
-### 2. Configurar permisos
+### Paso 5: Configurar Subdominio
 
-```bash
-chmod -R 755 storage bootstrap/cache
-chown -R www-data:www-data storage bootstrap/cache
+1. En cPanel → **Subdominios**
+2. Crear subdominio `api`
+3. Raíz del documento: `public_html/api/public`
+
+### Paso 6: Configurar .htaccess
+
+En `public_html/api/public/.htaccess`:
+
+```apache
+<IfModule mod_rewrite.c>
+    <IfModule mod_negotiation.c>
+        Options -MultiViews -Indexes
+    </IfModule>
+
+    RewriteEngine On
+
+    # Handle Authorization Header
+    RewriteCond %{HTTP:Authorization} .
+    RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+    # Redirect Trailing Slashes
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_URI} (.+)/$
+    RewriteRule ^ %1 [L,R=301]
+
+    # Front Controller
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteRule ^ index.php [L]
+</IfModule>
+
+# Upload size para fotos de asistencia
+php_value upload_max_filesize 20M
+php_value post_max_size 20M
 ```
 
-### 3. Configurar Supervisor (Queue Worker)
+### Paso 7: Verificar
 
-Crear archivo `/etc/supervisor/conf.d/asistencia-worker.conf`:
+Visite: `https://api.sudominio.com/api/health`
 
-```ini
-[program:asistencia-worker]
-process_name=%(program_name)s_%(process_num)02d
-command=php /path/to/asistencia-backend/artisan queue:work --sleep=3 --tries=3 --timeout=600
-autostart=true
-autorestart=true
-user=www-data
-numprocs=2
-redirect_stderr=true
-stdout_logfile=/path/to/asistencia-backend/storage/logs/worker.log
-```
-
-Luego ejecutar:
-
-```bash
-sudo supervisorctl reread
-sudo supervisorctl update
-sudo supervisorctl start asistencia-worker:*
-```
-
-## 🔧 Mantenimiento
-
-### Limpiar caché
-
-```bash
-php artisan cache:clear
-php artisan config:clear
-php artisan route:clear
-php artisan view:clear
-```
-
-### Reiniciar queue workers
-
-```bash
-php artisan queue:restart
-```
-
-### Logs
-
-Los logs se encuentran en `storage/logs/laravel.log`
-
-## 📝 Changelog
-
-### v1.2.0 (2025-12-23)
-- ✅ Sistema de asistencias diarias materializadas
-- ✅ Provisioning de supervisores desde usuarios app
-- ✅ Mejoras en validación de geofencing
-- ✅ Filtro de instituciones para supervisores
-- ✅ Vista de perfil para supervisores
-- ✅ Exclusión de supervisor logueado de lista de docentes
-- ✅ Optimización de consultas y rendimiento
-
-### v1.1.0 (2025-12-20)
-- ✅ Sistema de revisión de asistencias (Fase 6)
-- ✅ Navegación entre marcaciones
-- ✅ Observadores para automatización
-- ✅ Mejoras en importación masiva
-
-### v1.0.0 (2025-12-14)
-- ✅ Sistema base de asistencias
-- ✅ Autenticación con Sanctum
-- ✅ Importación/Exportación Excel
-- ✅ Sistema de justificaciones
-- ✅ Múltiples horarios por día
-- ✅ Auditoría completa
-
-## 📄 Licencia
-
-Este proyecto es privado y confidencial.
+Debe mostrar: `{"status":"ok"}`
 
 ---
 
-**Versión:** 1.2.0  
-**Última actualización:** 23 de diciembre de 2025  
-**Desarrollado con:** Laravel 11 + MySQL
+## 🔧 Actualización
+
+```bash
+cd public_html/api
+php artisan down
+git pull origin main  # si usa git
+composer install --optimize-autoloader --no-dev
+php artisan migrate --force
+php artisan config:clear
+php artisan config:cache
+php artisan route:cache
+php artisan up
+```
+
+---
+
+## 📝 Requisitos del Servidor
+
+- **PHP**: 8.2+
+- **MySQL**: 8.0+
+- **Composer**: 2.x
+- **Extensiones PHP**: cli, fpm, mysql, xml, mbstring, curl, zip, gd, bcmath, intl
+
+---
+
+## 🔐 Credenciales Predeterminadas
+
+Después de ejecutar `php artisan db:seed`, se crea automáticamente el Super Administrador:
+
+**Super Admin:**
+- Email: `admin@asistencia.com`
+- Password: `SuperAdmin123`
+
+> ⚠️ **MUY IMPORTANTE**: 
+> - Cambie estas credenciales inmediatamente después del primer acceso
+> - Use una contraseña segura con al menos 8 caracteres
+> - El super admin puede crear otros usuarios desde el dashboard web
+
+### Cómo Cambiar la Contraseña del Super Admin
+
+**Opción 1 - Desde el Dashboard Web (Recomendado):**
+1. Inicie sesión con las credenciales predeterminadas
+2. Vaya a su perfil
+3. Cambie la contraseña
+
+**Opción 2 - Por Línea de Comandos:**
+```bash
+php artisan tinker
+```
+Luego ejecute:
+```php
+$admin = App\Models\UsuarioWeb::where('email', 'admin@asistencia.com')->first();
+$admin->password = 'SuNuevaContraseñaSegura123';
+$admin->save();
+exit;
+```
+
+### Crear Usuarios Adicionales
+
+Una vez que el super admin ha iniciado sesión en el dashboard web, puede:
+- Crear otros administradores
+- Crear supervisores (directores)
+- Crear instituciones educativas
+- Importar usuarios app (docentes) mediante Excel
+
+### Gestión de Perfil de Usuarios
+
+Todos los usuarios web (super_admin, administrador, supervisor) pueden acceder a su perfil desde el menú de usuario en el navbar y:
+
+**Cambiar su contraseña:**
+1. Clic en avatar → "Mi Perfil"
+2. Botón "Cambiar Contraseña"
+3. Ingresar contraseña actual, nueva y confirmación
+4. La nueva contraseña debe tener al menos 8 caracteres
+
+**Cambiar su email:**
+1. Clic en avatar → "Mi Perfil"
+2. Botón "Cambiar Email"
+3. Ingresar nuevo email y contraseña actual para confirmar
+4. El email debe ser único en el sistema
+
+> 💡 **Endpoints disponibles:**
+> - `POST /api/v1/web/perfil/cambiar-password`
+> - `POST /api/v1/web/perfil/cambiar-email`
+
+---
+
+## 📚 Documentación Completa
+
+Para instrucciones detalladas, consulte:
+- [DEPLOYMENT.md](DEPLOYMENT.md) - Guía técnica completa
+- [README.md](../README.md) - Manual general del sistema
+
+---
+
+## 🐛 Solución de Problemas
+
+**Error 500:**
+```bash
+chmod -R 755 storage bootstrap/cache
+php artisan config:clear
+```
+
+**CORS Error:**  
+Actualice `CORS_ALLOWED_ORIGINS` en `.env` y ejecute `php artisan config:cache`
+
+**Logs:**  
+`storage/logs/laravel.log`
+
+---
+
+**Sistema de Control de Asistencias © 2026**

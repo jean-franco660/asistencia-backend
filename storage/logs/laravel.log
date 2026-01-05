@@ -1,218 +1,113 @@
-[2025-12-24 09:20:57] local.DEBUG: 🔍 Resultados de búsqueda {"count":36,"search_term":null} 
-[2025-12-24 09:30:51] local.DEBUG: 🔍 Resultados de búsqueda {"count":36,"search_term":null} 
-[2025-12-24 09:34:57] local.DEBUG: 🔍 Resultados de búsqueda {"count":36,"search_term":null} 
-[2025-12-24 09:38:20] local.DEBUG: 🔍 Resultados de búsqueda {"count":36,"search_term":null} 
-[2025-12-24 09:45:40] local.DEBUG: 🔍 Resultados de búsqueda {"count":36,"search_term":null} 
-[2025-12-24 09:53:53] local.DEBUG: 🔍 Resultados de búsqueda {"count":36,"search_term":null} 
-[2025-12-24 09:55:32] local.DEBUG: 🔍 Resultados de búsqueda {"count":36,"search_term":null} 
-[2025-12-24 09:56:23] local.DEBUG: 🔍 Resultados de búsqueda {"count":36,"search_term":null} 
-[2025-12-24 10:08:14] local.DEBUG: 🔍 Resultados de búsqueda {"count":36,"search_term":null} 
-[2025-12-24 11:25:09] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 1 instID 7: 1  
-[2025-12-24 11:25:09] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 1 instID 4: 1  
-[2025-12-24 11:33:16] local.DEBUG: 🔍 Resultados de búsqueda {"count":36,"search_term":null} 
-[2025-12-24 11:53:44] local.ERROR: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'api_asistencias.asignaciones' doesn't exist (Connection: mysql, SQL: alter table `asignaciones` add `configuracion_turnos` json null comment 'Configuración de turnos activos del usuario (JSON)' after `institucion_id`) {"exception":"[object] (Illuminate\\Database\\QueryException(code: 42S02): SQLSTATE[42S02]: Base table or view not found: 1146 Table 'api_asistencias.asignaciones' doesn't exist (Connection: mysql, SQL: alter table `asignaciones` add `configuracion_turnos` json null comment 'Configuración de turnos activos del usuario (JSON)' after `institucion_id`) at D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Connection.php:824)
-[stacktrace]
-#0 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Connection.php(778): Illuminate\\Database\\Connection->runQueryCallback('alter table `as...', Array, Object(Closure))
-#1 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Connection.php(559): Illuminate\\Database\\Connection->run('alter table `as...', Array, Object(Closure))
-#2 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Schema\\Blueprint.php(121): Illuminate\\Database\\Connection->statement('alter table `as...')
-#3 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Schema\\Builder.php(618): Illuminate\\Database\\Schema\\Blueprint->build()
-#4 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Schema\\Builder.php(460): Illuminate\\Database\\Schema\\Builder->build(Object(Illuminate\\Database\\Schema\\Blueprint))
-#5 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Support\\Facades\\Facade.php(363): Illuminate\\Database\\Schema\\Builder->table('asignaciones', Object(Closure))
-#6 D:\\practicas\\asistencia-backend\\database\\migrations\\2025_12_24_115257_add_configuracion_turnos_to_asignaciones.php(14): Illuminate\\Support\\Facades\\Facade::__callStatic('table', Array)
-#7 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Migrations\\Migrator.php(514): Illuminate\\Database\\Migrations\\Migration@anonymous->up()
-#8 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Migrations\\Migrator.php(439): Illuminate\\Database\\Migrations\\Migrator->runMethod(Object(Illuminate\\Database\\MySqlConnection), Object(Illuminate\\Database\\Migrations\\Migration@anonymous), 'up')
-#9 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Migrations\\Migrator.php(448): Illuminate\\Database\\Migrations\\Migrator->Illuminate\\Database\\Migrations\\{closure}()
-#10 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Migrations\\Migrator.php(250): Illuminate\\Database\\Migrations\\Migrator->runMigration(Object(Illuminate\\Database\\Migrations\\Migration@anonymous), 'up')
-#11 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Console\\View\\Components\\Task.php(41): Illuminate\\Database\\Migrations\\Migrator->Illuminate\\Database\\Migrations\\{closure}()
-#12 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Migrations\\Migrator.php(809): Illuminate\\Console\\View\\Components\\Task->render('2025_12_24_1152...', Object(Closure))
-#13 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Migrations\\Migrator.php(250): Illuminate\\Database\\Migrations\\Migrator->write('Illuminate\\\\Cons...', '2025_12_24_1152...', Object(Closure))
-#14 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Migrations\\Migrator.php(210): Illuminate\\Database\\Migrations\\Migrator->runUp('D:\\\\practicas\\\\as...', 3, false)
-#15 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Migrations\\Migrator.php(137): Illuminate\\Database\\Migrations\\Migrator->runPending(Array, Array)
-#16 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Console\\Migrations\\MigrateCommand.php(116): Illuminate\\Database\\Migrations\\Migrator->run(Array, Array)
-#17 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Migrations\\Migrator.php(666): Illuminate\\Database\\Console\\Migrations\\MigrateCommand->Illuminate\\Database\\Console\\Migrations\\{closure}()
-#18 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Console\\Migrations\\MigrateCommand.php(109): Illuminate\\Database\\Migrations\\Migrator->usingConnection(NULL, Object(Closure))
-#19 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Console\\Migrations\\MigrateCommand.php(88): Illuminate\\Database\\Console\\Migrations\\MigrateCommand->runMigrations()
-#20 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Container\\BoundMethod.php(36): Illuminate\\Database\\Console\\Migrations\\MigrateCommand->handle()
-#21 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Container\\Util.php(43): Illuminate\\Container\\BoundMethod::Illuminate\\Container\\{closure}()
-#22 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Container\\BoundMethod.php(96): Illuminate\\Container\\Util::unwrapIfClosure(Object(Closure))
-#23 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Container\\BoundMethod.php(35): Illuminate\\Container\\BoundMethod::callBoundMethod(Object(Illuminate\\Foundation\\Application), Array, Object(Closure))
-#24 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Container\\Container.php(836): Illuminate\\Container\\BoundMethod::call(Object(Illuminate\\Foundation\\Application), Array, Array, NULL)
-#25 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Console\\Command.php(211): Illuminate\\Container\\Container->call(Array)
-#26 D:\\practicas\\asistencia-backend\\vendor\\symfony\\console\\Command\\Command.php(318): Illuminate\\Console\\Command->execute(Object(Symfony\\Component\\Console\\Input\\ArgvInput), Object(Illuminate\\Console\\OutputStyle))
-#27 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Console\\Command.php(180): Symfony\\Component\\Console\\Command\\Command->run(Object(Symfony\\Component\\Console\\Input\\ArgvInput), Object(Illuminate\\Console\\OutputStyle))
-#28 D:\\practicas\\asistencia-backend\\vendor\\symfony\\console\\Application.php(1110): Illuminate\\Console\\Command->run(Object(Symfony\\Component\\Console\\Input\\ArgvInput), Object(Symfony\\Component\\Console\\Output\\ConsoleOutput))
-#29 D:\\practicas\\asistencia-backend\\vendor\\symfony\\console\\Application.php(359): Symfony\\Component\\Console\\Application->doRunCommand(Object(Illuminate\\Database\\Console\\Migrations\\MigrateCommand), Object(Symfony\\Component\\Console\\Input\\ArgvInput), Object(Symfony\\Component\\Console\\Output\\ConsoleOutput))
-#30 D:\\practicas\\asistencia-backend\\vendor\\symfony\\console\\Application.php(194): Symfony\\Component\\Console\\Application->doRun(Object(Symfony\\Component\\Console\\Input\\ArgvInput), Object(Symfony\\Component\\Console\\Output\\ConsoleOutput))
-#31 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Console\\Kernel.php(197): Symfony\\Component\\Console\\Application->run(Object(Symfony\\Component\\Console\\Input\\ArgvInput), Object(Symfony\\Component\\Console\\Output\\ConsoleOutput))
-#32 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Application.php(1235): Illuminate\\Foundation\\Console\\Kernel->handle(Object(Symfony\\Component\\Console\\Input\\ArgvInput), Object(Symfony\\Component\\Console\\Output\\ConsoleOutput))
-#33 D:\\practicas\\asistencia-backend\\artisan(16): Illuminate\\Foundation\\Application->handleCommand(Object(Symfony\\Component\\Console\\Input\\ArgvInput))
-#34 {main}
-
-[previous exception] [object] (PDOException(code: 42S02): SQLSTATE[42S02]: Base table or view not found: 1146 Table 'api_asistencias.asignaciones' doesn't exist at D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Connection.php:570)
-[stacktrace]
-#0 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Connection.php(570): PDOStatement->execute()
-#1 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Connection.php(811): Illuminate\\Database\\Connection->Illuminate\\Database\\{closure}('alter table `as...', Array)
-#2 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Connection.php(778): Illuminate\\Database\\Connection->runQueryCallback('alter table `as...', Array, Object(Closure))
-#3 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Connection.php(559): Illuminate\\Database\\Connection->run('alter table `as...', Array, Object(Closure))
-#4 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Schema\\Blueprint.php(121): Illuminate\\Database\\Connection->statement('alter table `as...')
-#5 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Schema\\Builder.php(618): Illuminate\\Database\\Schema\\Blueprint->build()
-#6 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Schema\\Builder.php(460): Illuminate\\Database\\Schema\\Builder->build(Object(Illuminate\\Database\\Schema\\Blueprint))
-#7 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Support\\Facades\\Facade.php(363): Illuminate\\Database\\Schema\\Builder->table('asignaciones', Object(Closure))
-#8 D:\\practicas\\asistencia-backend\\database\\migrations\\2025_12_24_115257_add_configuracion_turnos_to_asignaciones.php(14): Illuminate\\Support\\Facades\\Facade::__callStatic('table', Array)
-#9 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Migrations\\Migrator.php(514): Illuminate\\Database\\Migrations\\Migration@anonymous->up()
-#10 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Migrations\\Migrator.php(439): Illuminate\\Database\\Migrations\\Migrator->runMethod(Object(Illuminate\\Database\\MySqlConnection), Object(Illuminate\\Database\\Migrations\\Migration@anonymous), 'up')
-#11 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Migrations\\Migrator.php(448): Illuminate\\Database\\Migrations\\Migrator->Illuminate\\Database\\Migrations\\{closure}()
-#12 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Migrations\\Migrator.php(250): Illuminate\\Database\\Migrations\\Migrator->runMigration(Object(Illuminate\\Database\\Migrations\\Migration@anonymous), 'up')
-#13 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Console\\View\\Components\\Task.php(41): Illuminate\\Database\\Migrations\\Migrator->Illuminate\\Database\\Migrations\\{closure}()
-#14 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Migrations\\Migrator.php(809): Illuminate\\Console\\View\\Components\\Task->render('2025_12_24_1152...', Object(Closure))
-#15 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Migrations\\Migrator.php(250): Illuminate\\Database\\Migrations\\Migrator->write('Illuminate\\\\Cons...', '2025_12_24_1152...', Object(Closure))
-#16 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Migrations\\Migrator.php(210): Illuminate\\Database\\Migrations\\Migrator->runUp('D:\\\\practicas\\\\as...', 3, false)
-#17 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Migrations\\Migrator.php(137): Illuminate\\Database\\Migrations\\Migrator->runPending(Array, Array)
-#18 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Console\\Migrations\\MigrateCommand.php(116): Illuminate\\Database\\Migrations\\Migrator->run(Array, Array)
-#19 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Migrations\\Migrator.php(666): Illuminate\\Database\\Console\\Migrations\\MigrateCommand->Illuminate\\Database\\Console\\Migrations\\{closure}()
-#20 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Console\\Migrations\\MigrateCommand.php(109): Illuminate\\Database\\Migrations\\Migrator->usingConnection(NULL, Object(Closure))
-#21 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Console\\Migrations\\MigrateCommand.php(88): Illuminate\\Database\\Console\\Migrations\\MigrateCommand->runMigrations()
-#22 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Container\\BoundMethod.php(36): Illuminate\\Database\\Console\\Migrations\\MigrateCommand->handle()
-#23 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Container\\Util.php(43): Illuminate\\Container\\BoundMethod::Illuminate\\Container\\{closure}()
-#24 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Container\\BoundMethod.php(96): Illuminate\\Container\\Util::unwrapIfClosure(Object(Closure))
-#25 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Container\\BoundMethod.php(35): Illuminate\\Container\\BoundMethod::callBoundMethod(Object(Illuminate\\Foundation\\Application), Array, Object(Closure))
-#26 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Container\\Container.php(836): Illuminate\\Container\\BoundMethod::call(Object(Illuminate\\Foundation\\Application), Array, Array, NULL)
-#27 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Console\\Command.php(211): Illuminate\\Container\\Container->call(Array)
-#28 D:\\practicas\\asistencia-backend\\vendor\\symfony\\console\\Command\\Command.php(318): Illuminate\\Console\\Command->execute(Object(Symfony\\Component\\Console\\Input\\ArgvInput), Object(Illuminate\\Console\\OutputStyle))
-#29 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Console\\Command.php(180): Symfony\\Component\\Console\\Command\\Command->run(Object(Symfony\\Component\\Console\\Input\\ArgvInput), Object(Illuminate\\Console\\OutputStyle))
-#30 D:\\practicas\\asistencia-backend\\vendor\\symfony\\console\\Application.php(1110): Illuminate\\Console\\Command->run(Object(Symfony\\Component\\Console\\Input\\ArgvInput), Object(Symfony\\Component\\Console\\Output\\ConsoleOutput))
-#31 D:\\practicas\\asistencia-backend\\vendor\\symfony\\console\\Application.php(359): Symfony\\Component\\Console\\Application->doRunCommand(Object(Illuminate\\Database\\Console\\Migrations\\MigrateCommand), Object(Symfony\\Component\\Console\\Input\\ArgvInput), Object(Symfony\\Component\\Console\\Output\\ConsoleOutput))
-#32 D:\\practicas\\asistencia-backend\\vendor\\symfony\\console\\Application.php(194): Symfony\\Component\\Console\\Application->doRun(Object(Symfony\\Component\\Console\\Input\\ArgvInput), Object(Symfony\\Component\\Console\\Output\\ConsoleOutput))
-#33 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Console\\Kernel.php(197): Symfony\\Component\\Console\\Application->run(Object(Symfony\\Component\\Console\\Input\\ArgvInput), Object(Symfony\\Component\\Console\\Output\\ConsoleOutput))
-#34 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Application.php(1235): Illuminate\\Foundation\\Console\\Kernel->handle(Object(Symfony\\Component\\Console\\Input\\ArgvInput), Object(Symfony\\Component\\Console\\Output\\ConsoleOutput))
-#35 D:\\practicas\\asistencia-backend\\artisan(16): Illuminate\\Foundation\\Application->handleCommand(Object(Symfony\\Component\\Console\\Input\\ArgvInput))
-#36 {main}
-"} 
-[2025-12-24 11:54:22] local.DEBUG: 🔍 Resultados de búsqueda {"count":36,"search_term":null} 
-[2025-12-24 11:58:43] local.DEBUG: 🔍 Resultados de búsqueda {"count":36,"search_term":null} 
-[2025-12-24 12:00:18] local.DEBUG: 🔍 Resultados de búsqueda {"count":36,"search_term":null} 
-[2025-12-24 12:03:33] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 1 instID 4: 1  
-[2025-12-24 12:04:08] local.DEBUG: 🔍 Resultados de búsqueda {"count":36,"search_term":null} 
-[2025-12-24 12:04:42] local.DEBUG: 🔍 Resultados de búsqueda {"count":36,"search_term":null} 
-[2025-12-24 12:04:52] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 1 instID 7: 1  
-[2025-12-24 12:04:52] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 1 instID 4: 1  
-[2025-12-24 12:05:12] local.DEBUG: 🔍 Resultados de búsqueda {"count":36,"search_term":null} 
-[2025-12-24 12:06:58] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 1 instID 4: 1  
-[2025-12-24 12:07:14] local.DEBUG: 🔍 Resultados de búsqueda {"count":36,"search_term":null} 
-[2025-12-24 12:08:06] local.INFO: ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  
-[2025-12-24 12:08:06] local.INFO: 📱 ASISTENCIA - Petición recibida desde la app  
-[2025-12-24 12:08:06] local.INFO: ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  
-[2025-12-24 12:08:06] local.INFO: 👤 Usuario autenticado: {"id":1,"codigo_modular":"1001546645","nombre":"ARPI CHOQUEHUANCA LOURDES"} 
-[2025-12-24 12:08:06] local.INFO: 📸 Procesando foto Archivo (store)...  
-[2025-12-24 12:08:08] local.INFO: ✅ Foto guardada en disco local (store) {"path":"selfies/selfie_694bd7a6e2c19.jpg"} 
-[2025-12-24 12:08:09] local.INFO: ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  
-[2025-12-24 12:08:10] local.INFO: 📱 ASISTENCIA - Petición recibida desde la app  
-[2025-12-24 12:08:10] local.INFO: ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  
-[2025-12-24 12:08:10] local.INFO: 👤 Usuario autenticado: {"id":1,"codigo_modular":"1001546645","nombre":"ARPI CHOQUEHUANCA LOURDES"} 
-[2025-12-24 12:08:10] local.INFO: 📸 Procesando foto Archivo (store)...  
-[2025-12-24 12:08:10] local.INFO: ✅ Foto guardada en disco local (store) {"path":"selfies/selfie_694bd7aa165a4.jpg"} 
-[2025-12-24 12:08:11] local.DEBUG: 🔍 Resultados de búsqueda {"count":36,"search_term":null} 
-[2025-12-24 12:08:13] local.INFO: ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  
-[2025-12-24 12:08:13] local.INFO: 📱 ASISTENCIA - Petición recibida desde la app  
-[2025-12-24 12:08:13] local.INFO: ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  
-[2025-12-24 12:08:13] local.INFO: 👤 Usuario autenticado: {"id":1,"codigo_modular":"1001546645","nombre":"ARPI CHOQUEHUANCA LOURDES"} 
-[2025-12-24 12:08:13] local.INFO: 📸 Procesando foto Archivo (store)...  
-[2025-12-24 12:08:13] local.INFO: ✅ Foto guardada en disco local (store) {"path":"selfies/selfie_694bd7ad6160a.jpg"} 
-[2025-12-24 12:08:14] local.INFO: ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  
-[2025-12-24 12:08:14] local.INFO: 📱 ASISTENCIA - Petición recibida desde la app  
-[2025-12-24 12:08:14] local.INFO: ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  
-[2025-12-24 12:08:14] local.INFO: 👤 Usuario autenticado: {"id":1,"codigo_modular":"1001546645","nombre":"ARPI CHOQUEHUANCA LOURDES"} 
-[2025-12-24 12:08:14] local.INFO: 📸 Procesando foto Archivo (store)...  
-[2025-12-24 12:08:14] local.INFO: ✅ Foto guardada en disco local (store) {"path":"selfies/selfie_694bd7ae3797f.jpg"} 
-[2025-12-24 12:08:15] local.INFO: ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  
-[2025-12-24 12:08:15] local.INFO: 📱 ASISTENCIA - Petición recibida desde la app  
-[2025-12-24 12:08:15] local.INFO: ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  
-[2025-12-24 12:08:15] local.INFO: 👤 Usuario autenticado: {"id":1,"codigo_modular":"1001546645","nombre":"ARPI CHOQUEHUANCA LOURDES"} 
-[2025-12-24 12:08:15] local.INFO: 📸 Procesando foto Archivo (store)...  
-[2025-12-24 12:08:15] local.INFO: ✅ Foto guardada en disco local (store) {"path":"selfies/selfie_694bd7af688ef.jpg"} 
-[2025-12-24 12:08:16] local.INFO: ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  
-[2025-12-24 12:08:16] local.INFO: 📱 ASISTENCIA - Petición recibida desde la app  
-[2025-12-24 12:08:16] local.INFO: ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  
-[2025-12-24 12:08:16] local.INFO: 👤 Usuario autenticado: {"id":1,"codigo_modular":"1001546645","nombre":"ARPI CHOQUEHUANCA LOURDES"} 
-[2025-12-24 12:08:16] local.INFO: 📸 Procesando foto Archivo (store)...  
-[2025-12-24 12:08:16] local.INFO: ✅ Foto guardada en disco local (store) {"path":"selfies/selfie_694bd7b02b37d.jpg"} 
-[2025-12-24 12:08:18] local.INFO: ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  
-[2025-12-24 12:08:18] local.INFO: 📱 ASISTENCIA - Petición recibida desde la app  
-[2025-12-24 12:08:18] local.INFO: ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  
-[2025-12-24 12:08:18] local.INFO: 👤 Usuario autenticado: {"id":1,"codigo_modular":"1001546645","nombre":"ARPI CHOQUEHUANCA LOURDES"} 
-[2025-12-24 12:08:18] local.INFO: 📸 Procesando foto Archivo (store)...  
-[2025-12-24 12:08:18] local.INFO: ✅ Foto guardada en disco local (store) {"path":"selfies/selfie_694bd7b25bd4e.jpg"} 
-[2025-12-24 12:08:19] local.INFO: ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  
-[2025-12-24 12:08:19] local.INFO: 📱 ASISTENCIA - Petición recibida desde la app  
-[2025-12-24 12:08:19] local.INFO: ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  
-[2025-12-24 12:08:19] local.INFO: 👤 Usuario autenticado: {"id":1,"codigo_modular":"1001546645","nombre":"ARPI CHOQUEHUANCA LOURDES"} 
-[2025-12-24 12:08:19] local.INFO: 📸 Procesando foto Archivo (store)...  
-[2025-12-24 12:08:19] local.INFO: ✅ Foto guardada en disco local (store) {"path":"selfies/selfie_694bd7b332939.jpg"} 
-[2025-12-24 12:08:20] local.INFO: ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  
-[2025-12-24 12:08:20] local.INFO: 📱 ASISTENCIA - Petición recibida desde la app  
-[2025-12-24 12:08:20] local.INFO: ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  
-[2025-12-24 12:08:20] local.INFO: 👤 Usuario autenticado: {"id":1,"codigo_modular":"1001546645","nombre":"ARPI CHOQUEHUANCA LOURDES"} 
-[2025-12-24 12:08:20] local.INFO: 📸 Procesando foto Archivo (store)...  
-[2025-12-24 12:08:20] local.INFO: ✅ Foto guardada en disco local (store) {"path":"selfies/selfie_694bd7b41a79e.jpg"} 
-[2025-12-24 12:08:21] local.INFO: ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  
-[2025-12-24 12:08:21] local.INFO: 📱 ASISTENCIA - Petición recibida desde la app  
-[2025-12-24 12:08:21] local.INFO: ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  
-[2025-12-24 12:08:21] local.INFO: 👤 Usuario autenticado: {"id":1,"codigo_modular":"1001546645","nombre":"ARPI CHOQUEHUANCA LOURDES"} 
-[2025-12-24 12:08:21] local.INFO: 📸 Procesando foto Archivo (store)...  
-[2025-12-24 12:08:21] local.INFO: ✅ Foto guardada en disco local (store) {"path":"selfies/selfie_694bd7b550e89.jpg"} 
-[2025-12-24 12:08:22] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 1 instID 4: 1  
-[2025-12-24 12:08:25] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 1 instID 4: 1  
-[2025-12-24 12:17:49] local.DEBUG: 🔍 Resultados de búsqueda {"count":36,"search_term":null} 
-[2025-12-24 12:19:59] local.DEBUG: 🔍 Resultados de búsqueda {"count":36,"search_term":null} 
-[2025-12-24 12:22:46] local.DEBUG: 🔍 Resultados de búsqueda {"count":36,"search_term":null} 
-[2025-12-24 12:34:32] local.DEBUG: 🔍 Resultados de búsqueda {"count":36,"search_term":null} 
-[2025-12-24 12:38:07] local.DEBUG: 🔍 Resultados de búsqueda {"count":36,"search_term":null} 
-[2025-12-24 14:46:22] local.DEBUG: 🔍 Resultados de búsqueda {"count":36,"search_term":null} 
-[2025-12-24 14:47:58] local.DEBUG: 🔍 Resultados de búsqueda {"count":36,"search_term":null} 
-[2025-12-24 14:48:34] local.ERROR: Call to undefined method App\Http\Controllers\Api\AsistenciaController::getMarcacion() {"userId":1,"exception":"[object] (Error(code: 0): Call to undefined method App\\Http\\Controllers\\Api\\AsistenciaController::getMarcacion() at D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\ControllerDispatcher.php:46)
-[stacktrace]
-#0 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\Route.php(265): Illuminate\\Routing\\ControllerDispatcher->dispatch(Object(Illuminate\\Routing\\Route), Object(App\\Http\\Controllers\\Api\\AsistenciaController), 'getMarcacion')
-#1 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\Route.php(211): Illuminate\\Routing\\Route->runController()
-#2 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\Router.php(822): Illuminate\\Routing\\Route->run()
-#3 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(180): Illuminate\\Routing\\Router->Illuminate\\Routing\\{closure}(Object(Illuminate\\Http\\Request))
-#4 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\Middleware\\SubstituteBindings.php(50): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
-#5 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(219): Illuminate\\Routing\\Middleware\\SubstituteBindings->handle(Object(Illuminate\\Http\\Request), Object(Closure))
-#6 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\Middleware\\ThrottleRequests.php(166): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
-#7 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\Middleware\\ThrottleRequests.php(129): Illuminate\\Routing\\Middleware\\ThrottleRequests->handleRequest(Object(Illuminate\\Http\\Request), Object(Closure), Array)
-#8 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\Middleware\\ThrottleRequests.php(90): Illuminate\\Routing\\Middleware\\ThrottleRequests->handleRequestUsingNamedLimiter(Object(Illuminate\\Http\\Request), Object(Closure), 'api', Object(Closure))
-#9 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(219): Illuminate\\Routing\\Middleware\\ThrottleRequests->handle(Object(Illuminate\\Http\\Request), Object(Closure), 'api')
-#10 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Auth\\Middleware\\Authenticate.php(63): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
-#11 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(219): Illuminate\\Auth\\Middleware\\Authenticate->handle(Object(Illuminate\\Http\\Request), Object(Closure), 'sanctum')
-#12 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(137): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
-#13 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\Router.php(821): Illuminate\\Pipeline\\Pipeline->then(Object(Closure))
-#14 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\Router.php(800): Illuminate\\Routing\\Router->runRouteWithinStack(Object(Illuminate\\Routing\\Route), Object(Illuminate\\Http\\Request))
-#15 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\Router.php(764): Illuminate\\Routing\\Router->runRoute(Object(Illuminate\\Http\\Request), Object(Illuminate\\Routing\\Route))
-#16 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Routing\\Router.php(753): Illuminate\\Routing\\Router->dispatchToRoute(Object(Illuminate\\Http\\Request))
-#17 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Http\\Kernel.php(200): Illuminate\\Routing\\Router->dispatch(Object(Illuminate\\Http\\Request))
-#18 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(180): Illuminate\\Foundation\\Http\\Kernel->Illuminate\\Foundation\\Http\\{closure}(Object(Illuminate\\Http\\Request))
-#19 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Http\\Middleware\\TransformsRequest.php(21): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
-#20 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Http\\Middleware\\ConvertEmptyStringsToNull.php(31): Illuminate\\Foundation\\Http\\Middleware\\TransformsRequest->handle(Object(Illuminate\\Http\\Request), Object(Closure))
-#21 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(219): Illuminate\\Foundation\\Http\\Middleware\\ConvertEmptyStringsToNull->handle(Object(Illuminate\\Http\\Request), Object(Closure))
-#22 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Http\\Middleware\\TransformsRequest.php(21): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
-#23 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Http\\Middleware\\TrimStrings.php(51): Illuminate\\Foundation\\Http\\Middleware\\TransformsRequest->handle(Object(Illuminate\\Http\\Request), Object(Closure))
-#24 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(219): Illuminate\\Foundation\\Http\\Middleware\\TrimStrings->handle(Object(Illuminate\\Http\\Request), Object(Closure))
-#25 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Http\\Middleware\\ValidatePostSize.php(27): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
-#26 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(219): Illuminate\\Http\\Middleware\\ValidatePostSize->handle(Object(Illuminate\\Http\\Request), Object(Closure))
-#27 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Http\\Middleware\\PreventRequestsDuringMaintenance.php(109): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
-#28 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(219): Illuminate\\Foundation\\Http\\Middleware\\PreventRequestsDuringMaintenance->handle(Object(Illuminate\\Http\\Request), Object(Closure))
-#29 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Http\\Middleware\\TrustProxies.php(58): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
-#30 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(219): Illuminate\\Http\\Middleware\\TrustProxies->handle(Object(Illuminate\\Http\\Request), Object(Closure))
-#31 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Http\\Middleware\\InvokeDeferredCallbacks.php(22): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
-#32 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(219): Illuminate\\Foundation\\Http\\Middleware\\InvokeDeferredCallbacks->handle(Object(Illuminate\\Http\\Request), Object(Closure))
-#33 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Http\\Middleware\\ValidatePathEncoding.php(26): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
-#34 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(219): Illuminate\\Http\\Middleware\\ValidatePathEncoding->handle(Object(Illuminate\\Http\\Request), Object(Closure))
-#35 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Http\\Middleware\\HandleCors.php(61): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
-#36 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(219): Illuminate\\Http\\Middleware\\HandleCors->handle(Object(Illuminate\\Http\\Request), Object(Closure))
-#37 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Pipeline\\Pipeline.php(137): Illuminate\\Pipeline\\Pipeline->Illuminate\\Pipeline\\{closure}(Object(Illuminate\\Http\\Request))
-#38 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Http\\Kernel.php(175): Illuminate\\Pipeline\\Pipeline->then(Object(Closure))
-#39 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Http\\Kernel.php(144): Illuminate\\Foundation\\Http\\Kernel->sendRequestThroughRouter(Object(Illuminate\\Http\\Request))
-#40 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Application.php(1220): Illuminate\\Foundation\\Http\\Kernel->handle(Object(Illuminate\\Http\\Request))
-#41 D:\\practicas\\asistencia-backend\\public\\index.php(20): Illuminate\\Foundation\\Application->handleRequest(Object(Illuminate\\Http\\Request))
-#42 D:\\practicas\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\resources\\server.php(23): require_once('D:\\\\practicas\\\\as...')
-#43 {main}
-"} 
+[2025-12-29 10:38:57] local.DEBUG: 🔍 Resultados de búsqueda {"count":36,"search_term":null} 
+[2025-12-29 10:45:07] local.DEBUG: 🔍 Resultados de búsqueda {"count":10,"search_term":null} 
+[2025-12-29 10:49:05] local.DEBUG: 🔍 Resultados de búsqueda {"count":10,"search_term":null} 
+[2025-12-29 10:52:17] local.DEBUG: 🔍 Resultados de búsqueda {"count":3,"search_term":null} 
+[2025-12-29 10:57:27] local.DEBUG: 🔍 Resultados de búsqueda {"count":3,"search_term":null} 
+[2025-12-29 10:57:40] local.DEBUG: 🔍 Resultados de búsqueda {"count":3,"search_term":null} 
+[2025-12-29 10:57:42] local.DEBUG: 🔍 Resultados de búsqueda {"count":3,"search_term":null} 
+[2025-12-29 11:00:30] local.DEBUG: 🔍 Resultados de búsqueda {"count":3,"search_term":null} 
+[2025-12-29 11:07:19] local.DEBUG: 🔍 Resultados de búsqueda {"count":3,"search_term":null} 
+[2025-12-29 11:07:23] local.DEBUG: 🔍 Resultados de búsqueda {"count":3,"search_term":null} 
+[2025-12-29 11:09:06] local.DEBUG: 🔍 Resultados de búsqueda {"count":3,"search_term":null} 
+[2025-12-29 11:11:28] local.DEBUG: 🔍 Resultados de búsqueda {"count":3,"search_term":null} 
+[2025-12-29 11:14:05] local.DEBUG: 🔍 Resultados de búsqueda {"count":3,"search_term":null} 
+[2025-12-29 11:25:50] local.DEBUG: 🔍 Resultados de búsqueda {"count":3,"search_term":null} 
+[2025-12-29 11:33:01] local.DEBUG: 🔍 Resultados de búsqueda {"count":3,"search_term":null} 
+[2025-12-29 11:59:13] local.DEBUG: 🔍 Resultados de búsqueda {"count":3,"search_term":null} 
+[2025-12-29 11:59:23] local.DEBUG: 🔍 Resultados de búsqueda {"count":3,"search_term":null} 
+[2025-12-29 12:03:01] local.DEBUG: 🔍 Resultados de búsqueda {"count":36,"search_term":null} 
+[2025-12-29 12:07:00] local.DEBUG: 🔍 Resultados de búsqueda {"count":36,"search_term":null} 
+[2025-12-29 12:11:50] local.DEBUG: 🔍 Resultados de búsqueda {"count":36,"search_term":null} 
+[2025-12-29 12:49:14] local.DEBUG: 🔍 Búsqueda de instituciones {"search_term":"5","user_id":1,"user_rol":"super_admin"} 
+[2025-12-29 12:49:14] local.DEBUG: 🔍 Resultados de búsqueda {"count":10,"search_term":"5"} 
+[2025-12-29 12:49:16] local.DEBUG: 🔍 Búsqueda de instituciones {"search_term":"40","user_id":1,"user_rol":"super_admin"} 
+[2025-12-29 12:49:16] local.DEBUG: 🔍 Resultados de búsqueda {"count":3,"search_term":"40"} 
+[2025-12-29 12:50:06] local.DEBUG: 🔍 Resultados de búsqueda {"count":36,"search_term":null} 
+[2025-12-29 12:50:49] local.INFO: 🕐 Horario creado - Auto-asignando a usuarios {"horario_id":16,"institucion_id":11,"turno":"MAÑANA"} 
+[2025-12-29 12:50:49] local.INFO: Horario asignado - Activación automática con fecha_inicio {"usuario_app_id":6,"institucion_id":11,"horario_id":16,"fecha_inicio":"2025-12-29 00:00:00"} 
+[2025-12-29 12:50:49] local.INFO: ✅ Horario auto-asignado a usuarios (Multi-Turno) {"horario_id":16,"usuarios_actualizados":1} 
+[2025-12-29 13:30:01] local.DEBUG: 🔍 Resultados de búsqueda {"count":36,"search_term":null} 
+[2025-12-29 13:30:41] local.DEBUG: 🔍 Búsqueda de instituciones {"search_term":"40","user_id":1,"user_rol":"super_admin"} 
+[2025-12-29 13:30:41] local.DEBUG: 🔍 Resultados de búsqueda {"count":3,"search_term":"40"} 
+[2025-12-29 13:30:55] local.INFO: 🔄 [UsuarioApp] Iniciando actualización de usuario ID: 6 {"request":{"acceso_habilitado":true,"asignaciones":[{"institucion_id":11,"cargo":"DIRECTOR I.E.","estado":"ACTIVO","fecha_inicio":"2025-12-29T00:00:00.000000Z","fecha_fin":null},{"institucion_id":4,"cargo":"Docente","estado":"ACTIVO","fecha_inicio":null,"fecha_fin":null}],"password":"Cuba2020","password_confirmation":"Cuba2020"}} 
+[2025-12-29 13:30:56] local.INFO: ✅ [UsuarioApp] Datos básicos actualizados usuario ID: 6  
+[2025-12-29 13:30:56] local.INFO: 🔄 [UsuarioApp] Procesando asignaciones para usuario ID: 6 {"asignaciones":[{"institucion_id":11,"cargo":"DIRECTOR I.E.","estado":"ACTIVO","fecha_inicio":"2025-12-29T00:00:00.000000Z","fecha_fin":null},{"institucion_id":4,"cargo":"Docente","estado":"ACTIVO","fecha_inicio":null,"fecha_fin":null}]} 
+[2025-12-29 13:30:56] local.INFO: ℹ️ [UsuarioApp] Asignaciones previas marcadas como INACTIVO  
+[2025-12-29 13:30:56] local.INFO: ➡️ [UsuarioApp] Procesando asignación #0 {"datos":{"institucion_id":11,"cargo":"DIRECTOR I.E.","estado":"ACTIVO","fecha_inicio":"2025-12-29T00:00:00.000000Z","fecha_fin":null}} 
+[2025-12-29 13:30:56] local.INFO: ℹ️ [UsuarioApp] Horario auto-asignado: 16  
+[2025-12-29 13:30:56] local.INFO: ⚠️ [UsuarioApp] Asignación existente encontrada ID: 6 (Trashed: )  
+[2025-12-29 13:30:56] local.INFO: Reactivación manual - fecha_fin limpiada {"usuario_app_id":6,"institucion_id":11} 
+[2025-12-29 13:30:56] local.INFO: ✅ [UsuarioApp] Asignación guardada/actualizada ID: 6 {"estado":"ACTIVO"} 
+[2025-12-29 13:30:56] local.INFO: ➡️ [UsuarioApp] Procesando asignación #1 {"datos":{"institucion_id":4,"cargo":"Docente","estado":"ACTIVO","fecha_inicio":null,"fecha_fin":null}} 
+[2025-12-29 13:30:56] local.INFO: ℹ️ [UsuarioApp] Horario auto-asignado: 2  
+[2025-12-29 13:30:56] local.INFO: ✨ [UsuarioApp] Creando NUEVA asignación para Institución ID: 4  
+[2025-12-29 13:30:56] local.INFO: Asignación creada con horario - fecha_inicio establecida automáticamente {"usuario_app_id":6,"institucion_id":4,"fecha_inicio":"2025-12-29 00:00:00"} 
+[2025-12-29 13:30:56] local.INFO: ✅ [UsuarioApp] Asignación guardada/actualizada ID:  {"estado":"ACTIVO"} 
+[2025-12-29 13:30:56] local.INFO: 🏁 [UsuarioApp] Transacción completada exitosamente para usuario ID: 6  
+[2025-12-29 13:31:10] local.DEBUG: 🔍 Resultados de búsqueda {"count":36,"search_term":null} 
+[2025-12-29 13:31:30] local.DEBUG: 🔍 Resultados de búsqueda {"count":36,"search_term":null} 
+[2025-12-29 13:31:53] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 1 instID 4: 1  
+[2025-12-29 13:32:10] local.INFO: 🕐 Horario creado - Auto-asignando a usuarios {"horario_id":17,"institucion_id":11,"turno":"TARDE"} 
+[2025-12-29 13:32:10] local.INFO: Asignación creada con horario - fecha_inicio establecida automáticamente {"usuario_app_id":6,"institucion_id":11,"fecha_inicio":"2025-12-29 00:00:00"} 
+[2025-12-29 13:32:10] local.INFO: ✅ Horario auto-asignado a usuarios (Multi-Turno) {"horario_id":17,"usuarios_actualizados":1} 
+[2025-12-29 13:33:04] local.INFO: 🔄 [UsuarioApp] Iniciando actualización de usuario ID: 6 {"request":{"acceso_habilitado":true,"asignaciones":[{"institucion_id":4,"cargo":"Docente","estado":"ACTIVO","fecha_inicio":"2025-12-29T00:00:00.000000Z","fecha_fin":null},{"institucion_id":11,"cargo":"DIRECTOR I.E.","estado":"ACTIVO","fecha_inicio":"2025-12-29T00:00:00.000000Z","fecha_fin":null}]}} 
+[2025-12-29 13:33:04] local.INFO: ✅ [UsuarioApp] Datos básicos actualizados usuario ID: 6  
+[2025-12-29 13:33:04] local.INFO: 🔄 [UsuarioApp] Procesando asignaciones para usuario ID: 6 {"asignaciones":[{"institucion_id":4,"cargo":"Docente","estado":"ACTIVO","fecha_inicio":"2025-12-29T00:00:00.000000Z","fecha_fin":null},{"institucion_id":11,"cargo":"DIRECTOR I.E.","estado":"ACTIVO","fecha_inicio":"2025-12-29T00:00:00.000000Z","fecha_fin":null}]} 
+[2025-12-29 13:33:04] local.INFO: ℹ️ [UsuarioApp] Asignaciones previas marcadas como INACTIVO  
+[2025-12-29 13:33:04] local.INFO: ➡️ [UsuarioApp] Procesando asignación #0 {"datos":{"institucion_id":4,"cargo":"Docente","estado":"ACTIVO","fecha_inicio":"2025-12-29T00:00:00.000000Z","fecha_fin":null}} 
+[2025-12-29 13:33:04] local.INFO: ℹ️ [UsuarioApp] Horario auto-asignado: 2  
+[2025-12-29 13:33:04] local.INFO: ⚠️ [UsuarioApp] Asignación existente encontrada ID: 44 (Trashed: )  
+[2025-12-29 13:33:04] local.INFO: Reactivación manual - fecha_fin limpiada {"usuario_app_id":6,"institucion_id":4} 
+[2025-12-29 13:33:04] local.INFO: ✅ [UsuarioApp] Asignación guardada/actualizada ID: 44 {"estado":"ACTIVO"} 
+[2025-12-29 13:33:04] local.INFO: ➡️ [UsuarioApp] Procesando asignación #1 {"datos":{"institucion_id":11,"cargo":"DIRECTOR I.E.","estado":"ACTIVO","fecha_inicio":"2025-12-29T00:00:00.000000Z","fecha_fin":null}} 
+[2025-12-29 13:33:04] local.INFO: ℹ️ [UsuarioApp] Horario auto-asignado: 16  
+[2025-12-29 13:33:04] local.INFO: ⚠️ [UsuarioApp] Asignación existente encontrada ID: 6 (Trashed: )  
+[2025-12-29 13:33:04] local.WARNING: 🚨 [UsuarioApp] Eliminando 1 duplicados encontrados {"ids":{"Illuminate\\Support\\Collection":[45]}} 
+[2025-12-29 13:33:04] local.INFO: Reactivación manual - fecha_fin limpiada {"usuario_app_id":6,"institucion_id":11} 
+[2025-12-29 13:33:04] local.INFO: ✅ [UsuarioApp] Asignación guardada/actualizada ID: 6 {"estado":"ACTIVO"} 
+[2025-12-29 13:33:04] local.INFO: 🏁 [UsuarioApp] Transacción completada exitosamente para usuario ID: 6  
+[2025-12-29 13:34:15] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 6 instID 4: 1  
+[2025-12-29 13:34:21] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 6 instID 11: 1  
+[2025-12-29 13:34:31] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 6 instID 11: 1  
+[2025-12-29 13:45:10] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 6 instID 11: 1  
+[2025-12-29 13:50:12] local.DEBUG: 🔍 Resultados de búsqueda {"count":36,"search_term":null} 
+[2025-12-29 13:54:10] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 6 instID 4: 1  
+[2025-12-29 13:54:11] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 6 instID 4: 1  
+[2025-12-29 14:00:31] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 6 instID 4: 1  
+[2025-12-29 14:01:21] local.INFO: Asignación creada con horario - fecha_inicio establecida automáticamente {"usuario_app_id":6,"institucion_id":4,"fecha_inicio":"2025-12-29 00:00:00"} 
+[2025-12-29 14:07:59] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 6 instID 4: 1  
+[2025-12-29 14:08:23] local.INFO: Asignación creada con horario - fecha_inicio establecida automáticamente {"usuario_app_id":6,"institucion_id":4,"fecha_inicio":"2025-12-29 00:00:00"} 
+[2025-12-29 14:08:23] local.ERROR: Error actualizando horarios APP: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '6-4-2' for key 'usuario_app_institucion.uq_user_ie_schedule' (Connection: mysql, SQL: insert into `usuario_app_institucion` (`estado`, `usuario_app_id`, `institucion_id`, `horario_institucion_id`, `cargo`, `fecha_inicio`, `updated_at`, `created_at`) values (ACTIVO, 6, 4, 2, Docente, 2025-12-29 00:00:00, 2025-12-29 14:08:23, 2025-12-29 14:08:23))  
+[2025-12-29 14:11:45] local.INFO: Asignación creada con horario - fecha_inicio establecida automáticamente {"usuario_app_id":6,"institucion_id":4,"fecha_inicio":"2025-12-29 00:00:00"} 
+[2025-12-29 14:11:46] local.INFO: Asignación creada con horario - fecha_inicio establecida automáticamente {"usuario_app_id":6,"institucion_id":11,"fecha_inicio":"2025-12-29 00:00:00"} 
+[2025-12-29 14:11:46] local.INFO: Asignación creada con horario - fecha_inicio establecida automáticamente {"usuario_app_id":6,"institucion_id":11,"fecha_inicio":"2025-12-29 00:00:00"} 
+[2025-12-29 14:12:31] local.INFO: Asignación creada con horario - fecha_inicio establecida automáticamente {"usuario_app_id":6,"institucion_id":4,"fecha_inicio":"2025-12-29 00:00:00"} 
+[2025-12-29 14:12:32] local.INFO: Asignación creada con horario - fecha_inicio establecida automáticamente {"usuario_app_id":6,"institucion_id":11,"fecha_inicio":"2025-12-29 00:00:00"} 
+[2025-12-29 14:12:32] local.INFO: Asignación creada con horario - fecha_inicio establecida automáticamente {"usuario_app_id":6,"institucion_id":11,"fecha_inicio":"2025-12-29 00:00:00"} 
+[2025-12-29 14:14:31] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 6 instID 4: 1  
+[2025-12-29 14:14:50] local.INFO: Asignación creada con horario - fecha_inicio establecida automáticamente {"usuario_app_id":6,"institucion_id":4,"fecha_inicio":"2025-12-29 00:00:00"} 
+[2025-12-29 14:14:50] local.INFO: Asignación creada con horario - fecha_inicio establecida automáticamente {"usuario_app_id":6,"institucion_id":4,"fecha_inicio":"2025-12-29 00:00:00"} 
+[2025-12-29 14:14:51] local.INFO: Asignación creada con horario - fecha_inicio establecida automáticamente {"usuario_app_id":6,"institucion_id":11,"fecha_inicio":"2025-12-29 00:00:00"} 
+[2025-12-29 14:16:54] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 6 instID 4: 2  
+[2025-12-29 14:20:00] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 6 instID 4: 2  
+[2025-12-29 14:26:19] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 6 instID 4: 2  
+[2025-12-29 14:26:34] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 6 instID 4: 2  
+[2025-12-29 14:26:45] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 6 instID 4: 2  
+[2025-12-29 14:41:34] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 6 instID 4: 2  
+[2025-12-29 14:41:53] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 6 instID 4: 2  
+[2025-12-29 14:51:50] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 6 instID 4: 2  
+[2025-12-29 14:54:22] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 6 instID 4: 2  
+[2025-12-29 15:04:44] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 6 instID 4: 2  
+[2025-12-29 15:04:49] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 6 instID 4: 2  
+[2025-12-29 15:04:51] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 6 instID 4: 2  
+[2025-12-29 15:11:46] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 6 instID 4: 2  
+[2025-12-29 15:11:58] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 6 instID 4: 2  
+[2025-12-29 15:20:29] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 6 instID 4: 2  
+[2025-12-29 15:21:17] local.INFO: Asignación creada con horario - fecha_inicio establecida automáticamente {"usuario_app_id":6,"institucion_id":4,"fecha_inicio":"2025-12-29 00:00:00"} 
+[2025-12-29 15:21:18] local.INFO: Asignación creada con horario - fecha_inicio establecida automáticamente {"usuario_app_id":6,"institucion_id":11,"fecha_inicio":"2025-12-29 00:00:00"} 
+[2025-12-29 15:30:49] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 6 instID 4: 1  
+[2025-12-29 15:32:53] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 6 instID 4: 1  
+[2025-12-29 15:35:50] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 6 instID 4: 1  
+[2025-12-29 15:38:50] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 6 instID 4: 1  
+[2025-12-29 15:40:46] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 6 instID 4: 1  
+[2025-12-29 15:46:13] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 6 instID 11: 1  
