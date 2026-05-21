@@ -41,7 +41,7 @@ class ScheduleManagementController extends Controller
             ->groupBy('u.id', 'u.nombres', 'u.apellido_paterno', 'u.apellido_materno', 'i.id', 'i.nombre', 'i.codigo_modular_ie');
 
         // ✅ SEGURIDAD:: Filtro Obligatorio para Supervisores
-        if ($user->rol === 'supervisor') {
+        if ($user->esSupervisor()) {
             $institucionesIds = $user->institucionesVigentes()->pluck('id');
             if ($institucionesIds->isEmpty()) {
                 return response()->json(['data' => []]); // Sin instituciones, sin resultados
@@ -94,7 +94,7 @@ class ScheduleManagementController extends Controller
             ->orderBy('created_at', 'desc');
 
         // ✅ SECURITY: Supervisors only see their institutions
-        if ($user->rol === 'supervisor') {
+        if ($user->esSupervisor()) {
             $institucionesIds = $user->institucionesVigentes()->pluck('id');
             if ($institucionesIds->isEmpty()) {
                 return response()->json(['data' => []]);

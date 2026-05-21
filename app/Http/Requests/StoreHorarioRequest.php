@@ -3,7 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Validator;
+
 
 class StoreHorarioRequest extends FormRequest
 {
@@ -14,14 +14,21 @@ class StoreHorarioRequest extends FormRequest
 
     public function rules(): array
     {
-        return [
+        $rules = [
             'institucion_id' => 'required|exists:instituciones,id',
             'turno' => 'required|in:mañana,tarde,noche',
             'hora_entrada' => 'required|date_format:H:i',
-            'hora_salida' => 'required|date_format:H:i|after:hora_entrada',
+            'hora_salida' => 'required|date_format:H:i',
             'tolerancia_entrada' => 'nullable|integer|min:0|max:60',
             'tolerancia_salida' => 'nullable|integer|min:0|max:60',
         ];
+
+        // Para el turno noche, la hora de salida puede cruzar la medianoche, por lo que no requerimos 'after:hora_entrada'
+        if ($this->input('turno') !== 'noche') {
+            $rules['hora_salida'] .= '|after:hora_entrada';
+        }
+
+        return $rules;
     }
 
     public function messages(): array
@@ -39,47 +46,4 @@ class StoreHorarioRequest extends FormRequest
         ];
     }
 
-    /**
-     * Validación personalizada después de las reglas básicas
-     */
-    public function withValidator(Validator $validator): void
-    {
-        // Restricción de horarios desactivada temporalmente para pruebas
-        /*
-        $validator->after(function ($validator) {
-            $turno = $this->input('turno');
-            $hora_entrada = $this->input('hora_entrada');
-            $hora_salida = $this->input('hora_salida');
-
-            // Definir rangos de horas por turno
-            $rangos = [
-                'mañana' => ['inicio' => '05:00', 'fin' => '13:00'],
-                'tarde' => ['inicio' => '13:00', 'fin' => '19:00'],
-                'noche' => ['inicio' => '19:00', 'fin' => '23:59'],
-            ];
-
-            if (!isset($rangos[$turno])) {
-                return;
-            }
-
-            $rango = $rangos[$turno];
-
-            // Validar hora de entrada
-            if ($hora_entrada && ($hora_entrada < $rango['inicio'] || $hora_entrada > $rango['fin'])) {
-                $validator->errors()->add(
-                    'hora_entrada',
-                    "La hora de entrada debe estar entre {$rango['inicio']} y {$rango['fin']} para el turno {$turno}"
-                );
-            }
-
-            // Validar hora de salida
-            if ($hora_salida && ($hora_salida < $rango['inicio'] || $hora_salida > $rango['fin'])) {
-                $validator->errors()->add(
-                    'hora_salida',
-                    "La hora de salida debe estar entre {$rango['inicio']} y {$rango['fin']} para el turno {$turno}"
-                );
-            }
-        });
-        */
-    }
 }

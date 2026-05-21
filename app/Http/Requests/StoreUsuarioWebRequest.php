@@ -19,7 +19,7 @@ class StoreUsuarioWebRequest extends FormRequest
             'nombre' => 'required|string|max:100',
             'email' => 'required|email|unique:usuarios_web,email',
             'password' => 'required|string|min:8|confirmed',
-            'password_confirmation' => 'required|string|min:8',
+            'password_confirmation' => 'required|string',
             'rol' => 'required|in:super_admin,administrador,supervisor',
             'estado' => 'sometimes|in:pendiente,autorizado,rechazado',
             'institucion_id' => 'nullable|exists:instituciones,id',

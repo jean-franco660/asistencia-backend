@@ -168,14 +168,7 @@ class Asistencia extends Model
     /**
      * Situación administrativa en FALTA (incluye faltas completas y cualquier registro marcado como FALTA).
      */
-    protected $appends = [
-        'situacion',
-        'resultado',
-        'latitud',
-        'longitud',
-        'dentro_rango',
-        'foto',
-    ];
+    protected $appends = [];
 
     /* =========================
      * ACCESSORS
@@ -232,31 +225,35 @@ class Asistencia extends Model
 
     public function scopeSituacionFalta($query)
     {
-        return $query->where('situacion', self::SITUACION_FALTA);
+        return $query->where('estado_diario', 'FALTA');
     }
 
     public function scopeJustificadas($query)
     {
-        return $query->where('situacion', self::SITUACION_JUSTIFICADO);
+        return $query->where('estado_diario', 'JUSTIFICADO');
     }
 
     public function scopeNormales($query)
     {
-        return $query->where('situacion', self::SITUACION_NORMAL);
+        return $query->whereNotIn('estado_diario', ['FALTA', 'JUSTIFICADO']);
     }
 
     public function scopeTardes($query)
     {
-        return $query->where('resultado', self::RESULTADO_TARDE);
+        return $query->where('estado_diario', 'TARDANZA');
     }
 
     public function scopeDentroRango($query)
     {
-        return $query->where('dentro_rango', true);
+        return $query->whereHas('marcaciones', function ($q) {
+            $q->where('dentro_rango', true);
+        });
     }
 
     public function scopeFueraRango($query)
     {
-        return $query->where('dentro_rango', false);
+        return $query->whereHas('marcaciones', function ($q) {
+            $q->where('dentro_rango', false);
+        });
     }
 }

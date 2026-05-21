@@ -1,113 +1,92 @@
-[2025-12-29 10:38:57] local.DEBUG: 🔍 Resultados de búsqueda {"count":36,"search_term":null} 
-[2025-12-29 10:45:07] local.DEBUG: 🔍 Resultados de búsqueda {"count":10,"search_term":null} 
-[2025-12-29 10:49:05] local.DEBUG: 🔍 Resultados de búsqueda {"count":10,"search_term":null} 
-[2025-12-29 10:52:17] local.DEBUG: 🔍 Resultados de búsqueda {"count":3,"search_term":null} 
-[2025-12-29 10:57:27] local.DEBUG: 🔍 Resultados de búsqueda {"count":3,"search_term":null} 
-[2025-12-29 10:57:40] local.DEBUG: 🔍 Resultados de búsqueda {"count":3,"search_term":null} 
-[2025-12-29 10:57:42] local.DEBUG: 🔍 Resultados de búsqueda {"count":3,"search_term":null} 
-[2025-12-29 11:00:30] local.DEBUG: 🔍 Resultados de búsqueda {"count":3,"search_term":null} 
-[2025-12-29 11:07:19] local.DEBUG: 🔍 Resultados de búsqueda {"count":3,"search_term":null} 
-[2025-12-29 11:07:23] local.DEBUG: 🔍 Resultados de búsqueda {"count":3,"search_term":null} 
-[2025-12-29 11:09:06] local.DEBUG: 🔍 Resultados de búsqueda {"count":3,"search_term":null} 
-[2025-12-29 11:11:28] local.DEBUG: 🔍 Resultados de búsqueda {"count":3,"search_term":null} 
-[2025-12-29 11:14:05] local.DEBUG: 🔍 Resultados de búsqueda {"count":3,"search_term":null} 
-[2025-12-29 11:25:50] local.DEBUG: 🔍 Resultados de búsqueda {"count":3,"search_term":null} 
-[2025-12-29 11:33:01] local.DEBUG: 🔍 Resultados de búsqueda {"count":3,"search_term":null} 
-[2025-12-29 11:59:13] local.DEBUG: 🔍 Resultados de búsqueda {"count":3,"search_term":null} 
-[2025-12-29 11:59:23] local.DEBUG: 🔍 Resultados de búsqueda {"count":3,"search_term":null} 
-[2025-12-29 12:03:01] local.DEBUG: 🔍 Resultados de búsqueda {"count":36,"search_term":null} 
-[2025-12-29 12:07:00] local.DEBUG: 🔍 Resultados de búsqueda {"count":36,"search_term":null} 
-[2025-12-29 12:11:50] local.DEBUG: 🔍 Resultados de búsqueda {"count":36,"search_term":null} 
-[2025-12-29 12:49:14] local.DEBUG: 🔍 Búsqueda de instituciones {"search_term":"5","user_id":1,"user_rol":"super_admin"} 
-[2025-12-29 12:49:14] local.DEBUG: 🔍 Resultados de búsqueda {"count":10,"search_term":"5"} 
-[2025-12-29 12:49:16] local.DEBUG: 🔍 Búsqueda de instituciones {"search_term":"40","user_id":1,"user_rol":"super_admin"} 
-[2025-12-29 12:49:16] local.DEBUG: 🔍 Resultados de búsqueda {"count":3,"search_term":"40"} 
-[2025-12-29 12:50:06] local.DEBUG: 🔍 Resultados de búsqueda {"count":36,"search_term":null} 
-[2025-12-29 12:50:49] local.INFO: 🕐 Horario creado - Auto-asignando a usuarios {"horario_id":16,"institucion_id":11,"turno":"MAÑANA"} 
-[2025-12-29 12:50:49] local.INFO: Horario asignado - Activación automática con fecha_inicio {"usuario_app_id":6,"institucion_id":11,"horario_id":16,"fecha_inicio":"2025-12-29 00:00:00"} 
-[2025-12-29 12:50:49] local.INFO: ✅ Horario auto-asignado a usuarios (Multi-Turno) {"horario_id":16,"usuarios_actualizados":1} 
-[2025-12-29 13:30:01] local.DEBUG: 🔍 Resultados de búsqueda {"count":36,"search_term":null} 
-[2025-12-29 13:30:41] local.DEBUG: 🔍 Búsqueda de instituciones {"search_term":"40","user_id":1,"user_rol":"super_admin"} 
-[2025-12-29 13:30:41] local.DEBUG: 🔍 Resultados de búsqueda {"count":3,"search_term":"40"} 
-[2025-12-29 13:30:55] local.INFO: 🔄 [UsuarioApp] Iniciando actualización de usuario ID: 6 {"request":{"acceso_habilitado":true,"asignaciones":[{"institucion_id":11,"cargo":"DIRECTOR I.E.","estado":"ACTIVO","fecha_inicio":"2025-12-29T00:00:00.000000Z","fecha_fin":null},{"institucion_id":4,"cargo":"Docente","estado":"ACTIVO","fecha_inicio":null,"fecha_fin":null}],"password":"Cuba2020","password_confirmation":"Cuba2020"}} 
-[2025-12-29 13:30:56] local.INFO: ✅ [UsuarioApp] Datos básicos actualizados usuario ID: 6  
-[2025-12-29 13:30:56] local.INFO: 🔄 [UsuarioApp] Procesando asignaciones para usuario ID: 6 {"asignaciones":[{"institucion_id":11,"cargo":"DIRECTOR I.E.","estado":"ACTIVO","fecha_inicio":"2025-12-29T00:00:00.000000Z","fecha_fin":null},{"institucion_id":4,"cargo":"Docente","estado":"ACTIVO","fecha_inicio":null,"fecha_fin":null}]} 
-[2025-12-29 13:30:56] local.INFO: ℹ️ [UsuarioApp] Asignaciones previas marcadas como INACTIVO  
-[2025-12-29 13:30:56] local.INFO: ➡️ [UsuarioApp] Procesando asignación #0 {"datos":{"institucion_id":11,"cargo":"DIRECTOR I.E.","estado":"ACTIVO","fecha_inicio":"2025-12-29T00:00:00.000000Z","fecha_fin":null}} 
-[2025-12-29 13:30:56] local.INFO: ℹ️ [UsuarioApp] Horario auto-asignado: 16  
-[2025-12-29 13:30:56] local.INFO: ⚠️ [UsuarioApp] Asignación existente encontrada ID: 6 (Trashed: )  
-[2025-12-29 13:30:56] local.INFO: Reactivación manual - fecha_fin limpiada {"usuario_app_id":6,"institucion_id":11} 
-[2025-12-29 13:30:56] local.INFO: ✅ [UsuarioApp] Asignación guardada/actualizada ID: 6 {"estado":"ACTIVO"} 
-[2025-12-29 13:30:56] local.INFO: ➡️ [UsuarioApp] Procesando asignación #1 {"datos":{"institucion_id":4,"cargo":"Docente","estado":"ACTIVO","fecha_inicio":null,"fecha_fin":null}} 
-[2025-12-29 13:30:56] local.INFO: ℹ️ [UsuarioApp] Horario auto-asignado: 2  
-[2025-12-29 13:30:56] local.INFO: ✨ [UsuarioApp] Creando NUEVA asignación para Institución ID: 4  
-[2025-12-29 13:30:56] local.INFO: Asignación creada con horario - fecha_inicio establecida automáticamente {"usuario_app_id":6,"institucion_id":4,"fecha_inicio":"2025-12-29 00:00:00"} 
-[2025-12-29 13:30:56] local.INFO: ✅ [UsuarioApp] Asignación guardada/actualizada ID:  {"estado":"ACTIVO"} 
-[2025-12-29 13:30:56] local.INFO: 🏁 [UsuarioApp] Transacción completada exitosamente para usuario ID: 6  
-[2025-12-29 13:31:10] local.DEBUG: 🔍 Resultados de búsqueda {"count":36,"search_term":null} 
-[2025-12-29 13:31:30] local.DEBUG: 🔍 Resultados de búsqueda {"count":36,"search_term":null} 
-[2025-12-29 13:31:53] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 1 instID 4: 1  
-[2025-12-29 13:32:10] local.INFO: 🕐 Horario creado - Auto-asignando a usuarios {"horario_id":17,"institucion_id":11,"turno":"TARDE"} 
-[2025-12-29 13:32:10] local.INFO: Asignación creada con horario - fecha_inicio establecida automáticamente {"usuario_app_id":6,"institucion_id":11,"fecha_inicio":"2025-12-29 00:00:00"} 
-[2025-12-29 13:32:10] local.INFO: ✅ Horario auto-asignado a usuarios (Multi-Turno) {"horario_id":17,"usuarios_actualizados":1} 
-[2025-12-29 13:33:04] local.INFO: 🔄 [UsuarioApp] Iniciando actualización de usuario ID: 6 {"request":{"acceso_habilitado":true,"asignaciones":[{"institucion_id":4,"cargo":"Docente","estado":"ACTIVO","fecha_inicio":"2025-12-29T00:00:00.000000Z","fecha_fin":null},{"institucion_id":11,"cargo":"DIRECTOR I.E.","estado":"ACTIVO","fecha_inicio":"2025-12-29T00:00:00.000000Z","fecha_fin":null}]}} 
-[2025-12-29 13:33:04] local.INFO: ✅ [UsuarioApp] Datos básicos actualizados usuario ID: 6  
-[2025-12-29 13:33:04] local.INFO: 🔄 [UsuarioApp] Procesando asignaciones para usuario ID: 6 {"asignaciones":[{"institucion_id":4,"cargo":"Docente","estado":"ACTIVO","fecha_inicio":"2025-12-29T00:00:00.000000Z","fecha_fin":null},{"institucion_id":11,"cargo":"DIRECTOR I.E.","estado":"ACTIVO","fecha_inicio":"2025-12-29T00:00:00.000000Z","fecha_fin":null}]} 
-[2025-12-29 13:33:04] local.INFO: ℹ️ [UsuarioApp] Asignaciones previas marcadas como INACTIVO  
-[2025-12-29 13:33:04] local.INFO: ➡️ [UsuarioApp] Procesando asignación #0 {"datos":{"institucion_id":4,"cargo":"Docente","estado":"ACTIVO","fecha_inicio":"2025-12-29T00:00:00.000000Z","fecha_fin":null}} 
-[2025-12-29 13:33:04] local.INFO: ℹ️ [UsuarioApp] Horario auto-asignado: 2  
-[2025-12-29 13:33:04] local.INFO: ⚠️ [UsuarioApp] Asignación existente encontrada ID: 44 (Trashed: )  
-[2025-12-29 13:33:04] local.INFO: Reactivación manual - fecha_fin limpiada {"usuario_app_id":6,"institucion_id":4} 
-[2025-12-29 13:33:04] local.INFO: ✅ [UsuarioApp] Asignación guardada/actualizada ID: 44 {"estado":"ACTIVO"} 
-[2025-12-29 13:33:04] local.INFO: ➡️ [UsuarioApp] Procesando asignación #1 {"datos":{"institucion_id":11,"cargo":"DIRECTOR I.E.","estado":"ACTIVO","fecha_inicio":"2025-12-29T00:00:00.000000Z","fecha_fin":null}} 
-[2025-12-29 13:33:04] local.INFO: ℹ️ [UsuarioApp] Horario auto-asignado: 16  
-[2025-12-29 13:33:04] local.INFO: ⚠️ [UsuarioApp] Asignación existente encontrada ID: 6 (Trashed: )  
-[2025-12-29 13:33:04] local.WARNING: 🚨 [UsuarioApp] Eliminando 1 duplicados encontrados {"ids":{"Illuminate\\Support\\Collection":[45]}} 
-[2025-12-29 13:33:04] local.INFO: Reactivación manual - fecha_fin limpiada {"usuario_app_id":6,"institucion_id":11} 
-[2025-12-29 13:33:04] local.INFO: ✅ [UsuarioApp] Asignación guardada/actualizada ID: 6 {"estado":"ACTIVO"} 
-[2025-12-29 13:33:04] local.INFO: 🏁 [UsuarioApp] Transacción completada exitosamente para usuario ID: 6  
-[2025-12-29 13:34:15] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 6 instID 4: 1  
-[2025-12-29 13:34:21] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 6 instID 11: 1  
-[2025-12-29 13:34:31] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 6 instID 11: 1  
-[2025-12-29 13:45:10] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 6 instID 11: 1  
-[2025-12-29 13:50:12] local.DEBUG: 🔍 Resultados de búsqueda {"count":36,"search_term":null} 
-[2025-12-29 13:54:10] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 6 instID 4: 1  
-[2025-12-29 13:54:11] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 6 instID 4: 1  
-[2025-12-29 14:00:31] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 6 instID 4: 1  
-[2025-12-29 14:01:21] local.INFO: Asignación creada con horario - fecha_inicio establecida automáticamente {"usuario_app_id":6,"institucion_id":4,"fecha_inicio":"2025-12-29 00:00:00"} 
-[2025-12-29 14:07:59] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 6 instID 4: 1  
-[2025-12-29 14:08:23] local.INFO: Asignación creada con horario - fecha_inicio establecida automáticamente {"usuario_app_id":6,"institucion_id":4,"fecha_inicio":"2025-12-29 00:00:00"} 
-[2025-12-29 14:08:23] local.ERROR: Error actualizando horarios APP: SQLSTATE[23000]: Integrity constraint violation: 1062 Duplicate entry '6-4-2' for key 'usuario_app_institucion.uq_user_ie_schedule' (Connection: mysql, SQL: insert into `usuario_app_institucion` (`estado`, `usuario_app_id`, `institucion_id`, `horario_institucion_id`, `cargo`, `fecha_inicio`, `updated_at`, `created_at`) values (ACTIVO, 6, 4, 2, Docente, 2025-12-29 00:00:00, 2025-12-29 14:08:23, 2025-12-29 14:08:23))  
-[2025-12-29 14:11:45] local.INFO: Asignación creada con horario - fecha_inicio establecida automáticamente {"usuario_app_id":6,"institucion_id":4,"fecha_inicio":"2025-12-29 00:00:00"} 
-[2025-12-29 14:11:46] local.INFO: Asignación creada con horario - fecha_inicio establecida automáticamente {"usuario_app_id":6,"institucion_id":11,"fecha_inicio":"2025-12-29 00:00:00"} 
-[2025-12-29 14:11:46] local.INFO: Asignación creada con horario - fecha_inicio establecida automáticamente {"usuario_app_id":6,"institucion_id":11,"fecha_inicio":"2025-12-29 00:00:00"} 
-[2025-12-29 14:12:31] local.INFO: Asignación creada con horario - fecha_inicio establecida automáticamente {"usuario_app_id":6,"institucion_id":4,"fecha_inicio":"2025-12-29 00:00:00"} 
-[2025-12-29 14:12:32] local.INFO: Asignación creada con horario - fecha_inicio establecida automáticamente {"usuario_app_id":6,"institucion_id":11,"fecha_inicio":"2025-12-29 00:00:00"} 
-[2025-12-29 14:12:32] local.INFO: Asignación creada con horario - fecha_inicio establecida automáticamente {"usuario_app_id":6,"institucion_id":11,"fecha_inicio":"2025-12-29 00:00:00"} 
-[2025-12-29 14:14:31] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 6 instID 4: 1  
-[2025-12-29 14:14:50] local.INFO: Asignación creada con horario - fecha_inicio establecida automáticamente {"usuario_app_id":6,"institucion_id":4,"fecha_inicio":"2025-12-29 00:00:00"} 
-[2025-12-29 14:14:50] local.INFO: Asignación creada con horario - fecha_inicio establecida automáticamente {"usuario_app_id":6,"institucion_id":4,"fecha_inicio":"2025-12-29 00:00:00"} 
-[2025-12-29 14:14:51] local.INFO: Asignación creada con horario - fecha_inicio establecida automáticamente {"usuario_app_id":6,"institucion_id":11,"fecha_inicio":"2025-12-29 00:00:00"} 
-[2025-12-29 14:16:54] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 6 instID 4: 2  
-[2025-12-29 14:20:00] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 6 instID 4: 2  
-[2025-12-29 14:26:19] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 6 instID 4: 2  
-[2025-12-29 14:26:34] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 6 instID 4: 2  
-[2025-12-29 14:26:45] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 6 instID 4: 2  
-[2025-12-29 14:41:34] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 6 instID 4: 2  
-[2025-12-29 14:41:53] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 6 instID 4: 2  
-[2025-12-29 14:51:50] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 6 instID 4: 2  
-[2025-12-29 14:54:22] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 6 instID 4: 2  
-[2025-12-29 15:04:44] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 6 instID 4: 2  
-[2025-12-29 15:04:49] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 6 instID 4: 2  
-[2025-12-29 15:04:51] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 6 instID 4: 2  
-[2025-12-29 15:11:46] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 6 instID 4: 2  
-[2025-12-29 15:11:58] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 6 instID 4: 2  
-[2025-12-29 15:20:29] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 6 instID 4: 2  
-[2025-12-29 15:21:17] local.INFO: Asignación creada con horario - fecha_inicio establecida automáticamente {"usuario_app_id":6,"institucion_id":4,"fecha_inicio":"2025-12-29 00:00:00"} 
-[2025-12-29 15:21:18] local.INFO: Asignación creada con horario - fecha_inicio establecida automáticamente {"usuario_app_id":6,"institucion_id":11,"fecha_inicio":"2025-12-29 00:00:00"} 
-[2025-12-29 15:30:49] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 6 instID 4: 1  
-[2025-12-29 15:32:53] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 6 instID 4: 1  
-[2025-12-29 15:35:50] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 6 instID 4: 1  
-[2025-12-29 15:38:50] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 6 instID 4: 1  
-[2025-12-29 15:40:46] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 6 instID 4: 1  
-[2025-12-29 15:46:13] local.INFO: 🔍 [estadoDia] Asignaciones encontradas para userID 6 instID 11: 1  
+[2026-05-10 07:34:41] local.INFO: Importación de usuarios app encolada {"import_id":11,"usuario_id":1,"archivo":"plantilla_docentes.xlsx"} 
+[2026-05-10 07:34:42] local.INFO: 🚀 Iniciando ImportarUsuariosAppJob {"import_log_id":11,"archivo":"temp/importaciones/5BGzOWVBuRMl027zHYoDzFoab97iQlu0Iq4pgIGs.xlsx"} 
+[2026-05-10 07:34:43] local.INFO: Headers de usuarios app validados correctamente {"import_log_id":11,"headers":["codigo_modular","dni","apellido_paterno","apellido_materno","nombres","sexo","telefono","password","codigo_modular_ie","cargo"]} 
+[2026-05-10 07:34:45] local.INFO: 📄 Archivo de errores Excel generado {"import_log_id":11,"tipo":"usuarios_app","path":"imports/errors/errores_usuarios_app_11_20260510073445.xlsx","errores":3152} 
+[2026-05-10 07:34:45] local.INFO: ✅ ImportarUsuariosAppJob completado {"import_log_id":11,"resumen":{"id":11,"tipo":"usuarios_app","tipo_texto":"Usuarios","estado":"completed","estado_texto":"Completado","total":3152,"procesados":3152,"exitosos":0,"errores":3152,"porcentaje":100,"tasa_exito":0.0,"duracion":"-3 segundos","usuario":"Super Admin","iniciado_en":"2026-05-10T07:34:42+00:00","completado_en":"2026-05-10T07:34:45+00:00"}} 
+[2026-05-10 07:48:42] local.INFO: Importación de usuarios app encolada {"import_id":12,"usuario_id":1,"archivo":"plantilla_docentes.xlsx"} 
+[2026-05-10 07:48:44] local.INFO: 🚀 Iniciando ImportarUsuariosAppJob {"import_log_id":12,"archivo":"temp/importaciones/h8nUB7x8mIqbNKmydYsc5kd9p2Lzu9aNBnoInXJv.xlsx"} 
+[2026-05-10 07:48:45] local.INFO: Headers de usuarios app validados correctamente {"import_log_id":12,"headers":["codigo_modular","dni","apellido_paterno","apellido_materno","nombres","sexo","telefono","password","codigo_modular_ie","cargo"]} 
+[2026-05-10 07:48:47] local.INFO: 📄 Archivo de errores Excel generado {"import_log_id":12,"tipo":"usuarios_app","path":"imports/errors/errores_usuarios_app_12_20260510074846.xlsx","errores":3151} 
+[2026-05-10 07:48:47] local.INFO: ✅ ImportarUsuariosAppJob completado {"import_log_id":12,"resumen":{"id":12,"tipo":"usuarios_app","tipo_texto":"Usuarios","estado":"completed","estado_texto":"Completado","total":3151,"procesados":3151,"exitosos":0,"errores":3151,"porcentaje":100,"tasa_exito":0.0,"duracion":"-3 segundos","usuario":"Super Admin","iniciado_en":"2026-05-10T07:48:44+00:00","completado_en":"2026-05-10T07:48:47+00:00"}} 
+[2026-05-10 16:23:40] local.ERROR: SQLSTATE[HY000] [2002] No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión (Connection: mysql, SQL: select exists (select 1 from information_schema.tables where table_schema = schema() and table_name = 'migrations' and table_type in ('BASE TABLE', 'SYSTEM VERSIONED')) as `exists`) {"exception":"[object] (Illuminate\\Database\\QueryException(code: 2002): SQLSTATE[HY000] [2002] No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión (Connection: mysql, SQL: select exists (select 1 from information_schema.tables where table_schema = schema() and table_name = 'migrations' and table_type in ('BASE TABLE', 'SYSTEM VERSIONED')) as `exists`) at D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Connection.php:824)
+[stacktrace]
+#0 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Connection.php(778): Illuminate\\Database\\Connection->runQueryCallback('select exists (...', Array, Object(Closure))
+#1 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Connection.php(397): Illuminate\\Database\\Connection->run('select exists (...', Array, Object(Closure))
+#2 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Connection.php(343): Illuminate\\Database\\Connection->select('select exists (...', Array, true)
+#3 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Connection.php(360): Illuminate\\Database\\Connection->selectOne('select exists (...', Array, true)
+#4 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Schema\\Builder.php(174): Illuminate\\Database\\Connection->scalar('select exists (...')
+#5 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Migrations\\DatabaseMigrationRepository.php(185): Illuminate\\Database\\Schema\\Builder->hasTable('migrations')
+#6 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Migrations\\Migrator.php(753): Illuminate\\Database\\Migrations\\DatabaseMigrationRepository->repositoryExists()
+#7 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Console\\Migrations\\FreshCommand.php(67): Illuminate\\Database\\Migrations\\Migrator->repositoryExists()
+#8 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Migrations\\Migrator.php(666): Illuminate\\Database\\Console\\Migrations\\FreshCommand->Illuminate\\Database\\Console\\Migrations\\{closure}()
+#9 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Console\\Migrations\\FreshCommand.php(66): Illuminate\\Database\\Migrations\\Migrator->usingConnection(NULL, Object(Closure))
+#10 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Container\\BoundMethod.php(36): Illuminate\\Database\\Console\\Migrations\\FreshCommand->handle()
+#11 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Container\\Util.php(43): Illuminate\\Container\\BoundMethod::Illuminate\\Container\\{closure}()
+#12 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Container\\BoundMethod.php(96): Illuminate\\Container\\Util::unwrapIfClosure(Object(Closure))
+#13 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Container\\BoundMethod.php(35): Illuminate\\Container\\BoundMethod::callBoundMethod(Object(Illuminate\\Foundation\\Application), Array, Object(Closure))
+#14 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Container\\Container.php(836): Illuminate\\Container\\BoundMethod::call(Object(Illuminate\\Foundation\\Application), Array, Array, NULL)
+#15 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Console\\Command.php(211): Illuminate\\Container\\Container->call(Array)
+#16 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\symfony\\console\\Command\\Command.php(318): Illuminate\\Console\\Command->execute(Object(Symfony\\Component\\Console\\Input\\ArgvInput), Object(Illuminate\\Console\\OutputStyle))
+#17 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Console\\Command.php(180): Symfony\\Component\\Console\\Command\\Command->run(Object(Symfony\\Component\\Console\\Input\\ArgvInput), Object(Illuminate\\Console\\OutputStyle))
+#18 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\symfony\\console\\Application.php(1110): Illuminate\\Console\\Command->run(Object(Symfony\\Component\\Console\\Input\\ArgvInput), Object(Symfony\\Component\\Console\\Output\\ConsoleOutput))
+#19 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\symfony\\console\\Application.php(359): Symfony\\Component\\Console\\Application->doRunCommand(Object(Illuminate\\Database\\Console\\Migrations\\FreshCommand), Object(Symfony\\Component\\Console\\Input\\ArgvInput), Object(Symfony\\Component\\Console\\Output\\ConsoleOutput))
+#20 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\symfony\\console\\Application.php(194): Symfony\\Component\\Console\\Application->doRun(Object(Symfony\\Component\\Console\\Input\\ArgvInput), Object(Symfony\\Component\\Console\\Output\\ConsoleOutput))
+#21 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Console\\Kernel.php(197): Symfony\\Component\\Console\\Application->run(Object(Symfony\\Component\\Console\\Input\\ArgvInput), Object(Symfony\\Component\\Console\\Output\\ConsoleOutput))
+#22 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Application.php(1235): Illuminate\\Foundation\\Console\\Kernel->handle(Object(Symfony\\Component\\Console\\Input\\ArgvInput), Object(Symfony\\Component\\Console\\Output\\ConsoleOutput))
+#23 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\artisan(16): Illuminate\\Foundation\\Application->handleCommand(Object(Symfony\\Component\\Console\\Input\\ArgvInput))
+#24 {main}
+
+[previous exception] [object] (PDOException(code: 2002): SQLSTATE[HY000] [2002] No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión at D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Connectors\\Connector.php:66)
+[stacktrace]
+#0 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Connectors\\Connector.php(66): PDO->__construct('mysql:host=127....', 'root', Object(SensitiveParameterValue), Array)
+#1 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Connectors\\Connector.php(44): Illuminate\\Database\\Connectors\\Connector->createPdoConnection('mysql:host=127....', 'root', Object(SensitiveParameterValue), Array)
+#2 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Connectors\\MySqlConnector.php(24): Illuminate\\Database\\Connectors\\Connector->createConnection('mysql:host=127....', Array, Array)
+#3 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Connectors\\ConnectionFactory.php(184): Illuminate\\Database\\Connectors\\MySqlConnector->connect(Array)
+#4 [internal function]: Illuminate\\Database\\Connectors\\ConnectionFactory->Illuminate\\Database\\Connectors\\{closure}()
+#5 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Connection.php(1230): call_user_func(Object(Closure))
+#6 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Connection.php(1266): Illuminate\\Database\\Connection->getPdo()
+#7 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Connection.php(511): Illuminate\\Database\\Connection->getReadPdo()
+#8 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Connection.php(406): Illuminate\\Database\\Connection->getPdoForSelect(true)
+#9 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Connection.php(811): Illuminate\\Database\\Connection->Illuminate\\Database\\{closure}('select exists (...', Array)
+#10 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Connection.php(778): Illuminate\\Database\\Connection->runQueryCallback('select exists (...', Array, Object(Closure))
+#11 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Connection.php(397): Illuminate\\Database\\Connection->run('select exists (...', Array, Object(Closure))
+#12 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Connection.php(343): Illuminate\\Database\\Connection->select('select exists (...', Array, true)
+#13 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Connection.php(360): Illuminate\\Database\\Connection->selectOne('select exists (...', Array, true)
+#14 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Schema\\Builder.php(174): Illuminate\\Database\\Connection->scalar('select exists (...')
+#15 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Migrations\\DatabaseMigrationRepository.php(185): Illuminate\\Database\\Schema\\Builder->hasTable('migrations')
+#16 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Migrations\\Migrator.php(753): Illuminate\\Database\\Migrations\\DatabaseMigrationRepository->repositoryExists()
+#17 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Console\\Migrations\\FreshCommand.php(67): Illuminate\\Database\\Migrations\\Migrator->repositoryExists()
+#18 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Migrations\\Migrator.php(666): Illuminate\\Database\\Console\\Migrations\\FreshCommand->Illuminate\\Database\\Console\\Migrations\\{closure}()
+#19 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Database\\Console\\Migrations\\FreshCommand.php(66): Illuminate\\Database\\Migrations\\Migrator->usingConnection(NULL, Object(Closure))
+#20 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Container\\BoundMethod.php(36): Illuminate\\Database\\Console\\Migrations\\FreshCommand->handle()
+#21 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Container\\Util.php(43): Illuminate\\Container\\BoundMethod::Illuminate\\Container\\{closure}()
+#22 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Container\\BoundMethod.php(96): Illuminate\\Container\\Util::unwrapIfClosure(Object(Closure))
+#23 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Container\\BoundMethod.php(35): Illuminate\\Container\\BoundMethod::callBoundMethod(Object(Illuminate\\Foundation\\Application), Array, Object(Closure))
+#24 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Container\\Container.php(836): Illuminate\\Container\\BoundMethod::call(Object(Illuminate\\Foundation\\Application), Array, Array, NULL)
+#25 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Console\\Command.php(211): Illuminate\\Container\\Container->call(Array)
+#26 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\symfony\\console\\Command\\Command.php(318): Illuminate\\Console\\Command->execute(Object(Symfony\\Component\\Console\\Input\\ArgvInput), Object(Illuminate\\Console\\OutputStyle))
+#27 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Console\\Command.php(180): Symfony\\Component\\Console\\Command\\Command->run(Object(Symfony\\Component\\Console\\Input\\ArgvInput), Object(Illuminate\\Console\\OutputStyle))
+#28 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\symfony\\console\\Application.php(1110): Illuminate\\Console\\Command->run(Object(Symfony\\Component\\Console\\Input\\ArgvInput), Object(Symfony\\Component\\Console\\Output\\ConsoleOutput))
+#29 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\symfony\\console\\Application.php(359): Symfony\\Component\\Console\\Application->doRunCommand(Object(Illuminate\\Database\\Console\\Migrations\\FreshCommand), Object(Symfony\\Component\\Console\\Input\\ArgvInput), Object(Symfony\\Component\\Console\\Output\\ConsoleOutput))
+#30 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\symfony\\console\\Application.php(194): Symfony\\Component\\Console\\Application->doRun(Object(Symfony\\Component\\Console\\Input\\ArgvInput), Object(Symfony\\Component\\Console\\Output\\ConsoleOutput))
+#31 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Console\\Kernel.php(197): Symfony\\Component\\Console\\Application->run(Object(Symfony\\Component\\Console\\Input\\ArgvInput), Object(Symfony\\Component\\Console\\Output\\ConsoleOutput))
+#32 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Application.php(1235): Illuminate\\Foundation\\Console\\Kernel->handle(Object(Symfony\\Component\\Console\\Input\\ArgvInput), Object(Symfony\\Component\\Console\\Output\\ConsoleOutput))
+#33 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\artisan(16): Illuminate\\Foundation\\Application->handleCommand(Object(Symfony\\Component\\Console\\Input\\ArgvInput))
+#34 {main}
+"} 
+[2026-05-10 17:18:36] local.ERROR: The "--columns" option does not exist. {"exception":"[object] (Symfony\\Component\\Console\\Exception\\RuntimeException(code: 0): The \"--columns\" option does not exist. at D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\symfony\\console\\Input\\ArgvInput.php:226)
+[stacktrace]
+#0 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\symfony\\console\\Input\\ArgvInput.php(153): Symfony\\Component\\Console\\Input\\ArgvInput->addLongOption('columns', 'method,uri')
+#1 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\symfony\\console\\Input\\ArgvInput.php(88): Symfony\\Component\\Console\\Input\\ArgvInput->parseLongOption('--columns=metho...')
+#2 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\symfony\\console\\Input\\ArgvInput.php(77): Symfony\\Component\\Console\\Input\\ArgvInput->parseToken('--columns=metho...', true)
+#3 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\symfony\\console\\Input\\Input.php(53): Symfony\\Component\\Console\\Input\\ArgvInput->parse()
+#4 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\symfony\\console\\Command\\Command.php(276): Symfony\\Component\\Console\\Input\\Input->bind(Object(Symfony\\Component\\Console\\Input\\InputDefinition))
+#5 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Console\\Command.php(180): Symfony\\Component\\Console\\Command\\Command->run(Object(Symfony\\Component\\Console\\Input\\ArgvInput), Object(Illuminate\\Console\\OutputStyle))
+#6 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\symfony\\console\\Application.php(1110): Illuminate\\Console\\Command->run(Object(Symfony\\Component\\Console\\Input\\ArgvInput), Object(Symfony\\Component\\Console\\Output\\ConsoleOutput))
+#7 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\symfony\\console\\Application.php(359): Symfony\\Component\\Console\\Application->doRunCommand(Object(Illuminate\\Foundation\\Console\\RouteListCommand), Object(Symfony\\Component\\Console\\Input\\ArgvInput), Object(Symfony\\Component\\Console\\Output\\ConsoleOutput))
+#8 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\symfony\\console\\Application.php(194): Symfony\\Component\\Console\\Application->doRun(Object(Symfony\\Component\\Console\\Input\\ArgvInput), Object(Symfony\\Component\\Console\\Output\\ConsoleOutput))
+#9 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Console\\Kernel.php(197): Symfony\\Component\\Console\\Application->run(Object(Symfony\\Component\\Console\\Input\\ArgvInput), Object(Symfony\\Component\\Console\\Output\\ConsoleOutput))
+#10 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\vendor\\laravel\\framework\\src\\Illuminate\\Foundation\\Application.php(1235): Illuminate\\Foundation\\Console\\Kernel->handle(Object(Symfony\\Component\\Console\\Input\\ArgvInput), Object(Symfony\\Component\\Console\\Output\\ConsoleOutput))
+#11 D:\\Practicas\\Ugel Azangaro\\asistencia-backend\\artisan(16): Illuminate\\Foundation\\Application->handleCommand(Object(Symfony\\Component\\Console\\Input\\ArgvInput))
+#12 {main}
+"} 

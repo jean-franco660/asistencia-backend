@@ -283,6 +283,28 @@ class Feriado extends Model
      */
     public static function contarDiasLaborales(Carbon $desde, Carbon $hasta, ?int $institucionId = null): int
     {
+        // Precargar feriados aplicables para evitar N+1 queries en el bucle
+        $feriadosQuery = static::activos();
+        
+        if ($institucionId) {
+            $feriadosQuery->where(function ($q) use ($institucionId) {
+                $q->where('tipo', self::TIPO_NACIONAL)
+                  ->orWhere(function ($sq) use ($institucionId) {
+                      $sq->where('tipo', self::TIPO_INSTITUCIONAL)
+                         ->where('institucion_id', $institucionId);
+                  });
+            });
+        } else {
+            $feriadosQuery->where('tipo', self::TIPO_NACIONAL);
+        }
+
+        $feriados = $feriadosQuery->get(['dia', 'mes']);
+        
+        $feriadosSet = [];
+        foreach ($feriados as $feriado) {
+            $feriadosSet[$feriado->mes . '-' . $feriado->dia] = true;
+        }
+
         $dias = 0;
         $fecha = $desde->copy();
 
@@ -290,7 +312,8 @@ class Feriado extends Model
             // Excluir sábados y domingos
             if (!$fecha->isWeekend()) {
                 // Excluir feriados
-                if (!static::esFeriado($fecha, $institucionId)) {
+                $clave = $fecha->month . '-' . $fecha->day;
+                if (!isset($feriadosSet[$clave])) {
                     $dias++;
                 }
             }

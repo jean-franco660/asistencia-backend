@@ -35,18 +35,8 @@ class StoreUsuarioAppRequest extends FormRequest
 
             // Asignaciones (tabla usuario_app_institucion)
             // IMPORTANTE: El cargo NO va en usuarios_app, va en la asignación
-            'asignaciones' => [
-                'required',
-                'array',
-                'min:1',
-                function ($attribute, $value, $fail) {
-                    $institucionIds = array_column($value, 'institucion_id');
-                    if (count($institucionIds) !== count(array_unique($institucionIds))) {
-                        $fail('No puede asignar la misma institución más de una vez a un mismo usuario.');
-                    }
-                }
-            ],
-            'asignaciones.*.institucion_id' => 'required|exists:instituciones,id',
+            'asignaciones' => 'required|array|min:1',
+            'asignaciones.*.institucion_id' => 'required|exists:instituciones,id|distinct',
             'asignaciones.*.horario_institucion_id' => 'nullable|exists:horarios_institucion,id', // ✅ Opcional
             'asignaciones.*.cargo' => 'required|string|max:50', // Campo libre
             'asignaciones.*.estado' => 'nullable|in:ACTIVO,INACTIVO',
@@ -95,6 +85,7 @@ class StoreUsuarioAppRequest extends FormRequest
 
             'asignaciones.*.institucion_id.required' => 'La institución es obligatoria',
             'asignaciones.*.institucion_id.exists' => 'La institución seleccionada no existe',
+            'asignaciones.*.institucion_id.distinct' => 'No puede asignar la misma institución más de una vez a un mismo usuario.',
 
             'asignaciones.*.horario_institucion_id.exists' => 'El horario seleccionado no existe',
 

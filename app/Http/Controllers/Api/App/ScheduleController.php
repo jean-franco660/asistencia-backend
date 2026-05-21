@@ -58,7 +58,7 @@ class ScheduleController extends Controller
 
         $user = $request->user();
         $institucionId = $validated['institucion_id'];
-        $nuevosHorarios = $validated['horario_ids'];
+        $nuevosHorarios = array_unique($validated['horario_ids']); // ✅ Eliminar duplicados
 
         DB::beginTransaction();
         try {
@@ -98,14 +98,18 @@ class ScheduleController extends Controller
 
             // Crear nuevas asignaciones con el cargo preservado
             foreach ($nuevosHorarios as $horarioId) {
-                UsuarioAppInstitucion::create([
-                    'usuario_app_id' => $user->id,
-                    'institucion_id' => $institucionId,
-                    'horario_institucion_id' => $horarioId,
-                    'cargo' => $cargo, // ✅ Cargo preservado
-                    'estado' => 'ACTIVO',
-                    'fecha_inicio' => now(),
-                ]);
+                UsuarioAppInstitucion::updateOrCreate(
+                    [
+                        'usuario_app_id' => $user->id,
+                        'institucion_id' => $institucionId,
+                        'horario_institucion_id' => $horarioId,
+                    ],
+                    [
+                        'cargo' => $cargo,
+                        'estado' => 'ACTIVO',
+                        'fecha_inicio' => now(),
+                    ]
+                );
             }
 
             // Registrar cambio en log

@@ -15,7 +15,7 @@ class LoginWebRequest extends FormRequest
     {
         return [
             'email'    => 'required|email',
-            'password' => 'required|string|min:6'
+            'password' => 'required|string|min:8'
         ];
     }
 
@@ -25,7 +25,7 @@ class LoginWebRequest extends FormRequest
             'email.required' => 'El correo es obligatorio.',
             'email.email'    => 'Formato de correo inválido.',
             'password.required' => 'La contraseña es obligatoria.',
-            'password.min' => 'Minimo 6 caracteres.',
+            'password.min' => 'Minimo 8 caracteres.',
         ];
     }
 }

@@ -16,7 +16,7 @@ class UpdateUsuarioWebRequest extends FormRequest
         return [
             'nombre' => 'sometimes|string|max:100',
             'email' => 'sometimes|email|unique:usuarios_web,email,' . $this->id,
-            'password' => 'sometimes|string|min:6',
+            'password' => 'sometimes|string|min:8',
             'rol' => 'sometimes|in:administrador,supervisor',
             'estado' => 'sometimes|in:pendiente,autorizado,rechazado',
         ];

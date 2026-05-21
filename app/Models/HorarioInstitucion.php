@@ -184,6 +184,10 @@ class HorarioInstitucion extends Model
         $entrada = Carbon::parse($this->hora_entrada);
         $salida = Carbon::parse($this->hora_salida);
 
+        if ($salida->lessThan($entrada)) {
+            $salida->addDay();
+        }
+
         return $entrada->diffInMinutes($salida) / 60;
     }
 

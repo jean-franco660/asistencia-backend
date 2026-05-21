@@ -47,17 +47,8 @@ class UpdateUsuarioAppRequest extends FormRequest
             'acceso_habilitado' => 'sometimes|boolean',
 
             // Asignaciones (opcional, si se envía se reemplaza todo)
-            'asignaciones' => [
-                'sometimes',
-                'array',
-                function ($attribute, $value, $fail) {
-                    $institucionIds = array_column($value, 'institucion_id');
-                    if (count($institucionIds) !== count(array_unique($institucionIds))) {
-                        $fail('No puede asignar la misma institución más de una vez a un mismo usuario.');
-                    }
-                }
-            ],
-            'asignaciones.*.institucion_id' => 'required|exists:instituciones,id',
+            'asignaciones' => 'sometimes|array',
+            'asignaciones.*.institucion_id' => 'required|exists:instituciones,id|distinct',
             'asignaciones.*.horario_institucion_id' => 'nullable|exists:horarios_institucion,id', // ✅ Opcional
             'asignaciones.*.cargo' => 'required|string|max:50',
             'asignaciones.*.estado' => 'nullable|in:ACTIVO,INACTIVO',
@@ -94,6 +85,7 @@ class UpdateUsuarioAppRequest extends FormRequest
 
             'asignaciones.*.institucion_id.required' => 'La institución es obligatoria',
             'asignaciones.*.institucion_id.exists' => 'La institución seleccionada no existe',
+            'asignaciones.*.institucion_id.distinct' => 'No puede asignar la misma institución más de una vez a un mismo usuario.',
 
             'asignaciones.*.horario_institucion_id.exists' => 'El horario seleccionado no existe',
 

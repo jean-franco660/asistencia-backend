@@ -1,31 +1,40 @@
 <?php
 
-use App\Http\Controllers\Api\SupervisorDashboardController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\Api\UsuarioWebController;
-use App\Http\Controllers\Api\UsuarioAppController;
-use App\Http\Controllers\Api\InstitucionController;
-use App\Http\Controllers\Api\AsistenciaController;
-use App\Http\Controllers\Api\UsuarioAppImportController;
-use App\Http\Controllers\Api\HorariosInstitucionController;
-use App\Http\Controllers\Api\FeriadoController;
-use App\Http\Controllers\Api\StatsController;
-use App\Http\Controllers\Api\AppInstitucionController;
-use App\Http\Controllers\Api\JustificacionController;
 use Illuminate\Support\Facades\Storage;
+
+// Controladores App (Docentes - App Móvil)
+use App\Http\Controllers\Api\App\AsistenciaController as AppAsistenciaController;
+use App\Http\Controllers\Api\App\InstitucionController as AppInstitucionController;
+use App\Http\Controllers\Api\App\ScheduleController as AppScheduleController;
+
+// Controladores Web (Administradores/Supervisores - Panel Web)
+use App\Http\Controllers\Api\Web\AsistenciaController as WebAsistenciaController;
+use App\Http\Controllers\Api\Web\AuthController;
+use App\Http\Controllers\Api\Web\UsuarioWebController;
+use App\Http\Controllers\Api\Web\UsuarioAppController;
+use App\Http\Controllers\Api\Web\UsuarioAppImportController;
+use App\Http\Controllers\Api\Web\UsuarioAppInstitucionController;
+use App\Http\Controllers\Api\Web\InstitucionController as WebInstitucionController;
+use App\Http\Controllers\Api\Web\InstitucionImportController;
+use App\Http\Controllers\Api\Web\HorariosInstitucionController;
+use App\Http\Controllers\Api\Web\FeriadoController;
+use App\Http\Controllers\Api\Web\StatsController;
+use App\Http\Controllers\Api\Web\SupervisorDashboardController;
+use App\Http\Controllers\Api\Web\AuditLogController;
+use App\Http\Controllers\Api\Web\ReporteController;
+use App\Http\Controllers\Api\Web\JustificacionController;
+use App\Http\Controllers\Api\Web\PerfilController;
+use App\Http\Controllers\Api\Web\ProvisioningController;
+use App\Http\Controllers\Api\Web\ScheduleManagementController;
 
 /*
 |--------------------------------------------------------------------------
 | RUTA DE ESTADO (PRUEBA)
 |--------------------------------------------------------------------------
 */
-Route::get('/status', function () {
-    return response()->json([
-        'ok' => true,
-        'message' => 'API funcionando correctamente'
-    ]);
-});
+Route::get('/status', fn () => response()->json(['ok' => true, 'message' => 'API funcionando correctamente']));
 
 /*
 |--------------------------------------------------------------------------
@@ -33,38 +42,36 @@ Route::get('/status', function () {
 |--------------------------------------------------------------------------
 */
 Route::prefix('v1/app')->group(function () {
-    // Login con código modular - THROTTLE: 5 intentos por minuto
+    // Login con código modular
     Route::post('/login', [UsuarioAppController::class, 'login'])->middleware('throttle:login');
 
-    // Rutas protegidas con token para la app - THROTTLE: 60 peticiones por minuto
+    // Rutas protegidas con token
     Route::middleware(['auth:sanctum', 'throttle:api'])->group(function () {
-        // Perfil del docente autenticado
+        // Perfil
         Route::get('/perfil', [UsuarioAppController::class, 'perfil']);
-
-        // Logout
         Route::post('/logout', [UsuarioAppController::class, 'logout']);
 
-        // Instituciones
+        // Instituciones del docente
         Route::get('/instituciones', [AppInstitucionController::class, 'index']);
 
-        // Asistencias
-        Route::post('/asistencia', [AsistenciaController::class, 'store']);
-        Route::get('/asistencia/{usuarioId}', [AsistenciaController::class, 'historial']);
-        Route::post('/asistencias/sincronizar', [AsistenciaController::class, 'syncMovil']);
-        Route::get('/estado-dia', [AsistenciaController::class, 'estadoDia']);
+        // Asistencias (App)
+        Route::post('/asistencia', [AppAsistenciaController::class, 'store']);
+        Route::get('/asistencia/{usuarioId}', [AppAsistenciaController::class, 'historial']);
+        Route::post('/asistencias/sincronizar', [AppAsistenciaController::class, 'syncMovil']);
+        Route::get('/estado-dia', [AppAsistenciaController::class, 'estadoDia']);
 
         // Horarios
         Route::get('/horarios-institucion', [HorariosInstitucionController::class, 'index']);
 
-        // Justificaciones (Docente solo puede crear, ver y eliminar las suyas)
+        // Justificaciones (Docente: crear, ver, eliminar las suyas)
         Route::get('/justificaciones', [JustificacionController::class, 'index']);
         Route::post('/justificaciones', [JustificacionController::class, 'store']);
         Route::get('/justificaciones/{id}', [JustificacionController::class, 'show']);
         Route::delete('/justificaciones/{id}', [JustificacionController::class, 'destroy']);
 
         // Gestión de Horarios (Auto-asignación)
-        Route::get('/mis-horarios', [\App\Http\Controllers\Api\App\ScheduleController::class, 'getMisHorarios']);
-        Route::post('/actualizar-horarios', [\App\Http\Controllers\Api\App\ScheduleController::class, 'actualizarHorarios']);
+        Route::get('/mis-horarios', [AppScheduleController::class, 'getMisHorarios']);
+        Route::post('/actualizar-horarios', [AppScheduleController::class, 'actualizarHorarios']);
     });
 });
 
@@ -73,9 +80,7 @@ Route::prefix('v1/app')->group(function () {
 | RUTAS PARA LA WEB (ADMINISTRADOR / SUPERVISOR)
 |--------------------------------------------------------------------------
 */
-
 Route::prefix('v1/web')->group(function () {
-    // Login web - THROTTLE: 5 intentos por minuto
     Route::post('/login', [UsuarioWebController::class, 'login'])->middleware('throttle:login');
 });
 
@@ -85,8 +90,8 @@ Route::prefix('v1/web')->middleware(['auth:sanctum', 'throttle:api'])->group(fun
 
     // Perfil
     Route::get('/me', [UsuarioWebController::class, 'me']);
-    Route::post('/perfil/cambiar-password', [\App\Http\Controllers\Api\Web\PerfilController::class, 'cambiarPassword']);
-    Route::post('/perfil/cambiar-email', [\App\Http\Controllers\Api\Web\PerfilController::class, 'cambiarEmail']);
+    Route::post('/perfil/cambiar-password', [PerfilController::class, 'cambiarPassword']);
+    Route::post('/perfil/cambiar-email', [PerfilController::class, 'cambiarEmail']);
 
     // Logout
     Route::post('/logout', function (Request $request) {
@@ -107,12 +112,10 @@ Route::prefix('v1/web')->middleware(['auth:sanctum', 'throttle:api'])->group(fun
         Route::put('/{id}', [UsuarioWebController::class, 'update']);
         Route::delete('/{id}', [UsuarioWebController::class, 'destroy']);
 
-        // ACCIONES CRÍTICAS - THROTTLE: 30 por minuto
         Route::middleware('throttle:acciones-criticas')->group(function () {
             Route::post('/autorizar/{id}', [UsuarioWebController::class, 'autorizar']);
             Route::post('/rechazar/{id}', [UsuarioWebController::class, 'rechazar']);
         });
-
     });
 
     /*
@@ -121,22 +124,18 @@ Route::prefix('v1/web')->middleware(['auth:sanctum', 'throttle:api'])->group(fun
     |--------------------------------------------------------------------------
     */
     Route::prefix('supervisores/provisioning')->group(function () {
-        Route::get('/search', [\App\Http\Controllers\Api\Web\ProvisioningController::class, 'search']);
-        Route::get('/usuario-app/{usuarioApp}', [\App\Http\Controllers\Api\Web\ProvisioningController::class, 'show']);
-        Route::post('/', [\App\Http\Controllers\Api\Web\ProvisioningController::class, 'store']);
+        Route::get('/search', [ProvisioningController::class, 'search']);
+        Route::get('/usuario-app/{usuarioApp}', [ProvisioningController::class, 'show']);
+        Route::post('/', [ProvisioningController::class, 'store']);
     });
-
 
     /*
     |--------------------------------------------------------------------------
-    | USUARIOS APP (Docentes)
+    | USUARIOS APP (Docentes) — Gestión desde el panel web
     |--------------------------------------------------------------------------
     */
     Route::prefix('usuarios-app')->group(function () {
-        // Plantilla de importación
         Route::get('/template', [UsuarioAppImportController::class, 'downloadTemplate']);
-
-        // Rutas específicas ANTES de las rutas con parámetros
         Route::delete('/delete-multiple', [UsuarioAppController::class, 'destroyMultiple']);
 
         Route::get('/', [UsuarioAppController::class, 'index']);
@@ -148,13 +147,14 @@ Route::prefix('v1/web')->middleware(['auth:sanctum', 'throttle:api'])->group(fun
         Route::patch('/{id}/asignar-horario', [UsuarioAppController::class, 'asignarHorario'])->whereNumber('id');
         Route::patch('/{id}/estado', [UsuarioAppController::class, 'cambiarEstado'])->whereNumber('id');
 
-        // IMPORTACIÓN - THROTTLE: 3 por minuto
+        // Importación
         Route::middleware('throttle:importaciones')->group(function () {
-            Route::get('/import/stats', [UsuarioAppImportController::class, 'stats']); // ⭐ NUEVO
             Route::post('/importar', [UsuarioAppImportController::class, 'import']);
-            Route::get('/importacion/{id}', [UsuarioAppImportController::class, 'estadoImportacion'])->whereNumber('id');
             Route::get('/importacion/{id}/errores.xlsx', [UsuarioAppImportController::class, 'erroresExcel'])->whereNumber('id');
         });
+
+        Route::get('/import/stats', [UsuarioAppImportController::class, 'stats']);
+        Route::get('/importacion/{id}', [UsuarioAppImportController::class, 'estadoImportacion'])->whereNumber('id');
     });
 
     /*
@@ -162,7 +162,7 @@ Route::prefix('v1/web')->middleware(['auth:sanctum', 'throttle:api'])->group(fun
     | ASIGNACIONES (Usuario App - Institución)
     |--------------------------------------------------------------------------
     */
-    Route::post('/usuario-app-institucion/{id}/inactivar', [\App\Http\Controllers\Api\UsuarioAppInstitucionController::class, 'inactivar'])->whereNumber('id');
+    Route::post('/usuario-app-institucion/{id}/inactivar', [UsuarioAppInstitucionController::class, 'inactivar'])->whereNumber('id');
 
     /*
     |--------------------------------------------------------------------------
@@ -170,28 +170,24 @@ Route::prefix('v1/web')->middleware(['auth:sanctum', 'throttle:api'])->group(fun
     |--------------------------------------------------------------------------
     */
     Route::prefix('instituciones')->group(function () {
-        // Plantilla de importación
-        Route::get('/template', [\App\Http\Controllers\Api\InstitucionImportController::class, 'downloadTemplate']);
+        Route::get('/template', [InstitucionImportController::class, 'downloadTemplate']);
+        Route::get('/mias', [WebInstitucionController::class, 'misInstituciones']);
+        Route::delete('/delete-multiple', [WebInstitucionController::class, 'destroyMultiple']);
 
-        // Rutas específicas ANTES de las rutas con parámetros
-        Route::get('/mias', [InstitucionController::class, 'misInstituciones']);
-        Route::delete('/delete-multiple', [InstitucionController::class, 'destroyMultiple']);
-
-        // IMPORTACIÓN - THROTTLE: 3 por minuto
         Route::middleware('throttle:importaciones')->group(function () {
-            Route::get('/import/stats', [\App\Http\Controllers\Api\InstitucionImportController::class, 'stats']); // ⭐ NUEVO
-            Route::post('/importar', [\App\Http\Controllers\Api\InstitucionImportController::class, 'import']);
-            Route::get('/importacion/{id}', [\App\Http\Controllers\Api\InstitucionImportController::class, 'estadoImportacion'])->whereNumber('id');
-            Route::get('/importacion/{id}/errores.xlsx', [\App\Http\Controllers\Api\InstitucionImportController::class, 'erroresExcel'])->whereNumber('id');
+            Route::post('/importar', [InstitucionImportController::class, 'import']);
+            Route::get('/importacion/{id}/errores.xlsx', [InstitucionImportController::class, 'erroresExcel'])->whereNumber('id');
         });
 
-        // CRUD básico
-        Route::get('/', [InstitucionController::class, 'index']);
-        Route::post('/', [InstitucionController::class, 'store']);
-        Route::get('/{id}', [InstitucionController::class, 'show']);
-        Route::put('/{id}', [InstitucionController::class, 'update']);
-        Route::patch('/{id}', [InstitucionController::class, 'update']);
-        Route::delete('/{id}', [InstitucionController::class, 'destroy']);
+        Route::get('/import/stats', [InstitucionImportController::class, 'stats']);
+        Route::get('/importacion/{id}', [InstitucionImportController::class, 'estadoImportacion'])->whereNumber('id');
+
+        Route::get('/', [WebInstitucionController::class, 'index']);
+        Route::post('/', [WebInstitucionController::class, 'store']);
+        Route::get('/{id}', [WebInstitucionController::class, 'show']);
+        Route::put('/{id}', [WebInstitucionController::class, 'update']);
+        Route::patch('/{id}', [WebInstitucionController::class, 'update']);
+        Route::delete('/{id}', [WebInstitucionController::class, 'destroy']);
     });
 
     /*
@@ -221,34 +217,30 @@ Route::prefix('v1/web')->middleware(['auth:sanctum', 'throttle:api'])->group(fun
 
     /*
     |--------------------------------------------------------------------------
-    | ASISTENCIAS
+    | ASISTENCIAS (Web)
     |--------------------------------------------------------------------------
     */
     Route::prefix('asistencias')->group(function () {
-        // Rutas específicas primero
-        Route::get('/cabeceras', [AsistenciaController::class, 'listCabeceras']); // ⭐ NUEVO - Fase 5
-        Route::get('/semana', [AsistenciaController::class, 'resumenSemanal']);
-        Route::get('/mes-grafico', [AsistenciaController::class, 'resumenMensualGrafico']);
-        Route::get('/exportar', [AsistenciaController::class, 'exportar'])->name('asistencias.exportar');
-        Route::get('/exportar-institucion/{id}', [AsistenciaController::class, 'exportarInstitucion'])->whereNumber('id');
+        Route::get('/cabeceras', [WebAsistenciaController::class, 'listCabeceras']);
+        Route::get('/semana', [AppAsistenciaController::class, 'resumenSemanal']);
+        Route::get('/mes-grafico', [AppAsistenciaController::class, 'resumenMensualGrafico']);
+        Route::get('/exportar', [WebAsistenciaController::class, 'exportar'])->name('asistencias.exportar');
+        Route::get('/exportar-institucion/{id}', [WebAsistenciaController::class, 'exportarInstitucion'])->whereNumber('id');
 
-        // ⭐ NUEVO - Obtener marcación individual por ID
-        Route::get('/marcaciones/{id}', [AsistenciaController::class, 'getMarcacion'])->whereNumber('id');
+        Route::get('/marcaciones/{id}', [WebAsistenciaController::class, 'getMarcacion'])->whereNumber('id');
 
-        // CRUD básico (marcaciones individuales)
-        Route::get('/', [AsistenciaController::class, 'index']);
-        Route::get('/{id}', [AsistenciaController::class, 'show'])->whereNumber('id');
+        Route::get('/', [WebAsistenciaController::class, 'index']);
+        Route::get('/{id}', [WebAsistenciaController::class, 'show'])->whereNumber('id');
 
-        // Revisión de marcaciones (ID es AsistenciaDiaria)
-        Route::put('/marcaciones/{id}/review', [AsistenciaController::class, 'updateReview'])->whereNumber('id');
+        Route::put('/marcaciones/{id}/review', [WebAsistenciaController::class, 'updateReview'])->whereNumber('id');
     });
 
-    // Foto de asistencia (fuera del prefix para mantener la ruta original)
-    Route::get('/asistencia/foto/{id}', [AsistenciaController::class, 'foto'])->whereNumber('id');
+    // Foto de asistencia
+    Route::get('/asistencia/foto/{id}', [WebAsistenciaController::class, 'foto'])->whereNumber('id');
 
     /*
     |--------------------------------------------------------------------------
-    | JUSTIFICACIONES
+    | JUSTIFICACIONES (Web — Aprobar/Rechazar)
     |--------------------------------------------------------------------------
     */
     Route::prefix('justificaciones')->group(function () {
@@ -256,7 +248,6 @@ Route::prefix('v1/web')->middleware(['auth:sanctum', 'throttle:api'])->group(fun
         Route::get('/{id}', [JustificacionController::class, 'show']);
         Route::delete('/{id}', [JustificacionController::class, 'destroy']);
 
-        // ACCIONES CRÍTICAS - THROTTLE: 30 por minuto
         Route::middleware('throttle:acciones-criticas')->group(function () {
             Route::post('/{id}/aprobar', [JustificacionController::class, 'aprobar']);
             Route::post('/{id}/rechazar', [JustificacionController::class, 'rechazar']);
@@ -276,42 +267,34 @@ Route::prefix('v1/web')->middleware(['auth:sanctum', 'throttle:api'])->group(fun
     |--------------------------------------------------------------------------
     */
     Route::prefix('audit-logs')->middleware('can:viewAny,App\Models\AuditLog')->group(function () {
-        Route::get('/', [\App\Http\Controllers\Api\AuditLogController::class, 'index']);
-        Route::get('/stats', [\App\Http\Controllers\Api\AuditLogController::class, 'stats']);
-        Route::get('/modelo/{modelo}/{id}', [\App\Http\Controllers\Api\AuditLogController::class, 'historialModelo']);
-        Route::get('/{id}', [\App\Http\Controllers\Api\AuditLogController::class, 'show']);
+        Route::get('/', [AuditLogController::class, 'index']);
+        Route::get('/stats', [AuditLogController::class, 'stats']);
+        Route::get('/modelo/{modelo}/{id}', [AuditLogController::class, 'historialModelo']);
+        Route::get('/{id}', [AuditLogController::class, 'show']);
     });
-    /*
-    |--------------------------------------------------------------------------
-    | AUDITORÍA
-    |--------------------------------------------------------------------------
-    */
-    // Route::prefix('auditoria')->group(function () {
-    //     Route::get('/logs', [\App\Http\Controllers\Api\AuditoriaController::class, 'logs']);
-    // });
 
     /*
     |--------------------------------------------------------------------------
-    | GESTIÓN DE HORARIOS (Auto-asignación)
+    | GESTIÓN DE HORARIOS
     |--------------------------------------------------------------------------
     */
-    Route::prefix('horarios-gestion')->group(function () { // Changed prefix to avoid conflict with existing 'horarios'
-        Route::get('/asignaciones', [\App\Http\Controllers\Api\Web\ScheduleManagementController::class, 'index']);
-        Route::get('/historial', [\App\Http\Controllers\Api\Web\ScheduleManagementController::class, 'historial']);
-        Route::post('/modificar', [\App\Http\Controllers\Api\Web\ScheduleManagementController::class, 'modificarHorarios']);
+    Route::prefix('horarios-gestion')->group(function () {
+        Route::get('/asignaciones', [ScheduleManagementController::class, 'index']);
+        Route::get('/historial', [ScheduleManagementController::class, 'historial']);
+        Route::post('/modificar', [ScheduleManagementController::class, 'modificarHorarios']);
     });
+
     /*
     |--------------------------------------------------------------------------
     | REPORTES AVANZADOS (Excel)
     |--------------------------------------------------------------------------
     */
     Route::prefix('reportes')->group(function () {
-        Route::get('/periodo', [\App\Http\Controllers\Api\ReporteController::class, 'periodo']);
-        Route::get('/docente-historial', [\App\Http\Controllers\Api\ReporteController::class, 'docenteHistorial']);
-        Route::get('/institucion-consolidado', [\App\Http\Controllers\Api\ReporteController::class, 'institucionConsolidado']);
-        Route::get('/mensual', [\App\Http\Controllers\Api\ReporteController::class, 'mensual']);
+        Route::get('/periodo', [ReporteController::class, 'periodo']);
+        Route::get('/docente-historial', [ReporteController::class, 'docenteHistorial']);
+        Route::get('/institucion-consolidado', [ReporteController::class, 'institucionConsolidado']);
+        Route::get('/mensual', [ReporteController::class, 'mensual']);
     });
-
 });
 
 /*
@@ -321,10 +304,8 @@ Route::prefix('v1/web')->middleware(['auth:sanctum', 'throttle:api'])->group(fun
 */
 Route::get('v1/web/logos/{filename}', function ($filename) {
     $path = 'logos/' . $filename;
-
     if (!Storage::disk('public')->exists($path)) {
         abort(404, 'Logo no encontrado');
     }
-
     return response()->file(storage_path('app/public/' . $path));
 })->where('filename', '.*');

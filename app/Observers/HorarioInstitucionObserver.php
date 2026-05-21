@@ -22,6 +22,9 @@ class HorarioInstitucionObserver
             'turno' => $horarioInstitucion->nombre_turno,
         ]);
 
+        \Illuminate\Support\Facades\DB::transaction(function () use ($horarioInstitucion) {
+
+
         // 1. Asignar a los que no tienen horario (Lógica Legacy - Update)
         $asignaciones = \App\Models\UsuarioAppInstitucion::where('institucion_id', $horarioInstitucion->institucion_id)
             ->whereNull('horario_institucion_id')
@@ -43,14 +46,14 @@ class HorarioInstitucionObserver
             ->get()
             ->unique('usuario_app_id');
 
-        foreach ($usersWithOtherSchedules as $existingAssignment) {
-            // Verificar si ya tiene ESTE horario específico (evitar duplicados)
-            $alreadyHas = \App\Models\UsuarioAppInstitucion::where('usuario_app_id', $existingAssignment->usuario_app_id)
-                ->where('institucion_id', $horarioInstitucion->institucion_id)
-                ->where('horario_institucion_id', $horarioInstitucion->id)
-                ->exists();
+        // Precargar IDs de usuarios que YA tienen ESTE nuevo horario para evitar N+1 queries
+        $usersAlreadyHavingThisSchedule = \App\Models\UsuarioAppInstitucion::where('institucion_id', $horarioInstitucion->institucion_id)
+            ->where('horario_institucion_id', $horarioInstitucion->id)
+            ->pluck('usuario_app_id')
+            ->toArray();
 
-            if (!$alreadyHas) {
+        foreach ($usersWithOtherSchedules as $existingAssignment) {
+            if (!in_array($existingAssignment->usuario_app_id, $usersAlreadyHavingThisSchedule)) {
                 // Crear nueva asignación replicando el cargo
                 \App\Models\UsuarioAppInstitucion::create([
                     'usuario_app_id' => $existingAssignment->usuario_app_id,
@@ -63,10 +66,11 @@ class HorarioInstitucionObserver
             }
         }
 
-        \Log::info('✅ Horario auto-asignado a usuarios (Multi-Turno)', [
-            'horario_id' => $horarioInstitucion->id,
-            'usuarios_actualizados' => $count,
-        ]);
+            \Log::info('✅ Horario auto-asignado a usuarios (Multi-Turno)', [
+                'horario_id' => $horarioInstitucion->id,
+                'usuarios_actualizados' => $count,
+            ]);
+        });
     }
 
     /**

@@ -175,10 +175,19 @@ class ImportInstitucionesService
 
         // Validar enum tipo_gestion
         if ($tipoGestion !== null) {
+            $originalTipo = $tipoGestion; // Guardar original para log
             $tiposValidos = ['PUBLICA', 'PRIVADA', 'PUBLICA_CONVENIO'];
-            $tipoGestion = strtoupper($tipoGestion);
-            if (!in_array($tipoGestion, $tiposValidos, true)) {
-                throw new Exception('tipo_gestion inválido. Valores permitidos: PUBLICA, PRIVADA, PUBLICA_CONVENIO');
+            $tipoGestionNormalizado = strtoupper(str_replace([' ', '_'], ['_', '_'], $tipoGestion)); // Normalizar espacios y guiones
+            $tipoGestionNormalizado = str_replace(['PÚBLICA', 'PUBLICA CON CONVENIO', 'PÚBLICO', 'PRIVADO'], ['PUBLICA', 'PUBLICA_CONVENIO', 'PUBLICA', 'PRIVADA'], $tipoGestionNormalizado); // Mapear variaciones comunes
+            if (!in_array($tipoGestionNormalizado, $tiposValidos, true)) {
+                Log::warning('Valor tipo_gestion inválido, omitiendo', [
+                    'original' => $originalTipo,
+                    'normalizado' => $tipoGestionNormalizado,
+                    'permitidos' => $tiposValidos,
+                ]);
+                $tipoGestion = null; // Omitir el valor inválido
+            } else {
+                $tipoGestion = $tipoGestionNormalizado;
             }
         }
 
