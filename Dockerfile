@@ -34,14 +34,14 @@ RUN groupadd -g 1000 app || true \
 # Copy application source first so composer scripts can access artisan and config files
 COPY . ./
 
+# Ensure storage and bootstrap cache dirs exist with proper permissions before Composer runs
+RUN mkdir -p storage/framework storage/logs bootstrap/cache && \
+  chown -R app:app storage bootstrap/cache || true
+
 # Copy composer files and install as non-root to leverage cache and improve security
 COPY composer.json composer.lock ./
 RUN chown app:app composer.json composer.lock && \
   su -s /bin/sh app -c "composer install --no-dev --optimize-autoloader --no-interaction --no-progress"
-
-# Ensure storage and bootstrap cache dirs exist with proper permissions
-RUN mkdir -p storage/framework storage/logs bootstrap/cache && \
-  chown -R app:app storage bootstrap/cache || true
 
 # Copy entrypoint
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
