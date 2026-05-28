@@ -51,5 +51,5 @@ ENV PORT=8080
 EXPOSE 8080
 
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
-CMD ["php", "-S", "0.0.0.0:${PORT}", "-t", "public"]
+CMD php -S 0.0.0.0:"$PORT" -t public
 USER app
