@@ -22,6 +22,10 @@ WORKDIR /var/www/html
 
 # Copy composer files first and install to leverage cache
 COPY composer.json composer.lock ./
+# Allow Composer to run as root in containerized build environments (Railway/Nixpacks)
+ENV COMPOSER_ALLOW_SUPERUSER=1
+# Use a writable cache dir to avoid permission issues
+ENV COMPOSER_CACHE_DIR=/tmp/.composer
 RUN composer install --no-dev --optimize-autoloader --no-interaction --no-progress
 
 # Copy app
