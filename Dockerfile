@@ -21,24 +21,27 @@ RUN apt-get update && apt-get install -y \
   && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Install Composer
+
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 WORKDIR /var/www/html
 
-# Copy composer files first and install to leverage cache
-COPY composer.json composer.lock ./
-# Allow Composer to run as root in containerized build environments (Railway/Nixpacks)
-ENV COMPOSER_ALLOW_SUPERUSER=1
-# Use a writable cache dir to avoid permission issues
-ENV COMPOSER_CACHE_DIR=/tmp/.composer
-RUN composer install --no-dev --optimize-autoloader --no-interaction --no-progress
+# Create non-root user for running Composer and the app
+RUN groupadd -g 1000 app || true \
+  && useradd -u 1000 -m -g app -s /bin/sh app || true \
+  && mkdir -p /home/app/.composer && chown -R app:app /home/app
 
-# Copy app
+# Copy application source first so composer scripts can access artisan and config files
 COPY . ./
+
+# Copy composer files and install as non-root to leverage cache and improve security
+COPY composer.json composer.lock ./
+RUN chown app:app composer.json composer.lock && \
+  su -s /bin/sh app -c "composer install --no-dev --optimize-autoloader --no-interaction --no-progress"
 
 # Ensure storage and bootstrap cache dirs exist with proper permissions
 RUN mkdir -p storage/framework storage/logs bootstrap/cache && \
-    chown -R www-data:www-data storage bootstrap/cache || true
+  chown -R app:app storage bootstrap/cache || true
 
 # Copy entrypoint
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
@@ -49,3 +52,4 @@ EXPOSE 8080
 
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 CMD ["php", "-S", "0.0.0.0:${PORT}", "-t", "public"]
+USER app
