@@ -24,6 +24,7 @@ composer dump-autoload -o || true
 # Run migrations only if DB_HOST appears set and doesn't contain unreplaced placeholders
 if [ -n "$DB_HOST" ] && ! echo "$DB_HOST" | grep -q '\${'; then
   php artisan migrate --force || true
+  php artisan db:seed --class=SuperAdminSeeder --force || true
 fi
 
 # Start the built-in PHP server (Railway sets $PORT)
