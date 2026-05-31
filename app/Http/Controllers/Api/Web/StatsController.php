@@ -23,14 +23,14 @@ class StatsController extends Controller
 
         $isAdmin = $user->esAdminOSuperAdmin();
         /* ============================================================
-           📌 INSTITUCIONES DEL ÁMBITO
+            INSTITUCIONES DEL ÁMBITO
         ============================================================ */
         $institucionIds = $isAdmin
             ? Institucion::pluck('id')
             : $user->instituciones()->pluck('instituciones.id');
 
         /* ============================================================
-           📌 CONTADORES GENERALES
+            CONTADORES GENERALES
         ============================================================ */
         $docentesCount = $isAdmin
             ? UsuarioApp::count()
@@ -43,7 +43,7 @@ class StatsController extends Controller
         $instCount = $institucionIds->count();
 
         /* ============================================================
-           📌 FERIADOS (SOLO INFORMACIÓN, NO AFECTA ASISTENCIAS)
+            FERIADOS (SOLO INFORMACIÓN, NO AFECTA ASISTENCIAS)
         ============================================================ */
 
         // Feriado nacional
@@ -67,7 +67,7 @@ class StatsController extends Controller
         $motivoNoLaborable = optional($feriado)->descripcion;
 
         /* ============================================================
-           📌 VALIDACIÓN DE HORARIO (solo supervisor)
+            VALIDACIÓN DE HORARIO (solo supervisor)
         ============================================================ */
 
         if (!$hoyNoLaborable && !$isAdmin) {
@@ -96,7 +96,7 @@ class StatsController extends Controller
         }
 
         /* ============================================================
-           📌 LÓGICA REAL DE ASISTENCIAS Y FALTAS HOY
+            LÓGICA REAL DE ASISTENCIAS Y FALTAS HOY
         ============================================================ */
 
         // Obtener registros de hoy (Headers)
@@ -127,7 +127,7 @@ class StatsController extends Controller
         }
 
         /* ============================================================
-           📌 ESTADÍSTICAS ADICIONALES
+            ESTADÍSTICAS ADICIONALES
         ============================================================ */
 
         // Instituciones activas (con al menos un docente o actividad reciente)
@@ -170,11 +170,11 @@ class StatsController extends Controller
             ->count();
 
         /* ============================================================
-           📌 RESPUESTA FINAL (ESTRUCTURA EXPANDIDA)
+            RESPUESTA FINAL (ESTRUCTURA EXPANDIDA)
         ============================================================ */
 
         return response()->json([
-            // ✨ NUEVA ESTRUCTURA ANIDADA
+            //  NUEVA ESTRUCTURA ANIDADA
             'instituciones' => [
                 'total' => $instCount,
                 'activas' => $institucionesActivas,
@@ -196,7 +196,7 @@ class StatsController extends Controller
                 'rechazadas' => $justificacionesRechazadas,
             ],
 
-            // ✅ CAMPOS LEGACY (RETROCOMPATIBILIDAD)
+            //  CAMPOS LEGACY (RETROCOMPATIBILIDAD)
             'docentes_count' => $docentesCount,
             'total_instituciones' => $instCount,
             'asistencias_hoy' => $asistenciasHoy,

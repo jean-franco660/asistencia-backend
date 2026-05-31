@@ -154,7 +154,7 @@ class ImportUsuariosAppService
             // institución debe existir
             $inst = $instCache->get($norm['codigo_ie']);
 
-            // 🐛 DEBUG: Log búsqueda de institución
+            //  DEBUG: Log búsqueda de institución
             \Log::debug('Buscando institución para usuario', [
                 'codigo_ie' => $norm['codigo_ie'],
                 'institucion_encontrada' => $inst ? 'SI' : 'NO',
@@ -238,7 +238,7 @@ class ImportUsuariosAppService
                     continue;
                 }
 
-                // 🐛 DEBUG: Log antes de crear asignación
+                //  DEBUG: Log antes de crear asignación
                 \Log::debug('Creando asignación usuario-institución', [
                     'usuario_id' => $u->id,
                     'codigo_doc' => $p['codigo_doc'],
@@ -246,7 +246,7 @@ class ImportUsuariosAppService
                     'cargo' => $p['cargo'],
                 ]);
 
-                // ✅ Usar updateOrCreate para que el Observer se dispare
+                //  Usar updateOrCreate para que el Observer se dispare
                 $asignacion = UsuarioAppInstitucion::updateOrCreate(
                     [
                         'usuario_app_id' => (int) $u->id,
@@ -255,12 +255,12 @@ class ImportUsuariosAppService
                     [
                         'horario_institucion_id' => null, // Sin horario inicialmente
                         'cargo' => $p['cargo'],
-                        // ⚠️ NO establecer 'estado' aquí - el Observer lo manejará
+                        // ️ NO establecer 'estado' aquí - el Observer lo manejará
                         // El Observer verá que horario_institucion_id es null y establecerá INACTIVO
                     ]
                 );
 
-                // 🐛 DEBUG: Log después de crear asignación
+                //  DEBUG: Log después de crear asignación
                 \Log::debug('Asignación creada/actualizada', [
                     'asignacion_id' => $asignacion->id,
                     'estado' => $asignacion->estado,

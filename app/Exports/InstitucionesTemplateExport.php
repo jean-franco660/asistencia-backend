@@ -138,7 +138,7 @@ class InstitucionesTemplateExport implements
                 $sheet->insertNewRowBefore(1, 2);
 
                 // Instrucciones - Fila 1
-                $sheet->setCellValue('A1', '📋 PLANTILLA DE IMPORTACIÓN - INSTITUCIONES EDUCATIVAS');
+                $sheet->setCellValue('A1', ' PLANTILLA DE IMPORTACIÓN - INSTITUCIONES EDUCATIVAS');
                 $sheet->mergeCells('A1:H1');
                 $sheet->getStyle('A1')->applyFromArray([
                     'font' => [
@@ -157,7 +157,7 @@ class InstitucionesTemplateExport implements
                 ]);
 
                 // Notas - Fila 2
-                $sheet->setCellValue('A2', '⚠️ IMPORTANTE: Campos obligatorios: codigo_modular_ie (único), nombre, distrito, nivel_educativo. Pase el cursor sobre los encabezados para ver más ayuda.');
+                $sheet->setCellValue('A2', '️ IMPORTANTE: Campos obligatorios: codigo_modular_ie (único), nombre, distrito, nivel_educativo. Pase el cursor sobre los encabezados para ver más ayuda.');
                 $sheet->mergeCells('A2:H2');
                 $sheet->getStyle('A2')->applyFromArray([
                     'font' => [

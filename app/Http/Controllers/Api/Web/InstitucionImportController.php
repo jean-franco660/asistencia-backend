@@ -229,7 +229,7 @@ class InstitucionImportController extends Controller
             ], 404);
         }
 
-        // ✅ Asegurar tipo correcto (evita mezclar importaciones)
+        //  Asegurar tipo correcto (evita mezclar importaciones)
         if ($importLog->tipo !== ImportacionLog::TIPO_INSTITUCIONES) {
             return response()->json([
                 'success' => false,
@@ -252,7 +252,7 @@ class InstitucionImportController extends Controller
                 'iniciado_en' => $importLog->iniciado_en?->toIso8601String(),
                 'completado_en' => $importLog->completado_en?->toIso8601String(),
                 'duracion' => $importLog->duracion_formateada,
-                // 'errores' => $importLog->errores_detalle ?? [], // 🚫 OPTIMIZACIÓN: No enviar detalles en polling
+                // 'errores' => $importLog->errores_detalle ?? [], //  OPTIMIZACIÓN: No enviar detalles en polling
             ],
         ]);
     }
@@ -265,7 +265,7 @@ class InstitucionImportController extends Controller
     {
         $user = $request->user();
 
-        // ✅ Seguridad: solo admin
+        //  Seguridad: solo admin
         if (!($user instanceof \App\Models\UsuarioWeb && $user->esAdminOSuperAdmin())) {
             return response()->json([
                 'success' => false,

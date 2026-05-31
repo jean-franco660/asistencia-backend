@@ -132,7 +132,7 @@ class UsuariosAppTemplateExport implements
                 $sheet->insertNewRowBefore(1, 2);
 
                 // Instrucciones - Fila 1
-                $sheet->setCellValue('A1', '📋 PLANTILLA DE IMPORTACIÓN - USUARIOS APP (DOCENTES)');
+                $sheet->setCellValue('A1', ' PLANTILLA DE IMPORTACIÓN - USUARIOS APP (DOCENTES)');
                 $sheet->mergeCells('A1:J1');
                 $sheet->getStyle('A1')->applyFromArray([
                     'font' => [
@@ -151,7 +151,7 @@ class UsuariosAppTemplateExport implements
                 ]);
 
                 // Notas - Fila 2
-                $sheet->setCellValue('A2', '⚠️ IMPORTANTE: Campos obligatorios: codigo_modular (único), dni (único), apellido_paterno, nombres, password, codigo_modular_ie (debe existir), cargo. Las fechas de vigencia se gestionan automáticamente.');
+                $sheet->setCellValue('A2', '️ IMPORTANTE: Campos obligatorios: codigo_modular (único), dni (único), apellido_paterno, nombres, password, codigo_modular_ie (debe existir), cargo. Las fechas de vigencia se gestionan automáticamente.');
                 $sheet->mergeCells('A2:J2');
                 $sheet->getStyle('A2')->applyFromArray([
                     'font' => [

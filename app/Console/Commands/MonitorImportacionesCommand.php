@@ -20,20 +20,20 @@ class MonitorImportacionesCommand extends Command
         $estado = $this->option('estado');
         $watch = $this->option('watch');
 
-        // ✅ NUEVO: Validar tipo
+        //  NUEVO: Validar tipo
         if ($tipo && !in_array($tipo, ImportacionLog::getTiposDisponibles())) {
             $this->error('Tipo inválido. Tipos permitidos: ' . implode(', ', ImportacionLog::getTiposDisponibles()));
             return 1;
         }
 
-        // ✅ NUEVO: Validar estado
+        //  NUEVO: Validar estado
         if ($estado && !in_array($estado, ImportacionLog::getEstadosDisponibles())) {
             $this->error('Estado inválido. Estados permitidos: ' . implode(', ', ImportacionLog::getEstadosDisponibles()));
             return 1;
         }
 
         if ($watch) {
-            $this->info('🔄 Modo watch activado. Presiona Ctrl+C para salir.');
+            $this->info(' Modo watch activado. Presiona Ctrl+C para salir.');
             $this->newLine();
             
             while (true) {
@@ -70,7 +70,7 @@ class MonitorImportacionesCommand extends Command
         $this->info('               MONITOR DE IMPORTACIONES');
         $this->info('═══════════════════════════════════════════════════════════════');
         
-        // ✅ NUEVO: Mostrar filtros activos
+        //  NUEVO: Mostrar filtros activos
         if ($tipo || $estado) {
             $filtros = [];
             if ($tipo) $filtros[] = "Tipo: {$tipo}";
@@ -89,8 +89,8 @@ class MonitorImportacionesCommand extends Command
             ['Estado', 'Cantidad'],
             [
                 ['⏳ En Progreso', $enProgreso],
-                ['✅ Completadas', $completadas],
-                ['❌ Fallidas', $fallidas],
+                [' Completadas', $completadas],
+                [' Fallidas', $fallidas],
             ]
         );
 
@@ -117,12 +117,12 @@ class MonitorImportacionesCommand extends Command
 
             $rows[] = [
                 $importacion->id,
-                $importacion->tipo_formateado,  // ✅ Usar accessor
+                $importacion->tipo_formateado,  //  Usar accessor
                 $estadoColor,
                 $progreso,
                 $importacion->exitosos,
                 $importacion->errores_count,
-                $importacion->duracion_formateada ?? 'N/A',  // ✅ Usar accessor
+                $importacion->duracion_formateada ?? 'N/A',  //  Usar accessor
                 $importacion->iniciado_en?->diffForHumans() ?? 'Pendiente',
             ];
         }
@@ -134,7 +134,7 @@ class MonitorImportacionesCommand extends Command
         
         if ($enProcesoDetalle->isNotEmpty()) {
             $this->newLine();
-            $this->info('📊 Detalles de importaciones en progreso:');
+            $this->info(' Detalles de importaciones en progreso:');
             $this->newLine();
 
             foreach ($enProcesoDetalle as $imp) {
@@ -147,22 +147,22 @@ class MonitorImportacionesCommand extends Command
                     $imp->procesados,
                     $imp->total,
                     $imp->duracion_formateada ?? 'calculando...',
-                    $imp->tasa_exito  // ✅ Usar accessor
+                    $imp->tasa_exito  //  Usar accessor
                 ));
             }
         }
 
         $this->newLine();
-        $this->info('🕐 Actualizado: ' . now()->format('Y-m-d H:i:s'));
+        $this->info(' Actualizado: ' . now()->format('Y-m-d H:i:s'));
     }
 
     protected function getEstadoColor(string $estado): string
     {
         return match($estado) {
             ImportacionLog::ESTADO_PENDING => '<fg=blue>⏳ Pendiente</>',
-            ImportacionLog::ESTADO_PROCESSING => '<fg=yellow>⚙️  Procesando</>',
-            ImportacionLog::ESTADO_COMPLETED => '<fg=green>✅ Completado</>',
-            ImportacionLog::ESTADO_FAILED => '<fg=red>❌ Fallido</>',
+            ImportacionLog::ESTADO_PROCESSING => '<fg=yellow>️  Procesando</>',
+            ImportacionLog::ESTADO_COMPLETED => '<fg=green> Completado</>',
+            ImportacionLog::ESTADO_FAILED => '<fg=red> Fallido</>',
             default => $estado,
         };
     }

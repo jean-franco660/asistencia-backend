@@ -27,7 +27,7 @@ class SupervisorDashboardController extends Controller
                 'instituciones' => [],
                 'resumen' => [
                     'total_instituciones' => 0,
-                    'total_usuarios_app' => 0,  // ✅ snake_case
+                    'total_usuarios_app' => 0,  //  snake_case
                     'asistencias_hoy' => 0,
                     'ausencias_hoy' => 0,
                     'justificaciones_pendientes' => 0,
@@ -36,11 +36,11 @@ class SupervisorDashboardController extends Controller
         }
 
         /* ============================================================
-           📌 ESTADÍSTICAS AGREGADAS
+            ESTADÍSTICAS AGREGADAS
         ============================================================ */
 
         // Total de usuarios app en todas las instituciones del supervisor
-        $totalUsuariosApp = \App\Models\UsuarioApp::whereHas(  // ✅ camelCase
+        $totalUsuariosApp = \App\Models\UsuarioApp::whereHas(  //  camelCase
             'instituciones',
             fn($q) => $q->whereIn('instituciones.id', $institucionesIds)
         )->count();
@@ -56,7 +56,7 @@ class SupervisorDashboardController extends Controller
             ->get()
             ->groupBy('usuario_app_id');
 
-        $usuariosAppPresentes = 0;  // ✅ camelCase
+        $usuariosAppPresentes = 0;  //  camelCase
         foreach ($registrosHoy as $userId => $registros) {
             $registro = $registros->first();
             if ($registro && in_array($registro->estado_diario, ['PRESENTE', 'TARDANZA'])) {
@@ -72,11 +72,11 @@ class SupervisorDashboardController extends Controller
             ->count();
 
         /* ============================================================
-           📌 DESGLOSE POR INSTITUCIÓN
+            DESGLOSE POR INSTITUCIÓN
         ============================================================ */
 
         $institucionesData = $instituciones->map(function ($institucion) use ($today) {
-            $usuariosAppCount = $institucion->usuariosApp()->count();  // ✅ camelCase
+            $usuariosAppCount = $institucion->usuariosApp()->count();  //  camelCase
 
             $asistenciasHoyInst = Asistencia::where('institucion_id', $institucion->id)
                 ->whereDate('fecha', $today)
@@ -86,20 +86,20 @@ class SupervisorDashboardController extends Controller
                 'id' => $institucion->id,
                 'nombre' => $institucion->nombre,
                 'codigo_modular' => $institucion->codigo_modular_ie,
-                'usuarios_app' => $usuariosAppCount,  // ✅ snake_case para JSON
+                'usuarios_app' => $usuariosAppCount,  //  snake_case para JSON
                 'asistencias_hoy' => $asistenciasHoyInst,
             ];
         });
 
         /* ============================================================
-           📌 RESPUESTA FINAL
+            RESPUESTA FINAL
         ============================================================ */
 
         return response()->json([
             'instituciones' => $institucionesData,
             'resumen' => [
                 'total_instituciones' => $instituciones->count(),
-                'total_usuarios_app' => $totalUsuariosApp,  // ✅ snake_case
+                'total_usuarios_app' => $totalUsuariosApp,  //  snake_case
                 'asistencias_hoy' => $usuariosAppPresentes,
                 'ausencias_hoy' => $ausenciasHoy,
                 'justificaciones_pendientes' => $justificacionesPendientes,

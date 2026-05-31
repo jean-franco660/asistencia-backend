@@ -23,13 +23,13 @@ class CleanupBadInstituciones extends Command
         $this->info('═══════════════════════════════════════════════════════════════');
         $this->newLine();
 
-        // ✅ Estado actual
+        //  Estado actual
         $total = Institucion::count();
         $numericNames = Institucion::whereRaw("nombre REGEXP '^[0-9]+$'")->count();
         $emptyNames = Institucion::whereNull('nombre')->orWhere('nombre', '')->count();
         $invalidCodes = Institucion::whereRaw("LENGTH(codigo_modular_ie) < 6")->count();
 
-        $this->info('📊 Current database state:');
+        $this->info(' Current database state:');
         $this->table(
             ['Metric', 'Count'],
             [
@@ -41,16 +41,16 @@ class CleanupBadInstituciones extends Command
         );
         $this->newLine();
 
-        // ✅ Determinar qué eliminar
+        //  Determinar qué eliminar
         $toDelete = $this->option('all') ? $total : ($numericNames + $emptyNames);
         
         if ($toDelete === 0 && !$this->option('all')) {
-            $this->info('✅ No bad institutions found. Database is clean!');
+            $this->info(' No bad institutions found. Database is clean!');
             return 0;
         }
 
-        // ✅ Mostrar ejemplos
-        $this->info('📋 Examples of institutions to be deleted:');
+        //  Mostrar ejemplos
+        $this->info(' Examples of institutions to be deleted:');
         
         $examples = $this->option('all')
             ? Institucion::take(10)->get(['id', 'codigo_modular_ie', 'nombre', 'distrito'])
@@ -75,29 +75,29 @@ class CleanupBadInstituciones extends Command
         }
         $this->newLine();
 
-        // ✅ Determinar tipo de eliminación
+        //  Determinar tipo de eliminación
         $deleteType = $this->option('all') 
             ? 'ALL institutions' 
             : 'institutions with bad data (numeric/empty names)';
 
-        // ✅ Dry run
+        //  Dry run
         if ($this->option('dry-run')) {
-            $this->warn("🔍 DRY RUN: Would delete {$toDelete} {$deleteType}");
+            $this->warn(" DRY RUN: Would delete {$toDelete} {$deleteType}");
             $this->line('   No data was actually deleted.');
             $this->newLine();
-            $this->line('💡 To execute the cleanup, run without --dry-run flag.');
+            $this->line(' To execute the cleanup, run without --dry-run flag.');
             return 0;
         }
 
-        // ✅ Confirmación
-        if (!$this->confirm("⚠️  Are you sure you want to delete {$toDelete} {$deleteType}?", false)) {
-            $this->info('✅ Cleanup cancelled. No data was deleted.');
+        //  Confirmación
+        if (!$this->confirm("️  Are you sure you want to delete {$toDelete} {$deleteType}?", false)) {
+            $this->info(' Cleanup cancelled. No data was deleted.');
             return 0;
         }
 
-        // ✅ Realizar eliminación
+        //  Realizar eliminación
         $this->newLine();
-        $this->info('🧹 Deleting institutions...');
+        $this->info(' Deleting institutions...');
 
         DB::beginTransaction();
         
@@ -113,32 +113,32 @@ class CleanupBadInstituciones extends Command
             DB::commit();
 
             $this->newLine();
-            $this->info("✅ Successfully deleted {$deleted} institutions");
+            $this->info(" Successfully deleted {$deleted} institutions");
 
-            // ✅ Mostrar instituciones restantes
+            //  Mostrar instituciones restantes
             $remaining = Institucion::count();
             $this->line("   Remaining institutions: {$remaining}");
 
-            // ✅ Preguntar por import logs
+            //  Preguntar por import logs
             $deleteLogsDefault = !$this->option('keep-logs');
             
-            if ($this->confirm('🗑️  Do you also want to delete related import logs?', $deleteLogsDefault)) {
+            if ($this->confirm('️  Do you also want to delete related import logs?', $deleteLogsDefault)) {
                 $logsDeleted = ImportacionLog::where('tipo', ImportacionLog::TIPO_INSTITUCIONES)
                     ->where('estado', ImportacionLog::ESTADO_COMPLETED)
                     ->delete();
                     
-                $this->info("✅ Deleted {$logsDeleted} import logs");
+                $this->info(" Deleted {$logsDeleted} import logs");
             } else {
                 $this->line('   Import logs preserved.');
             }
 
-            // ✅ Resumen final
+            //  Resumen final
             $this->newLine();
             $this->info('═══════════════════════════════════════════════════════════════');
-            $this->info('✅ Cleanup completed successfully!');
+            $this->info(' Cleanup completed successfully!');
             $this->info('═══════════════════════════════════════════════════════════════');
             $this->newLine();
-            $this->line('💡 Next steps:');
+            $this->line(' Next steps:');
             $this->line('   1. Review your Excel template');
             $this->line('   2. Ensure column mapping is correct');
             $this->line('   3. Re-import institutions: php artisan instituciones:import');
@@ -149,7 +149,7 @@ class CleanupBadInstituciones extends Command
             DB::rollBack();
             
             $this->newLine();
-            $this->error('❌ Error during cleanup: ' . $e->getMessage());
+            $this->error(' Error during cleanup: ' . $e->getMessage());
             $this->error('   No data was deleted due to the error.');
             
             if ($this->option('verbose')) {

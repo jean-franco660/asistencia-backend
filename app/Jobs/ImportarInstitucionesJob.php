@@ -40,7 +40,7 @@ class ImportarInstitucionesJob implements ShouldQueue
         $importLog = ImportacionLog::findOrFail($this->importLogId);
 
         try {
-            Log::info('🚀 Iniciando ImportarInstitucionesJob', [
+            Log::info(' Iniciando ImportarInstitucionesJob', [
                 'import_log_id' => $importLog->id,
                 'archivo' => $this->archivoPath,
             ]);
@@ -77,7 +77,7 @@ class ImportarInstitucionesJob implements ShouldQueue
                 }
             }
 
-            // ✅ Normalizar TOTAL final (evita "de 0")
+            //  Normalizar TOTAL final (evita "de 0")
             $importLog->refresh();
 
             $exitosos = (int) ($importLog->exitosos ?? 0);
@@ -95,7 +95,7 @@ class ImportarInstitucionesJob implements ShouldQueue
 
             $importLog->marcarComoCompletada();
 
-            Log::info('✅ ImportarInstitucionesJob completado', [
+            Log::info(' ImportarInstitucionesJob completado', [
                 'import_log_id' => $importLog->id,
                 'resumen' => $importLog->resumen,
             ]);
@@ -103,7 +103,7 @@ class ImportarInstitucionesJob implements ShouldQueue
             Storage::delete($this->archivoPath);
 
         } catch (Exception $e) {
-            Log::error('❌ Error en ImportarInstitucionesJob', [
+            Log::error(' Error en ImportarInstitucionesJob', [
                 'import_log_id' => $importLog->id,
                 'error' => $e->getMessage(),
             ]);
@@ -115,7 +115,7 @@ class ImportarInstitucionesJob implements ShouldQueue
 
     public function failed(Exception $exception): void
     {
-        Log::error('💥 ImportarInstitucionesJob falló definitivamente', [
+        Log::error(' ImportarInstitucionesJob falló definitivamente', [
             'import_log_id' => $this->importLogId,
             'error' => $exception->getMessage(),
         ]);

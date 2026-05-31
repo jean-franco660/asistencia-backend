@@ -58,11 +58,11 @@ class ScheduleController extends Controller
 
         $user = $request->user();
         $institucionId = $validated['institucion_id'];
-        $nuevosHorarios = array_unique($validated['horario_ids']); // ✅ Eliminar duplicados
+        $nuevosHorarios = array_unique($validated['horario_ids']); //  Eliminar duplicados
 
         DB::beginTransaction();
         try {
-            // ✅ Verificar si el usuario ya cambió sus horarios este mes
+            //  Verificar si el usuario ya cambió sus horarios este mes
             $primerDiaMes = now()->startOfMonth();
             $ultimoCambioEsteMes = HorarioCambioLog::where('usuario_app_id', $user->id)
                 ->where('institucion_id', $institucionId)

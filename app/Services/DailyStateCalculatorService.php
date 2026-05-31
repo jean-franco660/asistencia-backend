@@ -32,7 +32,7 @@ class DailyStateCalculatorService
         $salidas_validas = $this->getValidMarkings($asistencia, AsistenciaDiaria::TIPO_SALIDA);
 
         // 2. Si falta ENTRADA o SALIDA → FALTA
-        // ✅ CORRECCIÓN 5: Guardar horas parciales para trazabilidad
+        //  CORRECCIÓN 5: Guardar horas parciales para trazabilidad
         if ($entradas_validas->isEmpty() || $salidas_validas->isEmpty()) {
             return [
                 'estado_diario' => 'FALTA',
@@ -72,7 +72,7 @@ class DailyStateCalculatorService
         $limite_entrada = Carbon::parse($horario->hora_entrada)
             ->addMinutes($horario->tolerancia_entrada_minutos);
 
-        // ✅ CORRECCIÓN 2: Orden correcto de diffInMinutes
+        //  CORRECCIÓN 2: Orden correcto de diffInMinutes
         $minutos_tarde = $primera_entrada->marcada_en->gt($limite_entrada)
             ? $limite_entrada->diffInMinutes($primera_entrada->marcada_en)
             : 0;

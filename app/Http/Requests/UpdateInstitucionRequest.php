@@ -8,7 +8,7 @@ class UpdateInstitucionRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        // ✅ Super admin y administrador pueden editar cualquier institución
+        //  Super admin y administrador pueden editar cualquier institución
         if (in_array($this->user()->rol, ['super_admin', 'administrador'])) {
             return true;
         }

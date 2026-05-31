@@ -16,7 +16,7 @@ class HorarioInstitucionObserver
      */
     public function created(HorarioInstitucion $horarioInstitucion): void
     {
-        \Log::info('🕐 Horario creado - Auto-asignando a usuarios', [
+        \Log::info(' Horario creado - Auto-asignando a usuarios', [
             'horario_id' => $horarioInstitucion->id,
             'institucion_id' => $horarioInstitucion->institucion_id,
             'turno' => $horarioInstitucion->nombre_turno,
@@ -66,7 +66,7 @@ class HorarioInstitucionObserver
             }
         }
 
-            \Log::info('✅ Horario auto-asignado a usuarios (Multi-Turno)', [
+            \Log::info(' Horario auto-asignado a usuarios (Multi-Turno)', [
                 'horario_id' => $horarioInstitucion->id,
                 'usuarios_actualizados' => $count,
             ]);

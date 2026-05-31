@@ -9,7 +9,7 @@ class StoreUsuarioWebRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        // ✅ Permitir super_admin y admin
+        //  Permitir super_admin y admin
         return in_array($this->user()->rol, ['super_admin', 'administrador']);
     }
 

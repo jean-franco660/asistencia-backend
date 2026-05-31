@@ -44,7 +44,7 @@ class InstitucionController extends Controller
             ]);
         }
 
-        // ⭐ NUEVO: Ordenamiento dinámico
+        // Ordenamiento dinámico
         $sortBy = $request->input('sort_by', 'id');  // Por defecto: id (orden de importación)
         $sortOrder = $request->input('sort_order', 'asc');  // asc o desc
 
@@ -73,6 +73,9 @@ class InstitucionController extends Controller
             'codigo_modular_ie' => 'required|string|unique:instituciones,codigo_modular_ie',
             'nombre' => 'required|string|max:255',
             'nivel_educativo' => 'nullable|string|max:100',
+            'tipo_gestion' => 'nullable|string|max:100',
+            'departamento' => 'nullable|string|max:100',
+            'provincia' => 'nullable|string|max:100',
             'distrito' => 'nullable|string|max:100',
             'centro_poblado' => 'nullable|string|max:100',
             'direccion' => 'nullable|string|max:500',
@@ -115,6 +118,9 @@ class InstitucionController extends Controller
             'codigo_modular_ie' => 'sometimes|string|unique:instituciones,codigo_modular_ie,' . $id,
             'nombre' => 'sometimes|string|max:255',
             'nivel_educativo' => 'nullable|string|max:100',
+            'tipo_gestion' => 'nullable|string|max:100',
+            'departamento' => 'nullable|string|max:100',
+            'provincia' => 'nullable|string|max:100',
             'distrito' => 'nullable|string|max:100',
             'centro_poblado' => 'nullable|string|max:100',
             'direccion' => 'nullable|string|max:500',
@@ -157,20 +163,20 @@ class InstitucionController extends Controller
      */
     public function destroy($id)
     {
-        Log::info("🗑️ DELETE - Intento de eliminar institución ID: {$id}");
-        Log::info("🗑️ DELETE - Método HTTP: " . request()->method());
-        Log::info("🗑️ DELETE - Request completo: " . json_encode(request()->all()));
-        Log::info("🗑️ DELETE - Headers: " . json_encode(request()->headers->all()));
+        Log::info("DELETE - Intento de eliminar institución ID: {$id}");
+        Log::info("DELETE - Método HTTP: " . request()->method());
+        Log::info("DELETE - Request completo: " . json_encode(request()->all()));
+        Log::info("DELETE - Headers: " . json_encode(request()->headers->all()));
 
         try {
             $institucion = Institucion::findOrFail($id);
-            Log::info("✅ DELETE - Institución encontrada: {$institucion->nombre} (ID: {$institucion->id})");
+            Log::info("DELETE - Institución encontrada: {$institucion->nombre} (ID: {$institucion->id})");
 
             // Verificar si tiene relaciones que impidan eliminarla
             $tieneUsuarios = $institucion->usuarios()->count();
             $tieneHorarios = $institucion->horarios()->count();
 
-            Log::info("📊 DELETE - Relaciones: {$tieneUsuarios} usuarios, {$tieneHorarios} horarios");
+            Log::info("DELETE - Relaciones: {$tieneUsuarios} usuarios, {$tieneHorarios} horarios");
 
             // Opción: Permitir eliminación forzada desvinculando relaciones
             // Descomenta estas líneas si quieres permitir eliminar instituciones con relaciones
@@ -179,8 +185,8 @@ class InstitucionController extends Controller
 
             $deleted = $institucion->delete();
 
-            Log::info("✅ DELETE - Resultado delete(): " . ($deleted ? 'TRUE' : 'FALSE'));
-            Log::info("✅ DELETE - Institución eliminada exitosamente de la DB");
+            Log::info("DELETE - Resultado delete(): " . ($deleted ? 'TRUE' : 'FALSE'));
+            Log::info("DELETE - Institución eliminada exitosamente de la DB");
 
             return response()->json([
                 'success' => true,
@@ -188,18 +194,19 @@ class InstitucionController extends Controller
             ], 200);
 
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
-            Log::error("❌ DELETE - Institución no encontrada con ID: {$id}");
+            Log::error("DELETE - Institución no encontrada con ID: {$id}");
             return response()->json([
                 'success' => false,
                 'message' => 'Institución no encontrada',
             ], 404);
 
         } catch (\Illuminate\Database\QueryException $e) {
-            Log::error("❌ DELETE - Error de base de datos: " . $e->getMessage());
-            Log::error("❌ DELETE - SQL Error Code: " . $e->getCode());
+            Log::error("DELETE - Error de base de datos: " . $e->getMessage());
+            Log::error("DELETE - SQL Error Code: " . $e->getCode());
 
             // Error de restricción de llave foránea
             if ($e->getCode() == '23000') {
+                Log::error(" DELETE - Error de restricción de llave foránea");
                 return response()->json([
                     'success' => false,
                     'message' => 'No se puede eliminar la institución porque tiene registros relacionados (usuarios, horarios, asistencias, etc.)',
@@ -214,8 +221,8 @@ class InstitucionController extends Controller
             ], 500);
 
         } catch (\Exception $e) {
-            Log::error("❌ DELETE - Error general: " . $e->getMessage());
-            Log::error("❌ DELETE - Trace: " . $e->getTraceAsString());
+            Log::error("DELETE - Error general: " . $e->getMessage());
+            Log::error("DELETE - Trace: " . $e->getTraceAsString());
 
             return response()->json([
                 'success' => false,
@@ -229,8 +236,8 @@ class InstitucionController extends Controller
      */
     public function destroyMultiple(Request $request)
     {
-        Log::info("🗑️ DELETE MULTIPLE - Intento de eliminar múltiples instituciones");
-        Log::info("🗑️ DELETE MULTIPLE - IDs recibidos: " . json_encode($request->ids));
+        Log::info("DELETE MULTIPLE - Intento de eliminar múltiples instituciones");
+        Log::info("DELETE MULTIPLE - IDs recibidos: " . json_encode($request->ids));
 
         $validated = $request->validate([
             'ids' => 'required|array',
@@ -240,7 +247,7 @@ class InstitucionController extends Controller
         try {
             $count = Institucion::whereIn('id', $validated['ids'])->delete();
 
-            Log::info("✅ DELETE MULTIPLE - Eliminadas {$count} instituciones");
+            Log::info("DELETE MULTIPLE - Eliminadas {$count} instituciones");
 
             return response()->json([
                 'success' => true,
@@ -249,7 +256,7 @@ class InstitucionController extends Controller
             ], 200);
 
         } catch (\Exception $e) {
-            Log::error("❌ DELETE MULTIPLE - Error: " . $e->getMessage());
+            Log::error("DELETE MULTIPLE - Error: " . $e->getMessage());
 
             return response()->json([
                 'success' => false,
@@ -278,7 +285,7 @@ class InstitucionController extends Controller
         if ($request->filled('q') || $request->filled('search')) {
             $searchTerm = $request->input('q') ?? $request->input('search');
 
-            Log::debug('🔍 Búsqueda de instituciones', [
+            Log::debug('Búsqueda de instituciones', [
                 'search_term' => $searchTerm,
                 'user_id' => $user->id,
                 'user_rol' => $user->rol,
@@ -301,7 +308,7 @@ class InstitucionController extends Controller
             $instituciones = $query->get();
         }
 
-        Log::debug('🔍 Resultados de búsqueda', [
+        Log::debug('Resultados de búsqueda', [
             'count' => $instituciones->count(),
             'search_term' => $request->input('search') ?? $request->input('q'),
         ]);

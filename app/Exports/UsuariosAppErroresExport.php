@@ -33,7 +33,7 @@ class UsuariosAppErroresExport implements
 
         // ⭐ Fila de instrucciones
         $rows[] = [
-            '📋 INSTRUCCIONES',
+            ' INSTRUCCIONES',
             'Corrija los errores indicados y vuelva a importar este archivo.',
             '',
             '',

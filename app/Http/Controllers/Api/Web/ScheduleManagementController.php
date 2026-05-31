@@ -40,7 +40,7 @@ class ScheduleManagementController extends Controller
             ])
             ->groupBy('u.id', 'u.nombres', 'u.apellido_paterno', 'u.apellido_materno', 'i.id', 'i.nombre', 'i.codigo_modular_ie');
 
-        // ✅ SEGURIDAD:: Filtro Obligatorio para Supervisores
+        //  SEGURIDAD:: Filtro Obligatorio para Supervisores
         if ($user->esSupervisor()) {
             $institucionesIds = $user->institucionesVigentes()->pluck('id');
             if ($institucionesIds->isEmpty()) {
@@ -49,7 +49,7 @@ class ScheduleManagementController extends Controller
             $query->whereIn('uai.institucion_id', $institucionesIds);
         }
 
-        // ✅ FILTROS DE TEXTO (Frontend envía 'usuario' y 'institucion')
+        //  FILTROS DE TEXTO (Frontend envía 'usuario' y 'institucion')
         if ($request->filled('institucion')) {
             $term = $request->institucion;
             $query->where(function ($q) use ($term) {
@@ -93,7 +93,7 @@ class ScheduleManagementController extends Controller
         $cambios = HorarioCambioLog::with(['usuario', 'institucion', 'admin'])
             ->orderBy('created_at', 'desc');
 
-        // ✅ SECURITY: Supervisors only see their institutions
+        //  SECURITY: Supervisors only see their institutions
         if ($user->esSupervisor()) {
             $institucionesIds = $user->institucionesVigentes()->pluck('id');
             if ($institucionesIds->isEmpty()) {

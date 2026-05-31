@@ -12,7 +12,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        // ✅ Usa el HandleCors de Laravel
+        //  Usa el HandleCors de Laravel
         $middleware->prepend(\Illuminate\Http\Middleware\HandleCors::class);
 
         $middleware->redirectGuestsTo(fn () => null);

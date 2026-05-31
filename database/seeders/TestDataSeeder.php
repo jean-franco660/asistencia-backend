@@ -184,7 +184,7 @@ class TestDataSeeder extends Seeder
 
         // Docentes 4 y 5 no tienen marcaciones (aparecerán como FALTA después del job)
 
-        $this->command->info('✅ Datos de prueba creados con DB directo:');
+        $this->command->info(' Datos de prueba creados con DB directo:');
         $this->command->info('   - 1 Institución: IE001');
         $this->command->info('   - 1 Horario: MAÑANA (L-V)');
         $this->command->info('   - 5 Docentes creados');

@@ -36,7 +36,7 @@ class UsuarioAppController extends Controller
             ], 401);
         }
 
-        // ✅ Validación 1: Verificar acceso habilitado
+        //  Validación 1: Verificar acceso habilitado
         if (!$usuario->tieneAccesoHabilitado()) {
             return response()->json([
                 'success' => false,
@@ -44,7 +44,7 @@ class UsuarioAppController extends Controller
             ], 403);
         }
 
-        // ✅ Validación 2: Verificar que tenga asignaciones activas
+        //  Validación 2: Verificar que tenga asignaciones activas
         $asignacionesActivas = $usuario->asignacionesActivas()->with(['institucion', 'horario'])->get();
 
         if ($asignacionesActivas->isEmpty()) {
@@ -54,7 +54,7 @@ class UsuarioAppController extends Controller
             ], 403);
         }
 
-        // ✅ Validación 3: Verificar que al menos una asignación tenga horario
+        //  Validación 3: Verificar que al menos una asignación tenga horario
         $asignaciones = $asignacionesActivas->filter(fn($a) => $a->horario !== null);
 
         if ($asignaciones->isEmpty()) {
@@ -127,7 +127,7 @@ class UsuarioAppController extends Controller
                     ->where('estado', UsuarioAppInstitucion::ESTADO_ACTIVO);
             });
 
-            // ✅ NUEVO: Excluir al supervisor logueado si también es usuario app
+            //  NUEVO: Excluir al supervisor logueado si también es usuario app
             // Esto evita que el supervisor se vea a sí mismo en la lista de docentes
             if ($user->usuario_app_id) {
                 $query->where('id', '!=', $user->usuario_app_id);
@@ -155,7 +155,7 @@ class UsuarioAppController extends Controller
             $query->porSexo($request->sexo);
         }
 
-        // ✅ Nuevo filtro por estado de asignación (ACTIVO, INACTIVO, PENDIENTE)
+        //  Nuevo filtro por estado de asignación (ACTIVO, INACTIVO, PENDIENTE)
         if ($request->filled('estado')) {
             $query->whereHas('asignaciones', function ($q) use ($request) {
                 $q->where('estado', mb_strtoupper($request->estado));
@@ -230,7 +230,7 @@ class UsuarioAppController extends Controller
 
     /**
      * Crea un nuevo usuario de la app
-     * ✅ CON ASIGNACIÓN AUTOMÁTICA DE HORARIO
+     *  CON ASIGNACIÓN AUTOMÁTICA DE HORARIO
      */
     public function store(StoreUsuarioAppRequest $request): JsonResponse
     {
@@ -245,7 +245,7 @@ class UsuarioAppController extends Controller
             // Crear asignaciones
             if ($request->filled('asignaciones')) {
                 foreach ($request->asignaciones as $asig) {
-                    // ✅ NUEVO: Si no se especifica horario, buscar uno automáticamente
+                    //  NUEVO: Si no se especifica horario, buscar uno automáticamente
                     $horarioId = $asig['horario_institucion_id'] ?? null;
 
                     if (!$horarioId) {
@@ -262,7 +262,7 @@ class UsuarioAppController extends Controller
                     UsuarioAppInstitucion::create([
                         'usuario_app_id' => $usuario->id,
                         'institucion_id' => $asig['institucion_id'],
-                        'horario_institucion_id' => $horarioId, // ✅ Asignado automáticamente
+                        'horario_institucion_id' => $horarioId, //  Asignado automáticamente
                         'cargo' => $asig['cargo'] ?? null,
                         'estado' => $asig['estado'] ?? UsuarioAppInstitucion::ESTADO_ACTIVO,
                         'fecha_inicio' => $asig['fecha_inicio'] ?? now(),
@@ -352,7 +352,7 @@ class UsuarioAppController extends Controller
      */
     public function update(UpdateUsuarioAppRequest $request, $id): JsonResponse
     {
-        \Log::info("🔄 [UsuarioApp] Iniciando actualización de usuario ID: {$id}", ['request' => $request->all()]);
+        \Log::info(" [UsuarioApp] Iniciando actualización de usuario ID: {$id}", ['request' => $request->all()]);
 
         $usuario = UsuarioApp::findOrFail($id);
         $this->authorize('update', $usuario);
@@ -368,11 +368,11 @@ class UsuarioAppController extends Controller
             }
 
             $usuario->update($data);
-            \Log::info("✅ [UsuarioApp] Datos básicos actualizados usuario ID: {$id}");
+            \Log::info(" [UsuarioApp] Datos básicos actualizados usuario ID: {$id}");
 
             // Actualizar asignaciones si se envían
             if ($request->has('asignaciones')) {
-                \Log::info("🔄 [UsuarioApp] Procesando asignaciones para usuario ID: {$id}", ['asignaciones' => $request->asignaciones]);
+                \Log::info(" [UsuarioApp] Procesando asignaciones para usuario ID: {$id}", ['asignaciones' => $request->asignaciones]);
 
                 // Desactivar asignaciones actuales
                 $usuario->asignaciones()->update([
@@ -383,9 +383,9 @@ class UsuarioAppController extends Controller
 
                 // Crear/actualizar nuevas asignaciones
                 foreach ($request->asignaciones as $index => $asig) {
-                    \Log::info("➡️ [UsuarioApp] Procesando asignación #{$index}", ['datos' => $asig]);
+                    \Log::info("️ [UsuarioApp] Procesando asignación #{$index}", ['datos' => $asig]);
 
-                    // ✅ NUEVO: Si no se especifica horario, buscar uno automáticamente
+                    //  NUEVO: Si no se especifica horario, buscar uno automáticamente
                     $horarioId = $asig['horario_institucion_id'] ?? null;
 
                     if (!$horarioId) {
@@ -399,14 +399,14 @@ class UsuarioAppController extends Controller
                         }
                     }
 
-                    // ✅ Robustez: Buscar asignación existente (incluso eliminada/soft-deleted) para evitar duplicados
+                    //  Robustez: Buscar asignación existente (incluso eliminada/soft-deleted) para evitar duplicados
                     $asignacion = UsuarioAppInstitucion::withTrashed()
                         ->where('usuario_app_id', $usuario->id)
                         ->where('institucion_id', $asig['institucion_id'])
                         ->first();
 
                     if ($asignacion) {
-                        \Log::info("⚠️ [UsuarioApp] Asignación existente encontrada ID: {$asignacion->id} (Trashed: {$asignacion->trashed()})");
+                        \Log::info("️ [UsuarioApp] Asignación existente encontrada ID: {$asignacion->id} (Trashed: {$asignacion->trashed()})");
 
                         // Limpiar duplicados extra si existen (para corregir inconsistencias antiguas)
                         $duplicados = UsuarioAppInstitucion::withTrashed()
@@ -416,7 +416,7 @@ class UsuarioAppController extends Controller
                             ->get(); // Obtener para loggear antes de borrar
 
                         if ($duplicados->count() > 0) {
-                            \Log::warning("🚨 [UsuarioApp] Eliminando {$duplicados->count()} duplicados encontrados", ['ids' => $duplicados->pluck('id')]);
+                            \Log::warning(" [UsuarioApp] Eliminando {$duplicados->count()} duplicados encontrados", ['ids' => $duplicados->pluck('id')]);
 
                             UsuarioAppInstitucion::withTrashed()
                                 ->where('usuario_app_id', $usuario->id)
@@ -427,29 +427,29 @@ class UsuarioAppController extends Controller
 
                         if ($asignacion->trashed()) {
                             $asignacion->restore();
-                            \Log::info("♻️ [UsuarioApp] Asignación restaurada ID: {$asignacion->id}");
+                            \Log::info("️ [UsuarioApp] Asignación restaurada ID: {$asignacion->id}");
                         }
                     } else {
                         $asignacion = new UsuarioAppInstitucion();
                         $asignacion->usuario_app_id = $usuario->id;
                         $asignacion->institucion_id = $asig['institucion_id'];
-                        \Log::info("✨ [UsuarioApp] Creando NUEVA asignación para Institución ID: {$asig['institucion_id']}");
+                        \Log::info(" [UsuarioApp] Creando NUEVA asignación para Institución ID: {$asig['institucion_id']}");
                     }
 
                     $asignacion->fill([
-                        'horario_institucion_id' => $horarioId, // ✅ Asignado automáticamente
+                        'horario_institucion_id' => $horarioId, //  Asignado automáticamente
                         'cargo' => $asig['cargo'] ?? null,
                         'estado' => $asig['estado'] ?? UsuarioAppInstitucion::ESTADO_ACTIVO,
                         'fecha_inicio' => $asig['fecha_inicio'] ?? now(),
                         'fecha_fin' => $asig['fecha_fin'] ?? null,
                     ]);
                     $asignacion->save();
-                    \Log::info("✅ [UsuarioApp] Asignación guardada/actualizada ID: {$asignacion->id}", ['estado' => $asignacion->estado]);
+                    \Log::info(" [UsuarioApp] Asignación guardada/actualizada ID: {$asignacion->id}", ['estado' => $asignacion->estado]);
                 }
             }
 
             DB::commit();
-            \Log::info("🏁 [UsuarioApp] Transacción completada exitosamente para usuario ID: {$id}");
+            \Log::info(" [UsuarioApp] Transacción completada exitosamente para usuario ID: {$id}");
 
             return response()->json([
                 'success' => true,
@@ -459,7 +459,7 @@ class UsuarioAppController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
-            \Log::error("❌ [UsuarioApp] Error en transacción update: " . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
+            \Log::error(" [UsuarioApp] Error en transacción update: " . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
 
             return response()->json([
                 'success' => false,
@@ -621,7 +621,7 @@ class UsuarioAppController extends Controller
     }
 
     /**
-     * ✅ NUEVO: Asigna horarios automáticamente a usuarios que no tienen
+     *  NUEVO: Asigna horarios automáticamente a usuarios que no tienen
      */
     public function asignarHorariosAutomaticamente(Request $request): JsonResponse
     {

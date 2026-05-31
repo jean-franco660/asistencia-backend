@@ -27,7 +27,7 @@ class CorregirEstadosAsignaciones extends Command
      */
     public function handle()
     {
-        $this->info('🔍 Buscando asignaciones sin horario...');
+        $this->info(' Buscando asignaciones sin horario...');
 
         // Buscar asignaciones ACTIVAS sin horario
         $asignaciones = UsuarioAppInstitucion::where('estado', UsuarioAppInstitucion::ESTADO_ACTIVO)
@@ -37,11 +37,11 @@ class CorregirEstadosAsignaciones extends Command
         $total = $asignaciones->count();
 
         if ($total === 0) {
-            $this->info('✅ No se encontraron asignaciones activas sin horario.');
+            $this->info(' No se encontraron asignaciones activas sin horario.');
             return 0;
         }
 
-        $this->warn("⚠️  Se encontraron {$total} asignaciones activas sin horario.");
+        $this->warn("️  Se encontraron {$total} asignaciones activas sin horario.");
 
         if (!$this->confirm('¿Desea cambiar su estado a INACTIVO?', true)) {
             $this->info('Operación cancelada.');
@@ -66,7 +66,7 @@ class CorregirEstadosAsignaciones extends Command
         $bar->finish();
         $this->newLine(2);
 
-        $this->info("✅ Se actualizaron {$actualizados} asignaciones a estado INACTIVO.");
+        $this->info(" Se actualizaron {$actualizados} asignaciones a estado INACTIVO.");
 
         return 0;
     }

@@ -19,9 +19,13 @@ return new class extends Migration {
             // Clasificación
             $table->string('nivel_educativo', 50)->index();
             $table->string('tipo_gestion', 50)->nullable()->index();
+            $table->string('departamento', 100)->nullable();
+            $table->string('provincia', 100)->nullable();
 
             // Ubicación administrativa
             $table->string('distrito', 100)->index();
+            $table->string('centro_poblado', 150)->nullable();
+            $table->string('direccion', 255)->nullable();
 
             // Geolocalización (precisión de 7 decimales ≈ 1.1cm)
             $table->decimal('latitud', 11, 7)->nullable();

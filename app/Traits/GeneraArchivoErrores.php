@@ -40,7 +40,7 @@ trait GeneraArchivoErrores
             // Generar el archivo Excel
             Excel::store($exportClass, $filePath, 'local');
             
-            Log::info("📄 Archivo de errores Excel generado", [
+            Log::info(" Archivo de errores Excel generado", [
                 'import_log_id' => $importLog->id,
                 'tipo' => $importLog->tipo,
                 'path' => $filePath,

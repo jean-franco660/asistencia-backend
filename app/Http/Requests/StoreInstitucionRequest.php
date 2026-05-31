@@ -8,7 +8,7 @@ class StoreInstitucionRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        // ✅ Permitir tanto super_admin como administrador
+        //  Permitir tanto super_admin como administrador
         return in_array($this->user()->rol, ['super_admin', 'administrador']);
     }
 

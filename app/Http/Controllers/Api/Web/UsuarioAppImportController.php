@@ -23,7 +23,7 @@ class UsuarioAppImportController extends Controller
 
 
     /**
-     * ✅ NUEVO: Estadísticas para la vista de importaciones
+     *  NUEVO: Estadísticas para la vista de importaciones
      * GET /api/usuarios-app/import/stats
      */
     public function stats(Request $request)
@@ -143,7 +143,7 @@ class UsuarioAppImportController extends Controller
             $archivoPath = $archivo->store('temp/importaciones');
             $archivoNombre = $archivo->getClientOriginalName();
 
-            // ✅ CORREGIDO: Usar TIPO_USUARIOS_APP (no 'docentes')
+            //  CORREGIDO: Usar TIPO_USUARIOS_APP (no 'docentes')
             $importLog = ImportacionLog::create([
                 'usuario_id' => $user->id,
                 'tipo' => ImportacionLog::TIPO_USUARIOS_APP,
@@ -229,7 +229,7 @@ class UsuarioAppImportController extends Controller
                 'iniciado_en' => $importLog->iniciado_en?->toIso8601String(),
                 'completado_en' => $importLog->completado_en?->toIso8601String(),
                 'duracion' => $importLog->duracion_formateada,
-                // 'errores' => $importLog->errores_detalle ?? [], // 🚫 OPTIMIZACIÓN: No enviar detalles en polling
+                // 'errores' => $importLog->errores_detalle ?? [], //  OPTIMIZACIÓN: No enviar detalles en polling
             ],
         ]);
     }
@@ -249,7 +249,7 @@ class UsuarioAppImportController extends Controller
             ], 404);
         }
 
-        // ✅ CORREGIDO: Usar TIPO_USUARIOS_APP (no 'docentes')
+        //  CORREGIDO: Usar TIPO_USUARIOS_APP (no 'docentes')
         if ($importLog->tipo !== ImportacionLog::TIPO_USUARIOS_APP) {
             return response()->json([
                 'success' => false,

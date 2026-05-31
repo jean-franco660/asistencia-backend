@@ -19,7 +19,7 @@ class UsuarioAppInstitucionObserver
         if ($vinculo->horario_institucion_id) {
             $vinculo->estado = UsuarioAppInstitucion::ESTADO_ACTIVO;
 
-            // ✅ REGLA: Establecer fecha_inicio automáticamente
+            //  REGLA: Establecer fecha_inicio automáticamente
             if (!$vinculo->fecha_inicio) {
                 $vinculo->fecha_inicio = today();
 
@@ -30,7 +30,7 @@ class UsuarioAppInstitucionObserver
                 ]);
             }
         } else {
-            // ✅ Si se crea SIN horario → PENDIENTE (en espera de horario)
+            //  Si se crea SIN horario → PENDIENTE (en espera de horario)
             $vinculo->estado = UsuarioAppInstitucion::ESTADO_PENDIENTE;
 
             Log::info('Asignación creada sin horario - estado PENDIENTE', [
@@ -45,7 +45,7 @@ class UsuarioAppInstitucionObserver
      */
     public function updating(UsuarioAppInstitucion $vinculo): void
     {
-        // ✅ REGLA 1: Asignación de horario → Activación automática
+        //  REGLA 1: Asignación de horario → Activación automática
         if ($vinculo->isDirty('horario_institucion_id') && $vinculo->horario_institucion_id) {
 
             // Cambiar a ACTIVO
@@ -74,7 +74,7 @@ class UsuarioAppInstitucionObserver
             }
         }
 
-        // ✅ REGLA 2: Cambio a INACTIVO (manual) → Inhabilitación automática
+        //  REGLA 2: Cambio a INACTIVO (manual) → Inhabilitación automática
         if (
             $vinculo->isDirty('estado') &&
             $vinculo->estado === UsuarioAppInstitucion::ESTADO_INACTIVO &&
@@ -91,7 +91,7 @@ class UsuarioAppInstitucionObserver
             ]);
         }
 
-        // ✅ REGLA 3: Reactivación manual (cambio de INACTIVO a ACTIVO)
+        //  REGLA 3: Reactivación manual (cambio de INACTIVO a ACTIVO)
         if (
             $vinculo->isDirty('estado') &&
             $vinculo->estado === UsuarioAppInstitucion::ESTADO_ACTIVO &&
@@ -107,7 +107,7 @@ class UsuarioAppInstitucionObserver
             ]);
         }
 
-        // ✅ REGLA 4: Eliminación de horario → Vuelve a PENDIENTE
+        //  REGLA 4: Eliminación de horario → Vuelve a PENDIENTE
         if (
             $vinculo->isDirty('horario_institucion_id') &&
             is_null($vinculo->horario_institucion_id) &&

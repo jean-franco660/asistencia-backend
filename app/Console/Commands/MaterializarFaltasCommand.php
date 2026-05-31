@@ -40,9 +40,9 @@ class MaterializarFaltasCommand extends Command
 
         try {
             $count = $this->service->materializarFaltas($fecha);
-            $this->info("✅ Proceso completado. Se generaron {$count} registros de FALTA.");
+            $this->info(" Proceso completado. Se generaron {$count} registros de FALTA.");
         } catch (\Exception $e) {
-            $this->error("❌ Error: " . $e->getMessage());
+            $this->error(" Error: " . $e->getMessage());
             \Log::error("Error en asistencias:generar-faltas: " . $e->getMessage());
             return 1;
         }

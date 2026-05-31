@@ -55,7 +55,7 @@ class UsuarioWebController extends Controller
         $user->tokens()->delete();
         $token = $user->createToken('web-token', ['web'])->plainTextToken;
 
-        // ✅ CORRECCIÓN
+        //  CORRECCIÓN
         $instituciones = [];
         if ($user->esSupervisor()) {
             $instituciones = $user->institucionesVigentes()
@@ -75,7 +75,7 @@ class UsuarioWebController extends Controller
                 'id' => $user->id,
                 'nombre' => $user->nombre,
                 'email' => $user->email,
-                'codigo' => $user->usuarioApp?->codigo_modular, // ✅ Código modular del usuario app
+                'codigo' => $user->usuarioApp?->codigo_modular, //  Código modular del usuario app
                 'rol' => $user->rol,
                 'estado' => $user->estado,
                 'puede_gestionar_justificaciones' => $user->puedeGestionarJustificaciones(),
@@ -96,7 +96,7 @@ class UsuarioWebController extends Controller
         // Cargar relación con usuario app si existe
         $user->load('usuarioApp');
 
-        // ✅ CORRECCIÓN
+        //  CORRECCIÓN
         $instituciones = [];
         if ($user->esSupervisor()) {
             $instituciones = $user->institucionesVigentes()
@@ -115,7 +115,7 @@ class UsuarioWebController extends Controller
                 'id' => $user->id,
                 'nombre' => $user->nombre,
                 'email' => $user->email,
-                'codigo' => $user->usuarioApp?->codigo_modular, // ✅ Código modular del usuario app
+                'codigo' => $user->usuarioApp?->codigo_modular, //  Código modular del usuario app
                 'rol' => $user->rol,
                 'estado' => $user->estado,
                 'puede_gestionar_justificaciones' => $user->puedeGestionarJustificaciones(),
@@ -202,7 +202,7 @@ class UsuarioWebController extends Controller
      */
     public function store(StoreUsuarioWebRequest $request): JsonResponse
     {
-        // 🔍 DEBUG: Ver qué llega
+        //  DEBUG: Ver qué llega
         \Log::info('=== CREAR ADMINISTRADOR ===');
         \Log::info('Request data:', $request->except(['password', 'password_confirmation']));
 
@@ -256,7 +256,7 @@ class UsuarioWebController extends Controller
 
             DB::commit();
 
-            \Log::info('✅ Transacción completada');
+            \Log::info(' Transacción completada');
 
             return response()->json([
                 'success' => true,
@@ -269,8 +269,8 @@ class UsuarioWebController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
 
-            // ❌ LOG DETALLADO DEL ERROR
-            \Log::error('❌ ERROR AL CREAR USUARIO');
+            //  LOG DETALLADO DEL ERROR
+            \Log::error(' ERROR AL CREAR USUARIO');
             \Log::error('Mensaje: ' . $e->getMessage());
             \Log::error('Archivo: ' . $e->getFile());
             \Log::error('Línea: ' . $e->getLine());

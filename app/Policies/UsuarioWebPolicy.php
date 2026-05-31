@@ -35,7 +35,7 @@ class UsuarioWebPolicy
 
     public function create(UsuarioWeb $user): bool
     {
-        // ✅ SOLUCIÓN: Usar strings directos
+        //  SOLUCIÓN: Usar strings directos
         return in_array($user->rol, ['super_admin', 'administrador']);
     }
 

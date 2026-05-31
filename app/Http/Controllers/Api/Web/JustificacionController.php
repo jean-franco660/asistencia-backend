@@ -27,7 +27,7 @@ class JustificacionController extends Controller
 
     /**
      * LISTAR JUSTIFICACIONES CON PAGINACIÓN
-     * ✅ CORREGIDO: codigo_modular en lugar de codigo_modular_docente
+     *  CORREGIDO: codigo_modular en lugar de codigo_modular_docente
      */
     public function index(Request $request)
     {
@@ -43,7 +43,7 @@ class JustificacionController extends Controller
         $user = $request->user();
 
         $query = Justificacion::with([
-            'usuario:id,codigo_modular,apellido_paterno,apellido_materno,nombres',  // ✅ CORRECTO
+            'usuario:id,codigo_modular,apellido_paterno,apellido_materno,nombres',  //  CORRECTO
             'institucion:id,nombre,codigo_modular_ie',
             'revisor:id,nombre,rol',
         ]);
@@ -91,7 +91,7 @@ class JustificacionController extends Controller
                 'usuario' => $j->usuario ? [
                     'id' => $j->usuario->id,
                     'nombre' => $j->usuario->nombre_completo,
-                    'codigo_modular' => $j->usuario->codigo_modular,  // ✅ CORRECTO
+                    'codigo_modular' => $j->usuario->codigo_modular,  //  CORRECTO
                 ] : null,
                 'institucion' => $j->institucion ? [
                     'id' => $j->institucion->id,
@@ -134,9 +134,9 @@ class JustificacionController extends Controller
         // Validación
         $request->validate([
             'institucion_id' => 'required|exists:instituciones,id',
-            'horario_institucion_id' => 'nullable|exists:horarios_institucion,id', // ✅ Para justificar horario específico
+            'horario_institucion_id' => 'nullable|exists:horarios_institucion,id', //  Para justificar horario específico
             'tipo' => 'required|in:ENFERMEDAD,PERMISO_PERSONAL,LICENCIA,COMISION_SERVICIO,CAPACITACION,DUELO,MATERNIDAD,PATERNIDAD,OLVIDO_MARCACION,OTRO',
-            'fecha_inicio' => 'required|date|before_or_equal:today',  // ✅ No permitir futuro
+            'fecha_inicio' => 'required|date|before_or_equal:today',  //  No permitir futuro
             'fecha_fin' => 'required|date|after_or_equal:fecha_inicio|before_or_equal:today',
             'motivo' => 'required|string|max:1000',
             'asistencia_id' => 'nullable|exists:asistencias,id',
@@ -167,7 +167,7 @@ class JustificacionController extends Controller
             'asistencia_id' => $request->asistencia_id,
             'usuario_app_id' => $user->id,
             'institucion_id' => (int) $request->institucion_id,
-            'horario_institucion_id' => $request->horario_institucion_id, // ✅ NUEVO
+            'horario_institucion_id' => $request->horario_institucion_id, //  NUEVO
             'tipo' => $request->tipo,
             'fecha_inicio' => $request->fecha_inicio,
             'fecha_fin' => $request->fecha_fin,
@@ -183,7 +183,7 @@ class JustificacionController extends Controller
 
     /**
      * APROBAR JUSTIFICACIÓN (solo UsuarioWeb con permisos)
-     * ✅ CORREGIDO: Eliminar auditoría manual duplicada - el Trait ya lo maneja
+     *  CORREGIDO: Eliminar auditoría manual duplicada - el Trait ya lo maneja
      */
     public function aprobar(Request $request, $id)
     {
@@ -209,7 +209,7 @@ class JustificacionController extends Controller
             'observaciones' => 'nullable|string|max:500',
         ]);
 
-        // ✅ SIMPLIFICADO: Solo actualizar, el Trait Auditable registrará automáticamente
+        //  SIMPLIFICADO: Solo actualizar, el Trait Auditable registrará automáticamente
         $justificacion->update([
             'estado' => Justificacion::ESTADO_APROBADO,
             'usuario_web_id' => $user->id,
@@ -242,7 +242,7 @@ class JustificacionController extends Controller
         }
 
         // Log de depuración
-        \Log::info('🔍 [Justificación] Intentando actualizar asistencias', [
+        \Log::info(' [Justificación] Intentando actualizar asistencias', [
             'justificacion_id' => $justificacion->id,
             'usuario_app_id' => $justificacion->usuario_app_id,
             'institucion_id' => $justificacion->institucion_id,
@@ -254,7 +254,7 @@ class JustificacionController extends Controller
         $queryVerificar = Asistencia::where('usuario_app_id', $justificacion->usuario_app_id)
             ->where('institucion_id', $justificacion->institucion_id);
 
-        // ✅ FILTRAR POR HORARIO si está presente
+        //  FILTRAR POR HORARIO si está presente
         if ($justificacion->horario_institucion_id) {
             $queryVerificar->where('horario_institucion_id', $justificacion->horario_institucion_id);
         }
@@ -265,7 +265,7 @@ class JustificacionController extends Controller
         ])
             ->get();
 
-        \Log::info('🔍 [Justificación] Asistencias encontradas: ' . $asistenciasEncontradas->count(), [
+        \Log::info(' [Justificación] Asistencias encontradas: ' . $asistenciasEncontradas->count(), [
             'asistencias' => $asistenciasEncontradas->pluck('id', 'fecha')->toArray()
         ]);
 
@@ -273,14 +273,14 @@ class JustificacionController extends Controller
         $queryActualizar = Asistencia::where('usuario_app_id', $justificacion->usuario_app_id)
             ->where('institucion_id', $justificacion->institucion_id); // Misma institución
 
-        // ✅ FILTRAR POR HORARIO si está presente en la justificación
+        //  FILTRAR POR HORARIO si está presente en la justificación
         if ($justificacion->horario_institucion_id) {
             $queryActualizar->where('horario_institucion_id', $justificacion->horario_institucion_id);
-            \Log::info('✅ [Justificación] Filtrando por horario específico', [
+            \Log::info(' [Justificación] Filtrando por horario específico', [
                 'horario_id' => $justificacion->horario_institucion_id
             ]);
         } else {
-            \Log::info('⚠️ [Justificación] SIN filtro de horario - actualizará TODOS los horarios de la institución');
+            \Log::info('️ [Justificación] SIN filtro de horario - actualizará TODOS los horarios de la institución');
         }
 
         $actualizadas = $queryActualizar->whereBetween('fecha', [
@@ -292,9 +292,9 @@ class JustificacionController extends Controller
                 'observacion' => 'Justificación Aprobada: ' . $request->observaciones
             ]);
 
-        \Log::info('✅ [Justificación] Asistencias actualizadas a PRESENTE: ' . $actualizadas);
+        \Log::info(' [Justificación] Asistencias actualizadas a PRESENTE: ' . $actualizadas);
 
-        // ✅ ELIMINADO: auditoría manual duplicada
+        //  ELIMINADO: auditoría manual duplicada
         // El Trait Auditable ya registró automáticamente el 'updated'
         // Si necesitas una acción personalizada 'aprobado', usar:
         // $justificacion->auditarAccion('aprobado', "...", [...])
@@ -309,7 +309,7 @@ class JustificacionController extends Controller
 
     /**
      * RECHAZAR JUSTIFICACIÓN (solo UsuarioWeb con permisos)
-     * ✅ CORREGIDO: Eliminar auditoría manual duplicada
+     *  CORREGIDO: Eliminar auditoría manual duplicada
      */
     public function rechazar(Request $request, $id)
     {
@@ -335,7 +335,7 @@ class JustificacionController extends Controller
             'observaciones' => 'required|string|max:500',
         ]);
 
-        // ✅ SIMPLIFICADO: Solo actualizar, el Trait maneja auditoría
+        //  SIMPLIFICADO: Solo actualizar, el Trait maneja auditoría
         $justificacion->update([
             'estado' => Justificacion::ESTADO_RECHAZADO,
             'usuario_web_id' => $user->id,
@@ -355,7 +355,7 @@ class JustificacionController extends Controller
                 'observacion' => 'Justificación rechazada: ' . $request->observaciones
             ]);
 
-        // ✅ ELIMINADO: auditoría manual duplicada
+        //  ELIMINADO: auditoría manual duplicada
 
         return response()->json([
             'success' => true,
@@ -418,7 +418,7 @@ class JustificacionController extends Controller
         }
 
         $justificacion->delete();
-        // ✅ El Trait Auditable registrará automáticamente el 'deleted'
+        //  El Trait Auditable registrará automáticamente el 'deleted'
 
         return response()->json([
             'success' => true,

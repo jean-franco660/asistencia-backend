@@ -49,7 +49,7 @@ class UpdateUsuarioAppRequest extends FormRequest
             // Asignaciones (opcional, si se envía se reemplaza todo)
             'asignaciones' => 'sometimes|array',
             'asignaciones.*.institucion_id' => 'required|exists:instituciones,id|distinct',
-            'asignaciones.*.horario_institucion_id' => 'nullable|exists:horarios_institucion,id', // ✅ Opcional
+            'asignaciones.*.horario_institucion_id' => 'nullable|exists:horarios_institucion,id', //  Opcional
             'asignaciones.*.cargo' => 'required|string|max:50',
             'asignaciones.*.estado' => 'nullable|in:ACTIVO,INACTIVO',
             'asignaciones.*.fecha_inicio' => 'nullable|date',

@@ -78,7 +78,7 @@ class Justificacion extends Model
     {
         parent::boot();
 
-        // ✅ NUEVO: Validación de fechas
+        //  NUEVO: Validación de fechas
         static::saving(function ($model) {
             // Validar que fecha_fin >= fecha_inicio
             if ($model->fecha_fin && $model->fecha_inicio) {

@@ -101,7 +101,7 @@ class HorariosInstitucionController extends Controller
             'activo' => true,
         ]);
 
-        // ✅ IMPORTANTE: Asignar automáticamente este horario a usuarios que no tienen uno
+        //  IMPORTANTE: Asignar automáticamente este horario a usuarios que no tienen uno
         $this->asignarHorarioAUsuariosSinHorario($request->institucion_id, $horario->id);
 
         return response()->json([
@@ -112,7 +112,7 @@ class HorariosInstitucionController extends Controller
     }
 
     /**
-     * ✅ Asigna un horario a todos los usuarios de una institución que no tienen horario
+     *  Asigna un horario a todos los usuarios de una institución que no tienen horario
      */
     protected function asignarHorarioAUsuariosSinHorario(int $institucionId, int $horarioId): void
     {

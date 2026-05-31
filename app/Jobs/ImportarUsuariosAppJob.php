@@ -40,7 +40,7 @@ class ImportarUsuariosAppJob implements ShouldQueue
         $importLog = ImportacionLog::findOrFail($this->importLogId);
 
         try {
-            Log::info('🚀 Iniciando ImportarUsuariosAppJob', [
+            Log::info(' Iniciando ImportarUsuariosAppJob', [
                 'import_log_id' => $importLog->id,
                 'archivo' => $this->archivoPath,
             ]);
@@ -53,13 +53,13 @@ class ImportarUsuariosAppJob implements ShouldQueue
 
             $absolutePath = Storage::path($this->archivoPath);
 
-            // 🔹 Importación
+            //  Importación
             Excel::import(
                 new UsuariosAppImport($importLog, $service),
                 $absolutePath
             );
 
-            // 🔹 Generar archivo de errores antes de cerrar
+            //  Generar archivo de errores antes de cerrar
             if ($importLog->tieneErrores()) {
                 $pathErrores = $this->generarArchivoErrores($importLog);
                 if ($pathErrores) {
@@ -67,7 +67,7 @@ class ImportarUsuariosAppJob implements ShouldQueue
                 }
             }
 
-            // 🔹 Normalizar contadores finales
+            //  Normalizar contadores finales
             $importLog->refresh();
 
             $exitosos  = (int) $importLog->exitosos;
@@ -87,7 +87,7 @@ class ImportarUsuariosAppJob implements ShouldQueue
 
             $importLog->marcarComoCompletada();
 
-            Log::info('✅ ImportarUsuariosAppJob completado', [
+            Log::info(' ImportarUsuariosAppJob completado', [
                 'import_log_id' => $importLog->id,
                 'resumen' => $importLog->resumen,
             ]);
@@ -95,7 +95,7 @@ class ImportarUsuariosAppJob implements ShouldQueue
             Storage::delete($this->archivoPath);
 
         } catch (Exception $e) {
-            Log::error('❌ Error en ImportarUsuariosAppJob', [
+            Log::error(' Error en ImportarUsuariosAppJob', [
                 'import_log_id' => $importLog->id,
                 'error' => $e->getMessage(),
             ]);
@@ -107,7 +107,7 @@ class ImportarUsuariosAppJob implements ShouldQueue
 
     public function failed(Exception $exception): void
     {
-        Log::error('💥 ImportarUsuariosAppJob falló definitivamente', [
+        Log::error(' ImportarUsuariosAppJob falló definitivamente', [
             'import_log_id' => $this->importLogId,
             'error' => $exception->getMessage(),
         ]);

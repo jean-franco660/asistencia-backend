@@ -37,7 +37,7 @@ class StoreUsuarioAppRequest extends FormRequest
             // IMPORTANTE: El cargo NO va en usuarios_app, va en la asignación
             'asignaciones' => 'required|array|min:1',
             'asignaciones.*.institucion_id' => 'required|exists:instituciones,id|distinct',
-            'asignaciones.*.horario_institucion_id' => 'nullable|exists:horarios_institucion,id', // ✅ Opcional
+            'asignaciones.*.horario_institucion_id' => 'nullable|exists:horarios_institucion,id', //  Opcional
             'asignaciones.*.cargo' => 'required|string|max:50', // Campo libre
             'asignaciones.*.estado' => 'nullable|in:ACTIVO,INACTIVO',
             'asignaciones.*.fecha_inicio' => 'nullable|date',

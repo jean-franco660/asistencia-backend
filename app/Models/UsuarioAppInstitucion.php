@@ -51,7 +51,7 @@ class UsuarioAppInstitucion extends Pivot
         'estado',
     ];
 
-    // ✅ Proteger fechas de asignación masiva - solo el Observer las modifica
+    //  Proteger fechas de asignación masiva - solo el Observer las modifica
     protected $guarded = ['id', 'fecha_inicio', 'fecha_fin'];
 
     protected $casts = [
@@ -133,22 +133,22 @@ class UsuarioAppInstitucion extends Pivot
     }
 
     /**
-     * ✅ CORREGIDO: Usar constantes sin espacios
+     *  CORREGIDO: Usar constantes sin espacios
      */
     public function scopePersonalAdministrativo($query)
     {
         return $query->whereIn('cargo', [
             self::CARGO_ADMINISTRATIVO,
             self::CARGO_AUXILIAR,
-            self::CARGO_PERSONAL_SERVICIO, // ✅ Sin espacio
+            self::CARGO_PERSONAL_SERVICIO, //  Sin espacio
         ]);
     }
 
     /**
-     * ✅ CORREGIDO: Usar objetos Carbon en lugar de strings
+     *  CORREGIDO: Usar objetos Carbon en lugar de strings
      */
     /**
-     * ✅ CORREGIDO: fecha_fin es EXCLUSIVA
+     *  CORREGIDO: fecha_fin es EXCLUSIVA
      * Un vínculo es vigente si estado=ACTIVO y fecha_inicio <= D < fecha_fin
      */
     public function scopeVigentes($query, $fecha = null)
@@ -244,10 +244,10 @@ class UsuarioAppInstitucion extends Pivot
     }
 
     /**
-     * ✅ CORREGIDO: Usar métodos Carbon para comparaciones
+     *  CORREGIDO: Usar métodos Carbon para comparaciones
      */
     /**
-     * ✅ CORREGIDO: fecha_fin es EXCLUSIVA
+     *  CORREGIDO: fecha_fin es EXCLUSIVA
      */
     public function estaVigente(): bool
     {
@@ -358,13 +358,13 @@ class UsuarioAppInstitucion extends Pivot
     }
 
     /**
-     * ✅ CORREGIDO: Usar copy() para no modificar el Carbon original
+     *  CORREGIDO: Usar copy() para no modificar el Carbon original
      * Renueva la asignación por un periodo adicional
      */
     public function renovarPor(int $meses): bool
     {
         $nuevaFechaFin = $this->fecha_fin
-            ? $this->fecha_fin->copy()->addMonths($meses) // ✅ Usar copy()
+            ? $this->fecha_fin->copy()->addMonths($meses) //  Usar copy()
             : today()->addMonths($meses);
 
         return $this->extenderHasta($nuevaFechaFin);

@@ -164,12 +164,12 @@ class AsistenciaService
         }
 
         try {
-            Log::info("📸 Procesando foto Base64 ({$contexto})...");
+            Log::info(" Procesando foto Base64 ({$contexto})...");
 
             $fotoData = base64_decode($fotoBase64);
 
             if ($fotoData === false) {
-                Log::error("❌ Error decodificando Base64 en {$contexto}");
+                Log::error(" Error decodificando Base64 en {$contexto}");
                 return null;
             }
 
@@ -179,17 +179,17 @@ class AsistenciaService
             if ($useS3) {
                 // Guardar en S3
                 Storage::disk('s3')->put($fileName, $fotoData, 'public');
-                Log::info("✅ Foto guardada en S3 ({$contexto})", ['path' => $fileName]);
+                Log::info(" Foto guardada en S3 ({$contexto})", ['path' => $fileName]);
             } else {
                 // Guardar en disco local
                 Storage::disk('public')->put($fileName, $fotoData);
-                Log::info("✅ Foto guardada en disco local ({$contexto})", ['path' => $fileName]);
+                Log::info(" Foto guardada en disco local ({$contexto})", ['path' => $fileName]);
             }
 
             return $fileName;
 
         } catch (\Throwable $e) {
-            Log::error("❌ Error guardando foto ({$contexto}): " . $e->getMessage());
+            Log::error(" Error guardando foto ({$contexto}): " . $e->getMessage());
             return null;
         }
     }
@@ -389,7 +389,7 @@ class AsistenciaService
         }
 
         try {
-            Log::info("📸 Procesando foto Archivo ({$contexto})...");
+            Log::info(" Procesando foto Archivo ({$contexto})...");
 
             $fileName = 'selfies/' . uniqid('selfie_') . '.jpg';
             $useS3 = env('USE_S3', false);
@@ -400,17 +400,17 @@ class AsistenciaService
             if ($useS3) {
                 // Guardar en S3
                 Storage::disk('s3')->put($fileName, $fileContent, 'public');
-                Log::info("✅ Foto guardada en S3 ({$contexto})", ['path' => $fileName]);
+                Log::info(" Foto guardada en S3 ({$contexto})", ['path' => $fileName]);
             } else {
                 // Guardar en disco local
                 Storage::disk('public')->put($fileName, $fileContent);
-                Log::info("✅ Foto guardada en disco local ({$contexto})", ['path' => $fileName]);
+                Log::info(" Foto guardada en disco local ({$contexto})", ['path' => $fileName]);
             }
 
             return $fileName;
 
         } catch (\Throwable $e) {
-            Log::error("❌ Error guardando foto archivo ({$contexto}): " . $e->getMessage());
+            Log::error(" Error guardando foto archivo ({$contexto}): " . $e->getMessage());
             return null;
         }
     }

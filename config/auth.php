@@ -4,7 +4,7 @@ return [
 
     'defaults' => [
         'guard' => env('AUTH_GUARD', 'web'),
-        'passwords' => env('AUTH_PASSWORD_BROKER', 'usuarios_web'), // ⚠️ Cambia 'users' a 'usuarios_web'
+        'passwords' => env('AUTH_PASSWORD_BROKER', 'usuarios_web'), // ️ Cambia 'users' a 'usuarios_web'
     ],
 
     'guards' => [
@@ -22,8 +22,8 @@ return [
     ],
 
     'passwords' => [
-        'usuarios_web' => [ // ⚠️ Cambia 'users' a 'usuarios_web'
-            'provider' => 'usuarios_web', // ⚠️ Cambia 'users' a 'usuarios_web'
+        'usuarios_web' => [ // ️ Cambia 'users' a 'usuarios_web'
+            'provider' => 'usuarios_web', // ️ Cambia 'users' a 'usuarios_web'
             'table' => env('AUTH_PASSWORD_RESET_TOKEN_TABLE', 'password_reset_tokens'),
             'expire' => 60,
             'throttle' => 60,
