@@ -51,21 +51,21 @@ class ImportacionLog extends Model
     ];
 
     protected $casts = [
-        'total'           => 'integer',
-        'procesados'      => 'integer',
-        'exitosos'        => 'integer',
-        'errores_count'   => 'integer',
+        'total' => 'integer',
+        'procesados' => 'integer',
+        'exitosos' => 'integer',
+        'errores_count' => 'integer',
         'errores_detalle' => 'array',
-        'iniciado_en'     => 'datetime',
-        'completado_en'   => 'datetime',
+        'iniciado_en' => 'datetime',
+        'completado_en' => 'datetime',
     ];
 
     protected $attributes = [
-        'estado'         => self::ESTADO_PENDING,
-        'total'          => 0,
-        'procesados'     => 0,
-        'exitosos'       => 0,
-        'errores_count'  => 0,
+        'estado' => self::ESTADO_PENDING,
+        'total' => 0,
+        'procesados' => 0,
+        'exitosos' => 0,
+        'errores_count' => 0,
     ];
 
     /* =========================
@@ -246,20 +246,20 @@ class ImportacionLog extends Model
     public function getResumenAttribute(): array
     {
         return [
-            'id'            => $this->id,
-            'tipo'          => $this->tipo,
-            'tipo_texto'    => $this->tipo_formateado,
-            'estado'        => $this->estado,
-            'estado_texto'  => $this->estado_formateado,
-            'total'         => $this->total,
-            'procesados'    => $this->procesados,
-            'exitosos'      => $this->exitosos,
-            'errores'       => $this->errores_count,
-            'porcentaje'    => $this->porcentaje,
-            'tasa_exito'    => $this->tasa_exito,
-            'duracion'      => $this->duracion_formateada,
-            'usuario'       => $this->usuario?->nombre,
-            'iniciado_en'   => $this->iniciado_en?->toIso8601String(),
+            'id' => $this->id,
+            'tipo' => $this->tipo,
+            'tipo_texto' => $this->tipo_formateado,
+            'estado' => $this->estado,
+            'estado_texto' => $this->estado_formateado,
+            'total' => $this->total,
+            'procesados' => $this->procesados,
+            'exitosos' => $this->exitosos,
+            'errores' => $this->errores_count,
+            'porcentaje' => $this->porcentaje,
+            'tasa_exito' => $this->tasa_exito,
+            'duracion' => $this->duracion_formateada,
+            'usuario' => $this->usuario?->nombre,
+            'iniciado_en' => $this->iniciado_en?->toIso8601String(),
             'completado_en' => $this->completado_en?->toIso8601String(),
         ];
     }
@@ -448,11 +448,11 @@ class ImportacionLog extends Model
         string $archivoTemp
     ): self {
         return static::create([
-            'usuario_id'       => $usuario->id,
-            'tipo'             => $tipo,
+            'usuario_id' => $usuario->id,
+            'tipo' => $tipo,
             'archivo_original' => $archivoOriginal,
-            'archivo_temp'     => $archivoTemp,
-            'estado'           => self::ESTADO_PENDING,
+            'archivo_temp' => $archivoTemp,
+            'estado' => self::ESTADO_PENDING,
         ]);
     }
 

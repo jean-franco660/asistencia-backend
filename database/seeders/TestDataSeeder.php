@@ -7,13 +7,21 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Carbon\Carbon;
 
+/**
+ * Seeder de pruebas funcionales para validar el flujo completo de asistencias.
+ * Inserta mediante DB directo (sin modelos) una institución, un horario mañanero,
+ * cinco docentes y escenarios variados de marcación (PRESENTE, TARDANZA, OBSERVADA y sin marcación).
+ * Requiere ejecutar `php artisan asistencias:materializar` tras la siembra para
+ * calcular el estado final de los docentes sin marcaciones.
+ * Solo para entorno de desarrollo/pruebas.
+ */
 class TestDataSeeder extends Seeder
 {
     public function run(): void
     {
+        // La fecha se fija en la zona horaria de Lima para que coincida con la del servidor
         $hoy = Carbon::today('America/Lima')->toDateString();
 
-        // 1. Insertar Institución directamente
         DB::table('instituciones')->insert([
             'codigo_modular_ie' => 'IE001',
             'nombre' => 'Institución Educativa de Prueba',
@@ -29,7 +37,7 @@ class TestDataSeeder extends Seeder
 
         $institucionId = DB::getPdo()->lastInsertId();
 
-        // 2. Insertar Horario
+        // Horario turno mañana de lunes a viernes con tolerancia de 15 minutos
         DB::table('horarios_institucion')->insert([
             'institucion_id' => $institucionId,
             'nombre_turno' => 'MAÑANA',
@@ -45,7 +53,7 @@ class TestDataSeeder extends Seeder
 
         $horarioId = DB::getPdo()->lastInsertId();
 
-        // 3. Insertar Docentes
+        // Los cinco docentes son ficticios; el primero recibe cargo de DIRECTOR
         $docentes = [];
         for ($i = 1; $i <= 5; $i++) {
             DB::table('usuarios_app')->insert([
@@ -64,7 +72,7 @@ class TestDataSeeder extends Seeder
             $docentes[] = DB::getPdo()->lastInsertId();
         }
 
-        // 4. Asignar docentes a institución
+        // El primer docente del arreglo recibe el cargo DIRECTOR; los demás se asignan como DOCENTE
         foreach ($docentes as $index => $docenteId) {
             DB::table('usuario_app_institucion')->insert([
                 'usuario_app_id' => $docenteId,
@@ -79,9 +87,7 @@ class TestDataSeeder extends Seeder
             ]);
         }
 
-        // 5. Crear asistencias para HOY
-
-        // Docente 1: PRESENTE
+        // Escenario 1 — Docente 1: marcación puntual en entrada y salida (resultado: PRESENTE)
         DB::table('asistencias')->insert([
             'id' => 1,
             'usuario_app_id' => $docentes[0],
@@ -114,7 +120,7 @@ class TestDataSeeder extends Seeder
             'updated_at' => now(),
         ]);
 
-        // Docente 2: TARDANZA  
+        // Escenario 2 — Docente 2: entrada a las 08:25, superior a la tolerancia de 15 min (resultado: TARDANZA)
         DB::table('asistencias')->insert([
             'id' => 2,
             'usuario_app_id' => $docentes[1],
@@ -147,7 +153,7 @@ class TestDataSeeder extends Seeder
             'updated_at' => now(),
         ]);
 
-        // Docente 3: OBSERVADA
+        // Escenario 3 — Docente 3: entrada fuera del radio GPS, queda en revisión (resultado: OBSERVADA)
         DB::table('asistencias')->insert([
             'id' => 3,
             'usuario_app_id' => $docentes[2],
@@ -185,13 +191,13 @@ class TestDataSeeder extends Seeder
         // Docentes 4 y 5 no tienen marcaciones (aparecerán como FALTA después del job)
 
         $this->command->info(' Datos de prueba creados con DB directo:');
-        $this->command->info('   - 1 Institución: IE001');
-        $this->command->info('   - 1 Horario: MAÑANA (L-V)');
-        $this->command->info('   - 5 Docentes creados');
-        $this->command->info('   - 3 Asistencias con marcaciones');
-        $this->command->info('   - 2 Docentes sin marcaciones');
+        $this->command->info(' - 1 Institución: IE001');
+        $this->command->info(' - 1 Horario: MAÑANA (L-V)');
+        $this->command->info(' - 5 Docentes creados');
+        $this->command->info(' - 3 Asistencias con marcaciones');
+        $this->command->info(' - 2 Docentes sin marcaciones');
         $this->command->info('');
         $this->command->info('Ejecuta ahora:');
-        $this->command->info('  php artisan asistencias:materializar ' . $hoy);
+        $this->command->info(' php artisan asistencias:materializar ' . $hoy);
     }
 }

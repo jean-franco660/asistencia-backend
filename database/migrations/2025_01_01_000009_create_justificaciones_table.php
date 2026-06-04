@@ -4,6 +4,11 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
+/**
+ * Crea la tabla `justificaciones`, que permite a los docentes solicitar la justificación
+ * de faltas o tardanzas. Cada justificación puede cubrir un rango de fechas y se somete
+ * a un flujo de aprobación (PENDIENTE → APROBADO / RECHAZADO) por un usuario web.
+ */
 return new class extends Migration {
     public function up(): void
     {

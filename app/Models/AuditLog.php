@@ -5,21 +5,24 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
+/**
+ * Registra acciones de auditoría realizadas sobre el sistema.
+ *
+ * Cada entrada captura quién realizó la acción (actor), sobre qué modelo,
+ * qué datos cambiaron (antes y después), y metadatos de la solicitud HTTP
+ * (IP, user agent, URL). Soporta tres tipos de actores: usuario web,
+ * usuario de la app y el sistema en procesos automáticos.
+ *
+ * Tabla: audit_logs
+ * Relaciones principales: actor (polimórfica, UsuarioWeb o UsuarioApp)
+ */
 class AuditLog extends Model
 {
     protected $table = 'audit_logs';
 
-    /* =========================
-     * CONSTANTES - TIPOS DE ACTOR
-     * ========================= */
-
     public const ACTOR_USUARIO_WEB = 'USUARIO_WEB';
     public const ACTOR_USUARIO_APP = 'USUARIO_APP';
     public const ACTOR_SISTEMA     = 'SISTEMA';
-
-    /* =========================
-     * CONSTANTES - ACCIONES COMUNES
-     * ========================= */
 
     public const ACCION_CREATED    = 'created';
     public const ACCION_UPDATED    = 'updated';
@@ -32,10 +35,6 @@ class AuditLog extends Model
     public const ACCION_MASIVO     = 'masivo';
     public const ACCION_LOGIN      = 'login';
     public const ACCION_LOGOUT     = 'logout';
-
-    /* =========================
-     * FILLABLE / CASTS
-     * ========================= */
 
     protected $fillable = [
         'actor_id',
@@ -58,28 +57,22 @@ class AuditLog extends Model
 
     protected $casts = [
         'datos_anteriores' => 'array',
-        'datos_nuevos'     => 'array',
-        'metadata'         => 'array',
+        'datos_nuevos' => 'array',
+        'metadata' => 'array',
     ];
 
-    /* =========================
-     * RELACIONES
-     * ========================= */
-
     /**
-     * Relación polimórfica con el actor (quien realizó la acción)
+     * Relación polimórfica con el actor que realizó la acción.
+     * Puede ser un UsuarioWeb, un UsuarioApp o null cuando la acción fue del sistema.
      */
     public function actor(): MorphTo
     {
         return $this->morphTo();
     }
 
-    /* =========================
-     * ACCESSORS
-     * ========================= */
-
     /**
-     * Obtener cambios legibles
+     * Retorna un arreglo con los campos que cambiaron, mostrando el valor anterior y el nuevo.
+     * Devuelve un arreglo vacío si no hay datos anteriores o nuevos registrados.
      */
     public function getCambiosAttribute(): array
     {
@@ -93,7 +86,7 @@ class AuditLog extends Model
             if ($anterior !== $nuevo) {
                 $cambios[$campo] = [
                     'anterior' => $anterior,
-                    'nuevo'    => $nuevo,
+                    'nuevo' => $nuevo,
                 ];
             }
         }
@@ -102,36 +95,36 @@ class AuditLog extends Model
     }
 
     /**
-     * Obtener resumen legible del cambio
+     * Retorna una cadena legible que resume los campos modificados con sus valores anterior y nuevo.
      */
     public function getResumenCambiosAttribute(): string
     {
         $cambios = $this->cambios;
-        
+
         if (empty($cambios)) {
             return 'Sin cambios detectados';
         }
 
         $resumen = [];
         foreach ($cambios as $campo => $valores) {
-            $resumen[] = "{$campo}: '{$valores['anterior']}' → '{$valores['nuevo']}'";
+            $resumen[] = "{$campo}: '{$valores['anterior']}' '{$valores['nuevo']}'";
         }
 
         return implode(', ', $resumen);
     }
 
     /**
-     * Fecha formateada
+     * Retorna la fecha de creación del registro formateada como 'd/m/Y H:i:s'.
      */
     public function getFechaFormateadaAttribute(): string
     {
         return $this->created_at?->format('d/m/Y H:i:s') ?? '';
     }
 
-    /* =========================
-     * SCOPES
-     * ========================= */
-
+    /**
+     * Filtra registros por el identificador y tipo de actor.
+     * Si `$actorType` es nulo, devuelve todos los registros del actor independientemente del tipo.
+     */
     public function scopePorActor($query, $actorId, $actorType = null)
     {
         $query->where('actor_id', $actorId);
@@ -143,6 +136,9 @@ class AuditLog extends Model
         return $query;
     }
 
+    /**
+     * Filtra registros por nombre de modelo y, opcionalmente, por su identificador.
+     */
     public function scopePorModelo($query, $modelo, $modeloId = null)
     {
         $query->where('modelo', $modelo);
@@ -154,16 +150,26 @@ class AuditLog extends Model
         return $query;
     }
 
+    /**
+     * Filtra por un tipo de acción específico.
+     */
     public function scopePorAccion($query, $accion)
     {
         return $query->where('accion', $accion);
     }
 
+    /**
+     * Filtra registros cuyo `created_at` cae dentro del rango indicado.
+     */
     public function scopeEntreFechas($query, $desde, $hasta)
     {
         return $query->whereBetween('created_at', [$desde, $hasta]);
     }
 
+    /**
+     * Filtra acciones consideradas críticas: autorización, rechazo, eliminación,
+     * importación y operaciones masivas.
+     */
     public function scopeAccionesCriticas($query)
     {
         return $query->whereIn('accion', [
@@ -175,6 +181,10 @@ class AuditLog extends Model
         ]);
     }
 
+    /**
+     * Filtra registros de actores tipo USUARIO_WEB.
+     * Si se proporciona `$usuarioId`, restringe además al usuario específico.
+     */
     public function scopePorUsuarioWeb($query, $usuarioId = null)
     {
         $query->where('actor_type', self::ACTOR_USUARIO_WEB);
@@ -186,6 +196,10 @@ class AuditLog extends Model
         return $query;
     }
 
+    /**
+     * Filtra registros de actores tipo USUARIO_APP.
+     * Si se proporciona `$usuarioId`, restringe además al usuario específico.
+     */
     public function scopePorUsuarioApp($query, $usuarioId = null)
     {
         $query->where('actor_type', self::ACTOR_USUARIO_APP);
@@ -197,20 +211,26 @@ class AuditLog extends Model
         return $query;
     }
 
+    /**
+     * Filtra registros generados por el sistema (sin actor humano).
+     */
     public function scopePorSistema($query)
     {
         return $query->where('actor_type', self::ACTOR_SISTEMA);
     }
 
+    /**
+     * Retorna los registros más recientes, ordenados descendentemente, limitados a `$limite`.
+     */
     public function scopeRecientes($query, int $limite = 50)
     {
         return $query->orderBy('created_at', 'desc')->limit($limite);
     }
 
-    /* =========================
-     * HELPERS
-     * ========================= */
-
+    /**
+     * Indica si la acción registrada es de tipo crítico (autorización, rechazo, eliminación,
+     * importación o masiva).
+     */
     public function esAccionCritica(): bool
     {
         return in_array($this->accion, [
@@ -222,32 +242,42 @@ class AuditLog extends Model
         ], true);
     }
 
+    /**
+     * Indica si la acción fue de creación de un registro.
+     */
     public function esCreacion(): bool
     {
         return $this->accion === self::ACCION_CREATED;
     }
 
+    /**
+     * Indica si la acción fue de actualización de un registro.
+     */
     public function esActualizacion(): bool
     {
         return $this->accion === self::ACCION_UPDATED;
     }
 
+    /**
+     * Indica si la acción fue de eliminación de un registro.
+     */
     public function esEliminacion(): bool
     {
         return $this->accion === self::ACCION_DELETED;
     }
 
+    /**
+     * Indica si el registro cuenta con una dirección IP capturada.
+     */
     public function tieneIpAddress(): bool
     {
         return !empty($this->ip_address);
     }
 
-    /* =========================
-     * MÉTODOS ESTÁTICOS
-     * ========================= */
-
     /**
-     * Registra una acción de auditoría
+     * Registra una acción de auditoría en la base de datos.
+     * Captura automáticamente la IP, user agent, URL y método HTTP del request actual.
+     * Cuando `$actor` es null, el tipo se asigna como SISTEMA.
      */
     public static function registrar(
         $actor,
@@ -261,22 +291,22 @@ class AuditLog extends Model
         ?array $metadata = null
     ): self {
         return static::create([
-            'actor_id'         => $actor?->id,
-            'actor_type'       => static::getActorType($actor),
-            'actor_nombre'     => static::getActorNombre($actor),
-            'actor_rol'        => static::getActorRol($actor),
-            'accion'           => $accion,
-            'descripcion'      => $descripcion,
-            'modelo'           => $modelo,
-            'modelo_id'        => $modeloId,
-            'modelo_nombre'    => $modeloNombre,
+            'actor_id' => $actor?->id,
+            'actor_type' => static::getActorType($actor),
+            'actor_nombre' => static::getActorNombre($actor),
+            'actor_rol' => static::getActorRol($actor),
+            'accion' => $accion,
+            'descripcion' => $descripcion,
+            'modelo' => $modelo,
+            'modelo_id' => $modeloId,
+            'modelo_nombre' => $modeloNombre,
             'datos_anteriores' => $datosAnteriores,
-            'datos_nuevos'     => $datosNuevos,
-            'metadata'         => $metadata,
-            'ip_address'       => request()->ip(),
-            'user_agent'       => request()->userAgent(),
-            'url'              => request()->fullUrl(),
-            'metodo_http'      => request()->method(),
+            'datos_nuevos' => $datosNuevos,
+            'metadata' => $metadata,
+            'ip_address' => request()->ip(),
+            'user_agent' => request()->userAgent(),
+            'url' => request()->fullUrl(),
+            'metodo_http' => request()->method(),
         ]);
     }
 

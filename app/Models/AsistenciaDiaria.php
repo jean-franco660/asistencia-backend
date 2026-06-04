@@ -7,6 +7,16 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
+/**
+ * Representa una marcación individual (ENTRADA o SALIDA) dentro de un día de asistencia.
+ *
+ * Cada registro almacena coordenadas GPS, foto, estado de validación automática
+ * y campos de revisión humana. Se vincula a la cabecera diaria mediante
+ * la relación `asistencia`.
+ *
+ * Tabla: asistencias_diarias
+ * Relaciones principales: asistencia (Asistencia), revisadoPor (UsuarioWeb)
+ */
 class AsistenciaDiaria extends Model
 {
     use HasFactory, SoftDeletes;
@@ -46,23 +56,19 @@ class AsistenciaDiaria extends Model
         'meta' => 'array',
     ];
 
-    // Tipos de marcación
     public const TIPO_ENTRADA = 'ENTRADA';
     public const TIPO_SALIDA = 'SALIDA';
 
-    // Estados de marcación
     public const ESTADO_VALIDA = 'VALIDA';
     public const ESTADO_OBSERVADA = 'OBSERVADA';
     public const ESTADO_ANULADA = 'ANULADA';
 
-    // Motivos comunes
     public const MOTIVO_OK = 'OK';
     public const MOTIVO_FUERA_DE_HORARIO = 'FUERA_DE_HORARIO';
     public const MOTIVO_RELOJ_NO_CONFIABLE = 'RELOJ_NO_CONFIABLE';
     public const MOTIVO_FUERA_DE_RANGO = 'FUERA_DE_RANGO';
     public const MOTIVO_SIN_GPS = 'SIN_GPS';
 
-    // Estados de revisión humana
     public const REVISION_PENDIENTE = 'PENDIENTE';
     public const REVISION_APROBADA = 'APROBADA';
     public const REVISION_MANTENER_OBSERVADA = 'MANTENER_OBSERVADA';

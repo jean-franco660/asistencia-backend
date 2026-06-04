@@ -14,6 +14,14 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use Maatwebsite\Excel\Facades\Excel;
 
+/**
+ * Gestiona la importación masiva de instituciones desde archivos Excel o CSV.
+ *
+ * Solo accesible para administradores y super_admin. El proceso de importación
+ * es asíncrono: el archivo se almacena temporalmente y se despacha un Job que
+ * procesa las filas en segundo plano. El estado del proceso se consulta mediante
+ * el método estadoImportacion. Los errores se pueden descargar como Excel.
+ */
 class InstitucionImportController extends Controller
 {
     public function __construct()
@@ -23,8 +31,12 @@ class InstitucionImportController extends Controller
 
 
     /**
-     * Estadísticas para la vista de importaciones
-     * GET /api/instituciones/import/stats
+     * Retorna las estadísticas generales de importación de instituciones.
+     *
+     * Incluye el total de instituciones registradas, datos de la última importación
+     * (en progreso o completada), la tasa de éxito promedio de las últimas 10
+     * importaciones y el total acumulado de errores pendientes.
+     * Solo accesible para administradores.
      */
     public function stats(Request $request)
     {
@@ -101,8 +113,12 @@ class InstitucionImportController extends Controller
     }
 
     /**
-     * Importar instituciones desde archivo Excel/CSV
-     * POST /api/instituciones/import
+     * Inicia la importación de instituciones desde un archivo Excel o CSV.
+     *
+     * Valida que el archivo sea válido (xlsx, xls, csv, máx 10 MB), lo almacena
+     * temporalmente, crea un registro de log y despacha el Job de importación
+     * en segundo plano. La respuesta incluye el import_id para consultar el estado
+     * mediante el método estadoImportacion. Solo accesible para administradores.
      */
     public function import(Request $request)
     {
@@ -206,8 +222,11 @@ class InstitucionImportController extends Controller
     }
 
     /**
-     * Consultar estado de una importación
-     * GET /api/instituciones/import/{id}/estado
+     * Consulta el estado de progreso de una importación específica.
+     *
+     * Los detalles de errores no se incluyen en esta respuesta para evitar
+     * payloads excesivos durante el polling. Se valida que el log corresponda
+     * al tipo TIPO_INSTITUCIONES para evitar cruce con importaciones de otro tipo.
      */
     public function estadoImportacion(Request $request, int $id)
     {
@@ -229,7 +248,7 @@ class InstitucionImportController extends Controller
             ], 404);
         }
 
-        //  Asegurar tipo correcto (evita mezclar importaciones)
+        // Asegurar tipo correcto (evita mezclar importaciones)
         if ($importLog->tipo !== ImportacionLog::TIPO_INSTITUCIONES) {
             return response()->json([
                 'success' => false,
@@ -252,20 +271,21 @@ class InstitucionImportController extends Controller
                 'iniciado_en' => $importLog->iniciado_en?->toIso8601String(),
                 'completado_en' => $importLog->completado_en?->toIso8601String(),
                 'duracion' => $importLog->duracion_formateada,
-                // 'errores' => $importLog->errores_detalle ?? [], //  OPTIMIZACIÓN: No enviar detalles en polling
+                // 'errores' => $importLog->errores_detalle ?? [], // OPTIMIZACIÓN: No enviar detalles en polling
             ],
         ]);
     }
 
     /**
-     * Descargar Excel de errores
-     * GET /api/instituciones/import/{id}/errores
+     * Descarga un archivo Excel con el detalle de los errores de una importación.
+     *
+     * Retorna 400 si no existen errores. Solo disponible para importaciones de tipo
+     * TIPO_INSTITUCIONES. Solo accesible para administradores.
      */
     public function erroresExcel(Request $request, int $id)
     {
         $user = $request->user();
 
-        //  Seguridad: solo admin
         if (!($user instanceof \App\Models\UsuarioWeb && $user->esAdminOSuperAdmin())) {
             return response()->json([
                 'success' => false,
@@ -305,8 +325,10 @@ class InstitucionImportController extends Controller
     }
 
     /**
-     * Descargar plantilla de instituciones
-     * GET /api/instituciones/import/plantilla
+     * Descarga la plantilla Excel para la importación de instituciones.
+     *
+     * La plantilla incluye los campos requeridos y de ejemplo para facilitar
+     * la preparación del archivo de importación. Solo accesible para administradores.
      */
     public function downloadTemplate(Request $request)
     {

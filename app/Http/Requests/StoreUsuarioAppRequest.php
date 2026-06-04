@@ -6,39 +6,46 @@ use Illuminate\Foundation\Http\FormRequest;
 use App\Models\UsuarioApp;
 use Illuminate\Validation\Rule;
 
+/**
+ * Valida los datos requeridos para crear un nuevo usuario de la aplicación móvil (docente).
+ * Exige al menos una asignación institucional con cargo, ya que el cargo no pertenece
+ * al usuario sino a la relación con la institución.
+ * La autorización se delega a las policies del controlador; esta clase siempre autoriza.
+ */
 class StoreUsuarioAppRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true; // La autorización se maneja en el controller con policies
+        // La autorización se maneja en el controlador mediante policies
+        return true;
     }
 
+    /**
+     * Retorna las reglas de validación para el nuevo usuario de la aplicación móvil.
+     * El campo 'asignaciones' es obligatorio y debe tener al menos un elemento,
+     * ya que un docente sin institución asignada no puede registrar asistencia.
+     * El campo 'cargo' se ubica en la asignación, no en el usuario, conforme al diseño del modelo.
+     */
     public function rules(): array
     {
         return [
-            // Identificación (según migración real)
             'codigo_modular' => 'required|string|max:20|unique:usuarios_app,codigo_modular',
             'dni' => 'required|string|max:15|unique:usuarios_app,dni',
 
-            // Datos personales
             'apellido_paterno' => 'required|string|max:100',
             'apellido_materno' => 'required|string|max:100',
             'nombres' => 'required|string|max:100',
-            'sexo' => ['nullable', Rule::in(UsuarioApp::getSexosDisponibles())], // M, F
+            'sexo' => ['nullable', Rule::in(UsuarioApp::getSexosDisponibles())], // Valores posibles: M, F
 
-            // Credenciales
             'password' => 'required|string|min:8|confirmed',
             'password_confirmation' => 'required|same:password',
 
-            // Acceso (según migración: acceso_habilitado, no "activo")
             'acceso_habilitado' => 'nullable|boolean',
 
-            // Asignaciones (tabla usuario_app_institucion)
-            // IMPORTANTE: El cargo NO va en usuarios_app, va en la asignación
             'asignaciones' => 'required|array|min:1',
             'asignaciones.*.institucion_id' => 'required|exists:instituciones,id|distinct',
-            'asignaciones.*.horario_institucion_id' => 'nullable|exists:horarios_institucion,id', //  Opcional
-            'asignaciones.*.cargo' => 'required|string|max:50', // Campo libre
+            'asignaciones.*.horario_institucion_id' => 'nullable|exists:horarios_institucion,id',
+            'asignaciones.*.cargo' => 'required|string|max:50',
             'asignaciones.*.estado' => 'nullable|in:ACTIVO,INACTIVO',
             'asignaciones.*.fecha_inicio' => 'nullable|date',
             'asignaciones.*.fecha_fin' => 'nullable|date|after:asignaciones.*.fecha_inicio',
@@ -48,17 +55,14 @@ class StoreUsuarioAppRequest extends FormRequest
     public function messages(): array
     {
         return [
-            // Código modular
             'codigo_modular.required' => 'El código modular es obligatorio',
             'codigo_modular.unique' => 'Este código modular ya está registrado',
             'codigo_modular.max' => 'El código modular no puede exceder :max caracteres',
 
-            // DNI
             'dni.required' => 'El DNI es obligatorio',
             'dni.unique' => 'Este DNI ya está registrado',
             'dni.max' => 'El DNI no puede exceder :max caracteres',
 
-            // Datos personales
             'apellido_paterno.required' => 'El apellido paterno es obligatorio',
             'apellido_paterno.max' => 'El apellido paterno no puede exceder :max caracteres',
 
@@ -68,17 +72,14 @@ class StoreUsuarioAppRequest extends FormRequest
             'nombres.required' => 'Los nombres son obligatorios',
             'nombres.max' => 'Los nombres no pueden exceder :max caracteres',
 
-            // Sexo
             'sexo.in' => 'El sexo debe ser M (Masculino) o F (Femenino)',
 
-            // Contraseña
             'password.required' => 'La contraseña es obligatoria',
             'password.min' => 'La contraseña debe tener al menos :min caracteres',
             'password.confirmed' => 'La confirmación de contraseña no coincide',
             'password_confirmation.required' => 'Debe confirmar la contraseña',
             'password_confirmation.same' => 'Las contraseñas no coinciden',
 
-            // Asignaciones
             'asignaciones.required' => 'Debe asignar al menos una institución',
             'asignaciones.min' => 'Debe asignar al menos una institución',
             'asignaciones.array' => 'Las asignaciones deben ser un arreglo',
@@ -102,12 +103,14 @@ class StoreUsuarioAppRequest extends FormRequest
     }
 
     /**
-     * Prepara los datos para validación
-     * Normaliza el código modular y otros campos
+     * Normaliza los datos de entrada antes de la validación.
+     * Si el cliente envía el campo 'codigo' en lugar de 'codigo_modular', lo mapea
+     * al nombre canónico para mantener compatibilidad con versiones anteriores del cliente.
+     * También establece 'acceso_habilitado' como verdadero por defecto si no se envía.
      */
     protected function prepareForValidation()
     {
-        // Normalizar código modular (si viene con alias)
+        // Normalizar código modular si llega con el nombre alternativo 'codigo'
         if ($this->has('codigo') && !$this->has('codigo_modular')) {
             $this->merge([
                 'codigo_modular' => $this->codigo
@@ -119,4 +122,4 @@ class StoreUsuarioAppRequest extends FormRequest
             'acceso_habilitado' => $this->input('acceso_habilitado', true),
         ]);
     }
-}
+}

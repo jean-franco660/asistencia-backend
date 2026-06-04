@@ -30,8 +30,8 @@ return [
     | your mailers below. You may also add additional mailers if needed.
     |
     | Supported: "smtp", "sendmail", "mailgun", "ses", "ses-v2",
-    |            "postmark", "resend", "log", "array",
-    |            "failover", "roundrobin"
+    |           "postmark", "resend", "log", "array",
+    |           "failover", "roundrobin"
     |
     */
 
@@ -57,7 +57,7 @@ return [
             'transport' => 'postmark',
             // 'message_stream_id' => env('POSTMARK_MESSAGE_STREAM_ID'),
             // 'client' => [
-            //     'timeout' => 5,
+            // 'timeout' => 5,
             // ],
         ],
 

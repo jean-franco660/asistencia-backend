@@ -4,6 +4,11 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
+/**
+ * Crea la tabla `instituciones`, que almacena los datos de las instituciones educativas
+ * gestionadas por la UGEL. Incluye identificación oficial (código modular), clasificación
+ * educativa, ubicación administrativa y coordenadas GPS para validar el radio de asistencia.
+ */
 return new class extends Migration {
     public function up(): void
     {
@@ -27,7 +32,7 @@ return new class extends Migration {
             $table->string('centro_poblado', 150)->nullable();
             $table->string('direccion', 255)->nullable();
 
-            // Geolocalización (precisión de 7 decimales ≈ 1.1cm)
+            // Geolocalización (precisión de 7 decimales  1.1cm)
             $table->decimal('latitud', 11, 7)->nullable();
             $table->decimal('longitud', 11, 7)->nullable();
             $table->unsignedInteger('radio')->default(30)->comment('Radio en metros');

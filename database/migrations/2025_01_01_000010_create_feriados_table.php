@@ -4,6 +4,11 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
+/**
+ * Crea la tabla `feriados`, que registra los días no laborables tanto nacionales
+ * como institucionales. Los campos `dia` y `mes` permiten evaluar rápidamente si
+ * una fecha es feriado en consultas recurrentes sin extraer componentes de `fecha`.
+ */
 return new class extends Migration {
     public function up(): void
     {

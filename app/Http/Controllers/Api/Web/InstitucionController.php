@@ -8,16 +8,30 @@ use App\Models\UsuarioWeb;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
+/**
+ * Gestiona el catálogo de instituciones educativas.
+ *
+ * Accesible para administradores y super_admin. Provee operaciones CRUD completas,
+ * importación masiva, eliminación individual y múltiple. Los supervisores pueden
+ * consultar sus instituciones asignadas mediante el método misInstituciones.
+ * El logo se almacena en el disco público; al actualizar o eliminar se gestiona
+ * automáticamente el archivo anterior.
+ */
 class InstitucionController extends Controller
 {
     /**
-     * Listar instituciones
+     * Lista instituciones con filtros opcionales y soporte para ordenamiento dinámico.
+     *
+     * Filtros disponibles: search (nombre o código modular), nivel_educativo, distrito.
+     * Si se proporciona 'limit', retorna una lista simple sin paginación. De lo contrario,
+     * pagina los resultados e incluye conteos de usuarios y horarios.
+     * Las columnas de ordenamiento permitidas son: id, codigo_modular_ie, nombre,
+     * distrito y created_at.
      */
     public function index(Request $request)
     {
         $query = Institucion::query();
 
-        // Filtros
         if ($request->filled('search')) {
             $query->where(function ($q) use ($request) {
                 $q->where('nombre', 'like', '%' . $request->search . '%')
@@ -65,7 +79,11 @@ class InstitucionController extends Controller
     }
 
     /**
-     * Crear institución
+     * Crea una nueva institución con sus datos geográficos y de ubicación.
+     *
+     * El campo codigo_modular_ie debe ser único. El radio define el perímetro en metros
+     * para la validación de geolocalizón al marcar asistencia. Si se adjunta logo,
+     * se almacena en el disco público bajo la carpeta 'logos'.
      */
     public function store(Request $request)
     {
@@ -99,7 +117,7 @@ class InstitucionController extends Controller
     }
 
     /**
-     * Mostrar institución
+     * Retorna el detalle de una institución, incluyendo conteos de usuarios y horarios.
      */
     public function show($id)
     {
@@ -108,7 +126,11 @@ class InstitucionController extends Controller
     }
 
     /**
-     * Actualizar institución
+     * Actualiza los datos de una institución, incluyendo su logo.
+     *
+     * Si se envía 'remove_logo' en true, elimina el archivo del disco y limpia el campo.
+     * Si se adjunta un nuevo logo, elimina el anterior antes de guardar el nuevo.
+     * El código modular solo es obligatorio al crear; en actualizón admite ausencia.
      */
     public function update(Request $request, $id)
     {
@@ -158,8 +180,11 @@ class InstitucionController extends Controller
     }
 
     /**
-     * Eliminar institución
-     * Acepta tanto DELETE como POST con _method=DELETE
+     * Elimina una institución del sistema.
+     *
+     * Rechaza la eliminación con código 409 si existen restricciones de llave foránea
+     * (usuarios, horarios, asistencias). Registra trazas de depuración en el log
+     * durante el proceso para facilitar el diagnóstico de errores.
      */
     public function destroy($id)
     {
@@ -232,7 +257,11 @@ class InstitucionController extends Controller
     }
 
     /**
-     * Eliminar múltiples instituciones
+     * Elimina múltiples instituciones en una sola operación.
+     *
+     * Requiere un array de IDs válidos. Retorna el conteo de registros eliminados.
+     * No verifica restricciones de llave foránea de forma individual; si alguna
+     * institución tiene relaciones, la operación puede fallar en bloque.
      */
     public function destroyMultiple(Request $request)
     {
@@ -266,17 +295,21 @@ class InstitucionController extends Controller
     }
 
     /**
-     * Instituciones del supervisor autenticado
+     * Retorna las instituciones accesibles para el usuario autenticado.
+     *
+     * Los administradores y super_admin ven todas las instituciones. Los supervisores
+     * solo ven sus instituciones vigentes. Acepta búsqueda por los parámetros 'q'
+     * o 'search', y soporte de 'limit' para retorno sin paginación.
+     * Incluye conteos de usuarios de la app y horarios.
      */
     public function misInstituciones(Request $request)
     {
         $user = $request->user();
 
         if ($user->esSuperAdmin() || $user->esAdministrador()) {
-            // Admin y super_admin ven todas las instituciones
             $query = Institucion::query();
         } else {
-            // Supervisores solo ven sus instituciones
+            // Los supervisores solo ven las instituciones a las que están asignados
             $institucionesIds = $user->institucionesVigentes()->pluck('id');
             $query = Institucion::whereIn('id', $institucionesIds);
         }

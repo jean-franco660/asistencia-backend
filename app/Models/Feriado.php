@@ -9,6 +9,15 @@ use App\Traits\Auditable;
 use Carbon\Carbon;
 
 /**
+ * Representa un día feriado, ya sea de alcance nacional o específico de una institución.
+ *
+ * Almacena la fecha completa y los campos `dia` y `mes` (generados automáticamente
+ * desde `fecha` en el evento `saving`) para facilitar consultas sin referencia al año,
+ * permitiendo reutilizar los feriados recurrentes (p.ej. fiestas patrias).
+ *
+ * Tabla: feriados
+ * Relaciones principales: institucion (Institucion)
+ *
  * @property Carbon|null $fecha
  */
 class Feriado extends Model
@@ -17,16 +26,8 @@ class Feriado extends Model
 
     protected $table = 'feriados';
 
-    /* =========================
-     * CONSTANTES - TIPOS
-     * ========================= */
-
     public const TIPO_NACIONAL      = 'nacional';
     public const TIPO_INSTITUCIONAL = 'institucional';
-
-    /* =========================
-     * FILLABLE / CASTS
-     * ========================= */
 
     protected $fillable = [
         'tipo',
@@ -39,11 +40,11 @@ class Feriado extends Model
     ];
 
     protected $casts = [
-        'activo'         => 'boolean',
-        'fecha'          => 'date',
-        'dia'            => 'integer',
-        'mes'            => 'integer',
-        'tipo'           => 'string',
+        'activo' => 'boolean',
+        'fecha' => 'date',
+        'dia' => 'integer',
+        'mes' => 'integer',
+        'tipo' => 'string',
         'institucion_id' => 'integer',
     ];
 
@@ -51,15 +52,14 @@ class Feriado extends Model
         'activo' => true,
     ];
 
-    /* =========================
-     * EVENTOS DEL MODELO
-     * ========================= */
-
+    /**
+     * Completa automáticamente los campos `dia` y `mes` a partir de `fecha` antes de persistir.
+     * Esto permite filtrar feriados por día y mes sin depender del año.
+     */
     protected static function boot()
     {
         parent::boot();
 
-        // Auto-completar día y mes desde la fecha
         static::saving(function ($model) {
             if ($model->fecha) {
                 $model->dia = $model->fecha->day;
@@ -68,24 +68,25 @@ class Feriado extends Model
         });
     }
 
-    /* =========================
-     * RELACIONES
-     * ========================= */
-
+    /**
+     * Institución propietaria del feriado (solo aplica para feriados de tipo institucional).
+     */
     public function institucion(): BelongsTo
     {
         return $this->belongsTo(Institucion::class);
     }
 
-    /* =========================
-     * ACCESSORS
-     * ========================= */
-
+    /**
+     * Retorna la fecha formateada como 'd/m/Y'.
+     */
     public function getFechaFormateadaAttribute(): string
     {
         return $this->fecha?->format('d/m/Y') ?? '';
     }
 
+    /**
+     * Retorna el nombre del día de la semana correspondiente a la fecha, en español.
+     */
     public function getDiaNombreAttribute(): string
     {
         if (!$this->fecha) {
@@ -95,47 +96,68 @@ class Feriado extends Model
         return $this->fecha->locale('es')->isoFormat('dddd');
     }
 
-    /* =========================
-     * SCOPES
-     * ========================= */
-
+    /**
+     * Filtra feriados activos.
+     */
     public function scopeActivos($query)
     {
         return $query->where('activo', true);
     }
 
+    /**
+     * Filtra feriados inactivos.
+     */
     public function scopeInactivos($query)
     {
         return $query->where('activo', false);
     }
 
+    /**
+     * Filtra feriados de tipo nacional.
+     */
     public function scopeNacionales($query)
     {
         return $query->where('tipo', self::TIPO_NACIONAL);
     }
 
+    /**
+     * Filtra feriados de tipo institucional.
+     */
     public function scopeInstitucionales($query)
     {
         return $query->where('tipo', self::TIPO_INSTITUCIONAL);
     }
 
+    /**
+     * Filtra feriados institucionales de una institución específica.
+     */
     public function scopePorInstitucion($query, int $institucionId)
     {
         return $query->where('tipo', self::TIPO_INSTITUCIONAL)
                      ->where('institucion_id', $institucionId);
     }
 
+    /**
+     * Filtra feriados que coinciden con el día y mes de la fecha proporcionada,
+     * independientemente del año (aplica para feriados recurrentes anuales).
+     */
     public function scopePorFecha($query, Carbon $fecha)
     {
         return $query->where('dia', $fecha->day)
                      ->where('mes', $fecha->month);
     }
 
+    /**
+     * Filtra feriados por año exacto.
+     */
     public function scopePorAnio($query, int $anio)
     {
         return $query->whereYear('fecha', $anio);
     }
 
+    /**
+     * Retorna los próximos feriados activos ordenados por fecha ascendente.
+     */
     public function scopeProximosFeriados($query, int $limite = 10)
     {
         $hoy = now();
@@ -146,6 +168,9 @@ class Feriado extends Model
                      ->limit($limite);
     }
 
+    /**
+     * Filtra feriados del mes indicado. Si se proporciona el año, restringe también por él.
+     */
     public function scopeDelMes($query, int $mes, ?int $anio = null)
     {
         $query->where('mes', $mes);
@@ -157,52 +182,67 @@ class Feriado extends Model
         return $query;
     }
 
+    /**
+     * Filtra feriados del año indicado. Si no se proporciona, usa el año actual.
+     */
     public function scopeDelAnio($query, ?int $anio = null)
     {
         $anio = $anio ?? now()->year;
         return $query->whereYear('fecha', $anio);
     }
 
-    /* =========================
-     * HELPERS
-     * ========================= */
-
+    /**
+     * Indica si el feriado es de tipo nacional.
+     */
     public function esNacional(): bool
     {
         return $this->tipo === self::TIPO_NACIONAL;
     }
 
+    /**
+     * Indica si el feriado es de tipo institucional.
+     */
     public function esInstitucional(): bool
     {
         return $this->tipo === self::TIPO_INSTITUCIONAL;
     }
 
+    /**
+     * Indica si el feriado está activo.
+     */
     public function estaActivo(): bool
     {
         return $this->activo === true;
     }
 
+    /**
+     * Indica si la fecha del feriado ya ha pasado respecto al momento actual.
+     */
     public function yaPaso(): bool
     {
         return $this->fecha < now()->toDateString();
     }
 
+    /**
+     * Indica si la fecha del feriado es hoy.
+     */
     public function esHoy(): bool
     {
         return $this->fecha->isToday();
     }
 
+    /**
+     * Indica si la fecha del feriado aún no ha llegado.
+     */
     public function esProximo(): bool
     {
         return $this->fecha > now()->toDateString();
     }
 
-    /* =========================
-     * MÉTODOS ESTÁTICOS
-     * ========================= */
-
     /**
-     * Verifica si una fecha es feriado
+     * Verifica si una fecha corresponde a un día feriado.
+     * Primero comprueba feriados nacionales; si se indica una institución,
+     * también evalúa sus feriados institucionales.
      */
     public static function esFeriado(Carbon $fecha, ?int $institucionId = null): bool
     {
@@ -210,14 +250,12 @@ class Feriado extends Model
                        ->where('dia', $fecha->day)
                        ->where('mes', $fecha->month);
 
-        // Buscar feriados nacionales
         $nacional = (clone $query)->where('tipo', self::TIPO_NACIONAL)->exists();
 
         if ($nacional) {
             return true;
         }
 
-        // Si se proporciona institución, buscar feriados institucionales
         if ($institucionId) {
             return (clone $query)
                 ->where('tipo', self::TIPO_INSTITUCIONAL)
@@ -229,7 +267,8 @@ class Feriado extends Model
     }
 
     /**
-     * Obtiene todos los feriados aplicables a una fecha e institución
+     * Obtiene todos los feriados aplicables a una fecha e institución.
+     * Devuelve feriados nacionales más los institucionales de la institución indicada.
      */
     public static function getFeriadosAplicables(Carbon $fecha, ?int $institucionId = null)
     {
@@ -253,7 +292,8 @@ class Feriado extends Model
     }
 
     /**
-     * Obtiene feriados del año actual
+     * Retorna los feriados del año indicado (o del año actual), ordenados por fecha.
+     * Si se proporciona una institución, incluye también sus feriados institucionales.
      */
     public static function getFeriadosDelAnio(?int $anio = null, ?int $institucionId = null)
     {
@@ -279,11 +319,13 @@ class Feriado extends Model
     }
 
     /**
-     * Cuenta días laborales entre dos fechas (excluyendo feriados y fines de semana)
+     * Cuenta los días laborales entre dos fechas, excluyendo sábados, domingos y feriados.
+     *
+     * Precarga todos los feriados aplicables en un set indexado por 'mes-dia' para
+     * evitar consultas N+1 dentro del bucle de iteración de fechas.
      */
     public static function contarDiasLaborales(Carbon $desde, Carbon $hasta, ?int $institucionId = null): int
     {
-        // Precargar feriados aplicables para evitar N+1 queries en el bucle
         $feriadosQuery = static::activos();
         
         if ($institucionId) {
@@ -309,9 +351,7 @@ class Feriado extends Model
         $fecha = $desde->copy();
 
         while ($fecha->lte($hasta)) {
-            // Excluir sábados y domingos
             if (!$fecha->isWeekend()) {
-                // Excluir feriados
                 $clave = $fecha->month . '-' . $fecha->day;
                 if (!isset($feriadosSet[$clave])) {
                     $dias++;
@@ -324,7 +364,7 @@ class Feriado extends Model
     }
 
     /**
-     * Obtiene tipos disponibles
+     * Retorna la lista de tipos de feriado disponibles.
      */
     public static function getTiposDisponibles(): array
     {
@@ -335,7 +375,7 @@ class Feriado extends Model
     }
 
     /**
-     * Obtiene tipos con etiquetas
+     * Retorna los tipos de feriado con su etiqueta legible.
      */
     public static function getTiposConEtiquetas(): array
     {
@@ -345,10 +385,9 @@ class Feriado extends Model
         ];
     }
 
-    /* =========================
-     * AUDITORÍA
-     * ========================= */
-
+    /**
+     * Retorna el nombre legible utilizado en el registro de auditoría.
+     */
     protected function getNombreAuditable(): string
     {
         return "{$this->descripcion} ({$this->fecha?->format('d/m/Y')})";

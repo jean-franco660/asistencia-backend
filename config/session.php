@@ -14,7 +14,7 @@ return [
     | persist session data. Database storage is a great default choice.
     |
     | Supported: "file", "cookie", "database", "memcached",
-    |            "redis", "dynamodb", "array"
+    |           "redis", "dynamodb", "array"
     |
     */
 

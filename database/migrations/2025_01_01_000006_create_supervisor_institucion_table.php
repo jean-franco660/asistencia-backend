@@ -4,6 +4,11 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
+/**
+ * Crea la tabla pivote `supervisor_institucion`, que asigna usuarios web con rol supervisor
+ * a instituciones específicas para que puedan revisar asistencias y gestionar justificaciones.
+ * La restricción de unicidad impide asignar el mismo supervisor dos veces a la misma institución.
+ */
 return new class extends Migration {
     public function up(): void
     {

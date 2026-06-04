@@ -6,21 +6,32 @@ use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use Illuminate\Http\Request;
 
+/**
+ * Expone el registro de auditoría del sistema.
+ *
+ * Solo accesible para el rol super_admin. Permite consultar, filtrar y obtener
+ * estadísticas de las acciones realizadas por cualquier actor sobre cualquier modelo.
+ * También expone el historial de cambios de un modelo específico.
+ */
 class AuditLogController extends Controller
 {
     /**
-     * Listar logs de auditoría con filtros y paginación
+     * Lista los registros de auditoría con filtros acumulativos y paginación.
+     *
+     * Filtros disponibles: actor_id, actor_type, actor_rol, modelo, modelo_id, accion,
+     * solo_criticas (booleano), fecha_desde, fecha_hasta y búsqueda general (buscar).
+     * La respuesta transforma cada log para incluir el nombre simple del modelo.
+     * Solo accesible para super_admin.
      */
     public function index(Request $request)
     {
-        // Solo super_admin y administrador pueden ver logs
+        // La restricción es intencional: solo super_admin tiene visibilidad total del log
         if (!in_array($request->user()->rol, ['super_admin'])) {
             return response()->json(['message' => 'No autorizado'], 403);
         }
 
         $query = AuditLog::query()->orderBy('created_at', 'desc');
 
-        // Filtro por actor (quien realizó la acción)
         if ($request->filled('actor_id')) {
             $query->where('actor_id', $request->actor_id);
         }
@@ -33,7 +44,6 @@ class AuditLogController extends Controller
             $query->where('actor_rol', $request->actor_rol);
         }
 
-        // Filtro por modelo afectado
         if ($request->filled('modelo')) {
             $query->where('modelo', $request->modelo);
         }
@@ -42,17 +52,14 @@ class AuditLogController extends Controller
             $query->where('modelo_id', $request->modelo_id);
         }
 
-        // Filtro por acción
         if ($request->filled('accion')) {
             $query->where('accion', $request->accion);
         }
 
-        // Filtro por acciones críticas
         if ($request->boolean('solo_criticas')) {
             $query->accionesCriticas();
         }
 
-        // Filtro por rango de fechas
         if ($request->filled('fecha_desde')) {
             $query->whereDate('created_at', '>=', $request->fecha_desde);
         }
@@ -61,7 +68,6 @@ class AuditLogController extends Controller
             $query->whereDate('created_at', '<=', $request->fecha_hasta);
         }
 
-        // Búsqueda general
         if ($request->filled('buscar')) {
             $buscar = $request->buscar;
             $query->where(function ($q) use ($buscar) {
@@ -73,7 +79,7 @@ class AuditLogController extends Controller
 
         $logs = $query->paginate($request->get('per_page', 20));
 
-        // Transformar para incluir cambios legibles
+        // Normaliza el nombre del modelo a su forma simple para facilitar la lectura en el frontend
         $logs->getCollection()->transform(function ($log) {
             return [
                 'id' => $log->id,
@@ -105,11 +111,12 @@ class AuditLogController extends Controller
     }
 
     /**
-     * Ver detalle de un log específico
+     * Retorna el detalle completo de un registro de auditoría, incluyendo
+     * datos anteriores, datos nuevos y diferencias calculadas.
+     * Solo accesible para super_admin.
      */
     public function show(Request $request, $id)
     {
-        // Solo super_admin y administrador
         if (!in_array($request->user()->rol, ['super_admin'])) {
             return response()->json(['message' => 'No autorizado'], 403);
         }
@@ -149,16 +156,19 @@ class AuditLogController extends Controller
     }
 
     /**
-     * Estadísticas de auditoría
+     * Retorna estadísticas agregadas del registro de auditoría.
+     *
+     * El parámetro 'periodo' define la ventana de días a analizar (por defecto 7).
+     * Incluye total de logs, acciones críticas, top de actores, acciones y modelos
+     * más frecuentes en el período. Solo accesible para super_admin.
      */
     public function stats(Request $request)
     {
-        // Solo super_admin y administrador
         if (!in_array($request->user()->rol, ['super_admin'])) {
             return response()->json(['message' => 'No autorizado'], 403);
         }
 
-        $periodo = $request->get('periodo', 7); // días
+        $periodo = $request->get('periodo', 7); // ventana de análisis en días
 
         $stats = [
             'total_logs' => AuditLog::count(),
@@ -195,16 +205,20 @@ class AuditLogController extends Controller
     }
 
     /**
-     * Historial de un modelo específico
+     * Retorna el historial de cambios de un registro específico de un modelo.
+     *
+     * El parámetro $modelo acepta el nombre simple de la clase (ej. 'UsuarioWeb')
+     * y lo resuelve al namespace completo mediante un mapa interno. Si el nombre
+     * no está en el mapa, se usa tal cual como clase completa.
+     * Solo accesible para super_admin.
      */
     public function historialModelo(Request $request, $modelo, $id)
     {
-        // Solo super_admin y administrador
         if (!in_array($request->user()->rol, ['super_admin'])) {
             return response()->json(['message' => 'No autorizado'], 403);
         }
 
-        // Mapear nombre simple a clase completa
+        // Permite recibir el nombre simple y resolverlo al namespace completo
         $modeloMap = [
             'UsuarioWeb' => 'App\Models\UsuarioWeb',
             'UsuarioApp' => 'App\Models\UsuarioApp',

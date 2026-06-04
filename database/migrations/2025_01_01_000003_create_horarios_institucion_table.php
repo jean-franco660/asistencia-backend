@@ -4,6 +4,11 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
+/**
+ * Crea la tabla `horarios_institucion`, que define los turnos laborales (mañana, tarde, noche)
+ * de cada institución, con horas de entrada/salida, tolerancias en minutos y los días
+ * activos de la semana. La restricción de unicidad evita turnos duplicados por institución.
+ */
 return new class extends Migration {
     public function up(): void
     {

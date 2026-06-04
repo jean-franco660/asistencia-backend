@@ -174,7 +174,7 @@ class StatsController extends Controller
         ============================================================ */
 
         return response()->json([
-            //  NUEVA ESTRUCTURA ANIDADA
+            // NUEVA ESTRUCTURA ANIDADA
             'instituciones' => [
                 'total' => $instCount,
                 'activas' => $institucionesActivas,
@@ -196,7 +196,7 @@ class StatsController extends Controller
                 'rechazadas' => $justificacionesRechazadas,
             ],
 
-            //  CAMPOS LEGACY (RETROCOMPATIBILIDAD)
+            // CAMPOS LEGACY (RETROCOMPATIBILIDAD)
             'docentes_count' => $docentesCount,
             'total_instituciones' => $instCount,
             'asistencias_hoy' => $asistenciasHoy,

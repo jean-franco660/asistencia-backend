@@ -5,14 +5,29 @@ namespace App\Http\Requests;
 use App\Models\UsuarioWeb;
 use Illuminate\Foundation\Http\FormRequest;
 
+/**
+ * Valida los datos requeridos para crear un nuevo usuario del panel web (administrador o supervisor).
+ * Solo los usuarios con rol 'super_admin' o 'administrador' pueden registrar nuevos usuarios web.
+ * Garantiza la unicidad del correo electrónico en la tabla de usuarios web.
+ */
 class StoreUsuarioWebRequest extends FormRequest
 {
+    /**
+     * Restringe la operación a usuarios con rol administrativo.
+     * Los supervisores no tienen permiso para crear otros usuarios web.
+     */
     public function authorize(): bool
     {
-        //  Permitir super_admin y admin
         return in_array($this->user()->rol, ['super_admin', 'administrador']);
     }
 
+    /**
+     * Retorna las reglas de validación para un nuevo usuario web.
+     * El campo 'estado' usa 'sometimes' porque puede ser omitido en la creación;
+     * si se envía, debe ser uno de los valores del flujo de aprobación.
+     * El campo 'rol' no puede ser 'super_admin' para evitar escalada de privilegios
+     * si el controlador no lo filtra previamente.
+     */
     public function rules(): array
     {
         return [

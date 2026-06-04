@@ -7,13 +7,17 @@ use Illuminate\Support\Facades\DB;
 use App\Models\Institucion;
 use App\Models\UsuarioApp;
 
+/**
+ * Seeder exclusivo para entorno de desarrollo local.
+ * Inserta datos mínimos de prueba: una institución educativa ficticia,
+ * un docente de ejemplo y la relación N:M entre ambos.
+ * No debe ejecutarse en producción.
+ */
 class DevDatosSeeder extends Seeder
 {
     public function run(): void
     {
-        // =========================================================
-        // 1) Institución
-        // =========================================================
+        // Institución educativa ficticia usada como referencia en las pruebas de desarrollo
         $inst = Institucion::create([
             'codigo_modular_ie' => 'PRUEBA001',
             'nombre' => 'IE Prueba Seed',
@@ -27,10 +31,7 @@ class DevDatosSeeder extends Seeder
             'logo' => null,
         ]);
 
-        // =========================================================
-        // 2) Docente (usuarios_app)
-        // NOTA: tu modelo hashea automáticamente "password"
-        // =========================================================
+        // Docente de prueba; el mutator del modelo hashea la contraseña automáticamente
         $doc = UsuarioApp::create([
             'codigo_modular' => '102030',
             'apellido_paterno' => 'Pérez',
@@ -41,10 +42,7 @@ class DevDatosSeeder extends Seeder
             'password' => 'Temp12345!',
         ]);
 
-        // =========================================================
-        // 3) Relación N:M (pivote docente_institucion)
-        //    - tu pivote tiene estado + fechas + timestamps
-        // =========================================================
+        // Asigna el docente a la institución mediante la tabla pivote usuario_app_institucion
         $doc->instituciones()->syncWithoutDetaching([
             $inst->id => [
                 'estado' => 'ACTIVO',

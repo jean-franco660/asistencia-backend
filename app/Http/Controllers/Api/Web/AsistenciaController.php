@@ -20,23 +20,22 @@ use Illuminate\Support\Str;
 use Maatwebsite\Excel\Facades\Excel;
 
 /**
- * Controlador de Asistencias para el PANEL WEB (Administradores/Supervisores)
+ * Gestiona las asistencias desde el panel web.
  *
- * Responsabilidades:
- * - Listar marcaciones individuales (index)
- * - Listar cabeceras diarias (listCabeceras)
- * - Ver detalle de asistencia (show)
- * - Obtener marcación individual (getMarcacion)
- * - Revisión de marcaciones (updateReview)
- * - Exportar reportes (exportar, exportarInstitucion)
- * - Servir foto de marcación (foto)
+ * Accesible para administradores y supervisores. Los supervisores solo pueden
+ * consultar y operar sobre las instituciones que tienen asignadas de forma vigente.
+ * Provee listado granular de marcaciones, cabeceras diarias, revisión de marcaciones
+ * observadas, exportación a Excel con auditoría y servicio de fotos de marcación.
  */
 class AsistenciaController extends Controller
 {
-    /* ================================================================
-     * LISTAR MARCACIONES (AsistenciaDiaria) — Vista granular
-     * ================================================================ */
-
+    /**
+     * Lista marcaciones individuales (AsistenciaDiaria) con filtros opcionales.
+     *
+     * Los supervisores solo ven marcaciones de sus instituciones vigentes. Soporta
+     * filtros por institución, rango de fechas, estado_marcacion, estado_revision,
+     * tipo y búsqueda por nombre o código del docente. Retorna paginado.
+     */
     public function index(Request $request): JsonResponse
     {
         try {
@@ -56,7 +55,7 @@ class AsistenciaController extends Controller
             // Filtro obligatorio: supervisores solo ven sus instituciones
             $this->aplicarFiltroInstituciones($query, $user, 'asistencias.institucion_id');
 
-            // Filtros opcionales
+            // Los siguientes filtros son acumulativos y todos opcionales
             if ($request->filled('institucion_id')) {
                 $this->validarAccesoInstitucion($user, $request->institucion_id);
                 $query->where('asistencias.institucion_id', $request->institucion_id);
@@ -90,10 +89,14 @@ class AsistenciaController extends Controller
         }
     }
 
-    /* ================================================================
-     * LISTAR CABECERAS DIARIAS — Vista principal
-     * ================================================================ */
-
+    /**
+     * Lista las cabeceras diarias de asistencia (modelo Asistencia).
+     *
+     * Cada cabecera agrupa las marcaciones de un docente en un día. Incluye el conteo
+     * de marcaciones con estado OBSERVADA y revisión PENDIENTE, útil para priorizar
+     * la revisión. Soporta filtros por institución, rango de fechas, estado_diario
+     * y búsqueda por docente.
+     */
     public function listCabeceras(Request $request): JsonResponse
     {
         try {
@@ -108,10 +111,10 @@ class AsistenciaController extends Controller
                 ->orderByDesc('fecha')
                 ->orderByDesc('created_at');
 
-            // Filtro obligatorio de instituciones
+            // Los supervisores quedan restringidos a sus instituciones vigentes
             $this->aplicarFiltroInstituciones($query, $user);
 
-            // Filtros opcionales
+            // Los siguientes filtros son acumulativos y todos opcionales
             if ($request->filled('institucion_id')) {
                 $this->validarAccesoInstitucion($user, $request->institucion_id);
                 $query->where('institucion_id', $request->institucion_id);
@@ -147,10 +150,12 @@ class AsistenciaController extends Controller
         }
     }
 
-    /* ================================================================
-     * VER DETALLE DE ASISTENCIA
-     * ================================================================ */
-
+    /**
+     * Retorna el detalle completo de una cabecera de asistencia incluyendo todas sus marcaciones.
+     *
+     * Los supervisores solo pueden acceder a asistencias de sus instituciones vigentes;
+     * de lo contrario se retorna 403.
+     */
     public function show(Request $request, $id): JsonResponse
     {
         $user = $request->user();
@@ -173,10 +178,12 @@ class AsistenciaController extends Controller
         return response()->json(['success' => true, 'data' => new AsistenciaResource($asistencia)]);
     }
 
-    /* ================================================================
-     * OBTENER MARCACIÓN INDIVIDUAL
-     * ================================================================ */
-
+    /**
+     * Retorna el detalle de una marcación individual (AsistenciaDiaria).
+     *
+     * Incluye los datos del docente, institución, horario y el revisor si ya fue revisada.
+     * Los supervisores solo pueden acceder a marcaciones de sus instituciones vigentes.
+     */
     public function getMarcacion(Request $request, $id): JsonResponse
     {
         $user = $request->user();
@@ -188,7 +195,7 @@ class AsistenciaController extends Controller
             'revisadoPor:id,nombre,email',
         ])->findOrFail($id);
 
-        // Validar acceso
+        // Los supervisores solo acceden a marcaciones de sus instituciones vigentes
         if (!$user->esAdminOSuperAdmin()) {
             $institucionesIds = $user->institucionesVigentes()->pluck('id');
             if (!$institucionesIds->contains($marcacion->asistencia->institucion_id)) {
@@ -199,10 +206,13 @@ class AsistenciaController extends Controller
         return response()->json(['success' => true, 'data' => $marcacion]);
     }
 
-    /* ================================================================
-     * REVISIÓN DE MARCACIÓN
-     * ================================================================ */
-
+    /**
+     * Actualiza el estado de revisión de una marcación observada.
+     *
+     * Estados válidos: PENDIENTE, APROBADA, MANTENER_OBSERVADA. Al aprobar se
+     * recalcula el estado diario de la cabecera usando DailyStateCalculatorService.
+     * El revisor y la fecha de revisión quedan registrados automáticamente.
+     */
     public function updateReview(Request $request, $id): JsonResponse
     {
         try {
@@ -210,12 +220,12 @@ class AsistenciaController extends Controller
 
             $request->validate([
                 'estado_revision' => 'required|in:PENDIENTE,APROBADA,MANTENER_OBSERVADA',
-                'observacion'     => 'nullable|string|max:500',
+                'observacion' => 'nullable|string|max:500',
             ]);
 
             $marcacion = AsistenciaDiaria::with('asistencia')->findOrFail($id);
 
-            // Validar acceso
+            // Los supervisores solo pueden revisar marcaciones de sus instituciones vigentes
             if (!$user->esAdminOSuperAdmin()) {
                 $institucionesIds = $user->institucionesVigentes()->pluck('id');
                 if (!$institucionesIds->contains($marcacion->asistencia->institucion_id)) {
@@ -224,13 +234,13 @@ class AsistenciaController extends Controller
             }
 
             $marcacion->update([
-                'estado_revision'            => $request->estado_revision,
-                'revision_observacion'       => $request->observacion,
+                'estado_revision' => $request->estado_revision,
+                'revision_observacion' => $request->observacion,
                 'revisado_por_usuario_web_id' => $user->id,
-                'revisado_en'                => now(),
+                'revisado_en' => now(),
             ]);
 
-            // Recalcular estado diario
+            // Recalcula el estado diario de la cabecera para reflejar el resultado de la revisión
             if ($marcacion->asistencia) {
                 $calculator = app(DailyStateCalculatorService::class);
                 $marcacion->asistencia->update($calculator->calculate($marcacion->asistencia));
@@ -239,7 +249,7 @@ class AsistenciaController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Revisión guardada correctamente',
-                'data'    => $marcacion->fresh(['asistencia.usuario', 'asistencia.institucion', 'asistencia.horario', 'revisadoPor']),
+                'data' => $marcacion->fresh(['asistencia.usuario', 'asistencia.institucion', 'asistencia.horario', 'revisadoPor']),
             ]);
 
         } catch (\Exception $e) {
@@ -248,25 +258,28 @@ class AsistenciaController extends Controller
         }
     }
 
-    /* ================================================================
-     * EXPORTAR ASISTENCIAS (con auditoría)
-     * ================================================================ */
-
+    /**
+     * Exporta asistencias a Excel aplicando los filtros de fecha, institución y tipo.
+     *
+     * Registra un evento de auditoría con los filtros aplicados, el total de registros
+     * exportados y el nombre del archivo generado. Los supervisores quedan
+     * restringidos automáticamente a sus instituciones vigentes.
+     */
     public function exportar(Request $request)
     {
         $user = $request->user();
 
         $filters = [
-            'fecha_inicio'   => $request->input('fecha_inicio'),
-            'fecha_fin'      => $request->input('fecha_fin'),
+            'fecha_inicio' => $request->input('fecha_inicio'),
+            'fecha_fin' => $request->input('fecha_fin'),
             'institucion_id' => $request->input('institucion_id'),
-            'tipo'           => $request->input('tipo'),
-            'user'           => $user,
+            'tipo' => $request->input('tipo'),
+            'user' => $user,
         ];
 
         $query = Asistencia::query();
 
-        // Filtro obligatorio
+        // Los supervisores quedan restringidos a sus instituciones vigentes
         $this->aplicarFiltroInstituciones($query, $user);
 
         if ($filters['fecha_inicio']) $query->whereDate('fecha', '>=', $filters['fecha_inicio']);
@@ -282,35 +295,38 @@ class AsistenciaController extends Controller
         $totalRegistros = $query->count();
         $filename       = 'Reporte_Asistencias_' . now()->format('Y-m-d_His') . '.xlsx';
 
-        // Auditoría
+        // Registra la exportación para trazabilidad administrativa
         AuditLog::create([
-            'actor_id'      => $user->id,
-            'actor_type'    => get_class($user),
-            'actor_nombre'  => $user->nombre,
-            'actor_rol'     => $user->rol,
-            'accion'        => 'exportado',
-            'descripcion'   => 'Exportación de reporte de asistencias',
-            'modelo'        => Asistencia::class,
-            'modelo_id'     => null,
+            'actor_id' => $user->id,
+            'actor_type' => get_class($user),
+            'actor_nombre' => $user->nombre,
+            'actor_rol' => $user->rol,
+            'accion' => 'exportado',
+            'descripcion' => 'Exportación de reporte de asistencias',
+            'modelo' => Asistencia::class,
+            'modelo_id' => null,
             'modelo_nombre' => 'Reporte de asistencias',
-            'metadata'      => [
+            'metadata' => [
                 'total_registros' => $totalRegistros,
-                'filtros'         => $filters,
-                'archivo'         => $filename,
+                'filtros' => $filters,
+                'archivo' => $filename,
             ],
-            'ip_address'  => $request->ip(),
-            'user_agent'  => $request->userAgent(),
-            'url'         => $request->fullUrl(),
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+            'url' => $request->fullUrl(),
             'metodo_http' => $request->method(),
         ]);
 
         return Excel::download(new AsistenciasMultipleExport($filters), $filename);
     }
 
-    /* ================================================================
-     * EXPORTAR POR INSTITUCIÓN
-     * ================================================================ */
-
+    /**
+     * Exporta el reporte de asistencias de una institución específica.
+     *
+     * Genera un archivo Excel con el nombre de la institución. Los supervisores
+     * solo pueden exportar instituciones que tienen asignadas de forma vigente.
+     * Acepta filtros de fecha_inicio y fecha_fin opcionales.
+     */
     public function exportarInstitucion(Request $request, $institucionId)
     {
         try {
@@ -337,10 +353,13 @@ class AsistenciaController extends Controller
         }
     }
 
-    /* ================================================================
-     * SERVIR FOTO DE MARCACIÓN
-     * ================================================================ */
-
+    /**
+     * Sirve el archivo de foto asociado a una marcación.
+     *
+     * Retorna 404 si la marcación no tiene foto o si el archivo no existe en disco.
+     * Sirve el archivo directamente desde el disco público sin verificar permisos
+     * de institución, por lo que debe protegerse a nivel de ruta.
+     */
     public function foto($id)
     {
         $marcacion = AsistenciaDiaria::findOrFail($id);
@@ -356,10 +375,6 @@ class AsistenciaController extends Controller
 
         return response()->file($disk->path($marcacion->foto_url));
     }
-
-    /* ================================================================
-     * MÉTODOS PRIVADOS REUTILIZABLES
-     * ================================================================ */
 
     /**
      * Aplica filtro de instituciones basado en el rol del usuario.

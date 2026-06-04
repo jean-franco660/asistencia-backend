@@ -4,6 +4,11 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
+/**
+ * Crea la tabla `asistencias_diarias`, que registra cada marcación individual (ENTRADA/SALIDA)
+ * realizada por un docente. Incluye coordenadas GPS, estado de validación geográfica,
+ * soporte para registros offline y un flujo de revisión humana para marcaciones observadas.
+ */
 return new class extends Migration {
     public function up(): void
     {
@@ -45,7 +50,7 @@ return new class extends Migration {
             // Metadata flexible
             $table->json('meta')->nullable();
 
-            // --- Revisión humana (consolidado) ---
+            // Revisión manual por un usuario web cuando la marcación resultó OBSERVADA
             $table->string('estado_revision', 20)->default('PENDIENTE')->index();
             $table->foreignId('revisado_por_usuario_web_id')
                 ->nullable()

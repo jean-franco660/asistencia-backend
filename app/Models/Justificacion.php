@@ -61,8 +61,8 @@ class Justificacion extends Model
     ];
 
     protected $casts = [
-        'fecha_inicio'   => 'date',
-        'fecha_fin'      => 'date',
+        'fecha_inicio' => 'date',
+        'fecha_fin' => 'date',
         'fecha_revision' => 'datetime',
     ];
 
@@ -78,7 +78,7 @@ class Justificacion extends Model
     {
         parent::boot();
 
-        //  NUEVO: Validación de fechas
+        // NUEVO: Validación de fechas
         static::saving(function ($model) {
             // Validar que fecha_fin >= fecha_inicio
             if ($model->fecha_fin && $model->fecha_inicio) {
@@ -407,14 +407,14 @@ class Justificacion extends Model
         ?int $horarioId = null
     ): self {
         return static::create([
-            'asistencia_id'          => null,
-            'usuario_app_id'         => $usuario->id,
-            'institucion_id'         => $institucion->id,
+            'asistencia_id' => null,
+            'usuario_app_id' => $usuario->id,
+            'institucion_id' => $institucion->id,
             'horario_institucion_id' => $horarioId,
-            'tipo'                   => $tipo,
-            'fecha_inicio'           => $fechaInicio,
-            'fecha_fin'              => $fechaFin,
-            'motivo'                 => $motivo,
+            'tipo' => $tipo,
+            'fecha_inicio' => $fechaInicio,
+            'fecha_fin' => $fechaFin,
+            'motivo' => $motivo,
         ]);
     }
 
@@ -427,14 +427,14 @@ class Justificacion extends Model
         string $motivo
     ): self {
         return static::create([
-            'asistencia_id'          => $asistencia->id,
-            'usuario_app_id'         => $asistencia->usuario_app_id,
-            'institucion_id'         => $asistencia->institucion_id,
+            'asistencia_id' => $asistencia->id,
+            'usuario_app_id' => $asistencia->usuario_app_id,
+            'institucion_id' => $asistencia->institucion_id,
             'horario_institucion_id' => $asistencia->horario_institucion_id,
-            'tipo'                   => $tipo,
-            'fecha_inicio'           => $asistencia->fecha,
-            'fecha_fin'              => $asistencia->fecha,
-            'motivo'                 => $motivo,
+            'tipo' => $tipo,
+            'fecha_inicio' => $asistencia->fecha,
+            'fecha_fin' => $asistencia->fecha,
+            'motivo' => $motivo,
         ]);
     }
 

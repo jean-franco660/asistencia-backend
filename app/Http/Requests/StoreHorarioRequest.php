@@ -4,7 +4,13 @@ namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-
+/**
+ * Valida los datos necesarios para crear un horario en una institución educativa.
+ * Gestiona los turnos mañana, tarde y noche, con validación condicional
+ * en la hora de salida para el turno noche, donde el cruce de medianoche
+ * hace inválida la regla 'after:hora_entrada'.
+ * Accesible por cualquier usuario autenticado con permisos sobre horarios.
+ */
 class StoreHorarioRequest extends FormRequest
 {
     public function authorize(): bool
@@ -12,6 +18,12 @@ class StoreHorarioRequest extends FormRequest
         return true;
     }
 
+    /**
+     * Retorna las reglas de validación para el horario.
+     * Para el turno noche se omite la regla 'after:hora_entrada' en hora_salida,
+     * ya que ese turno puede cruzar la medianoche y la comparación directa de horas
+     * produciría un falso negativo.
+     */
     public function rules(): array
     {
         $rules = [
@@ -23,7 +35,7 @@ class StoreHorarioRequest extends FormRequest
             'tolerancia_salida' => 'nullable|integer|min:0|max:60',
         ];
 
-        // Para el turno noche, la hora de salida puede cruzar la medianoche, por lo que no requerimos 'after:hora_entrada'
+        // El turno noche puede cruzar la medianoche, por lo que no se aplica 'after:hora_entrada'
         if ($this->input('turno') !== 'noche') {
             $rules['hora_salida'] .= '|after:hora_entrada';
         }

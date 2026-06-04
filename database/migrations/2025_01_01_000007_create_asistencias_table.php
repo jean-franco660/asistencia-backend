@@ -4,6 +4,12 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
+/**
+ * Crea la tabla `asistencias`, que funciona como cabecera diaria de asistencia por docente.
+ * Existe un registro único por docente, institución y fecha. Almacena el estado final del día
+ * (PRESENTE, TARDANZA, FALTA, etc.) calculado a partir de las marcaciones individuales
+ * registradas en `asistencias_diarias`. Permite revisión por un usuario web.
+ */
 return new class extends Migration {
     public function up(): void
     {

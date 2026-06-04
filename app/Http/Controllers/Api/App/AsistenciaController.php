@@ -21,14 +21,12 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Arr;
 
 /**
- * Controlador de Asistencias para la APP MÓVIL (Docentes)
+ * Gestiona las operaciones de asistencia expuestas a la aplicación móvil de docentes.
  *
- * Responsabilidades:
- * - Registrar marcación (store)
- * - Consultar historial del propio docente (historial)
- * - Consultar estado del día actual (estadoDia)
- * - Resumen semanal / mensual gráfico
- * - Sincronización offline (syncMovil)
+ * Permite registrar marcaciones de entrada y salida, consultar el historial personal,
+ * obtener el estado del día actual con selección inteligente de turno, generar resúmenes
+ * semanales y mensuales, y procesar lotes de marcaciones registradas sin conexión.
+ * Solo acceden docentes autenticados con token Sanctum.
  */
 class AsistenciaController extends Controller
 {
@@ -37,29 +35,34 @@ class AsistenciaController extends Controller
         protected AttendanceValidationService $validationService,
     ) {}
 
-    /* ================================================================
-     * REGISTRAR MARCACIÓN (ENTRADA/SALIDA)
-     * ================================================================ */
-
+    /**
+     * Registra una marcación de entrada o salida para el docente autenticado.
+     *
+     * Valida que el docente tenga asignación vigente en la institución indicada,
+     * que el día sea laborable según el horario asignado, y verifica la posición
+     * geográfica para determinar si la marcación es válida u observada.
+     * Si se envía un offline_uuid, aplica idempotencia para evitar duplicados.
+     * La operación se ejecuta dentro de una transacción de base de datos.
+     */
     public function store(Request $request): JsonResponse
     {
         try {
             $validated = $request->validate([
-                'institucion_id'        => 'required|integer|exists:instituciones,id',
+                'institucion_id' => 'required|integer|exists:instituciones,id',
                 'horario_institucion_id' => 'nullable|integer|exists:horarios_institucion,id',
-                'fecha_hora'            => 'required|date',
-                'latitud'               => 'required|numeric',
-                'longitud'              => 'required|numeric',
-                'tipo'                  => 'required|in:ENTRADA,SALIDA',
-                'foto'                  => 'nullable|file|image|mimes:jpg,jpeg,png|max:2048',
-                'offline_uuid'          => 'nullable|uuid',
+                'fecha_hora' => 'required|date',
+                'latitud' => 'required|numeric',
+                'longitud' => 'required|numeric',
+                'tipo' => 'required|in:ENTRADA,SALIDA',
+                'foto' => 'nullable|file|image|mimes:jpg,jpeg,png|max:2048',
+                'offline_uuid' => 'nullable|uuid',
             ]);
 
             $user     = $request->user();
             $fecha    = Carbon::parse($validated['fecha_hora'], 'America/Lima')->utc();
             $fechaDia = $fecha->setTimezone('America/Lima')->format('Y-m-d');
 
-            // Resolver asignación inteligente
+            // Selecciona el turno más apropiado según la hora actual cuando el docente tiene múltiples turnos
             $asignacion = $this->resolveAsignacionActiva(
                 $user,
                 $validated['institucion_id'],
@@ -78,7 +81,6 @@ class AsistenciaController extends Controller
                 return response()->json(['success' => false, 'message' => 'Sin horario asignado. Contacta al administrador.'], 403);
             }
 
-            // Validar día laborable
             $validacion = $this->asistenciaService->esDiaLaborableConHorario(
                 now('America/Lima'),
                 (int) $asignacion->institucion_id,
@@ -89,7 +91,7 @@ class AsistenciaController extends Controller
                 return response()->json(['success' => false, 'message' => $validacion['motivo']], 403);
             }
 
-            // Idempotencia (offline UUID)
+            // Evita duplicados cuando el dispositivo reintenta enviar una marcación ya procesada
             if (!empty($validated['offline_uuid'])) {
                 $existente = AsistenciaDiaria::where('offline_uuid', $validated['offline_uuid'])->first();
                 if ($existente) {
@@ -98,20 +100,19 @@ class AsistenciaController extends Controller
             }
 
             return DB::transaction(function () use ($user, $validated, $asignacion, $fecha, $fechaDia, $validacion, $request) {
-                // 1. HEADER: Crear o recuperar asistencia del día
+                // Cabecera diaria: agrupa todas las marcaciones del docente en un mismo día e institución
                 $asistencia = Asistencia::firstOrCreate(
                     [
                         'usuario_app_id' => $user->id,
                         'institucion_id' => $validated['institucion_id'],
-                        'fecha'          => $fechaDia,
+                        'fecha' => $fechaDia,
                     ],
                     [
                         'horario_institucion_id' => $asignacion->horario_institucion_id,
-                        'observacion'            => null,
+                        'observacion' => null,
                     ]
                 );
 
-                // 2. CÁLCULOS
                 $institucion = Institucion::findOrFail($validated['institucion_id']);
                 $dentroRango = $this->asistenciaService->estaDentroRango(
                     $validated['latitud'],
@@ -125,42 +126,39 @@ class AsistenciaController extends Controller
                     $validacion['horario']
                 );
 
-                // Estado de marcación
                 $estadoMarcacion = $dentroRango ? 'VALIDA' : 'OBSERVADA';
                 $motivoFinal     = !$dentroRango ? 'FUERA_DE_RANGO' : null;
 
+                // Una salida fuera del horario permitido también queda como observada
                 if ($validated['tipo'] === 'SALIDA' && ($calcResultado['requiere_observacion'] ?? false)) {
                     $estadoMarcacion = AsistenciaDiaria::ESTADO_OBSERVADA;
                     $motivoFinal     = $calcResultado['motivo_observacion'] ?? 'FUERA_DE_HORARIO';
                 }
 
-                // Guardar foto
                 $fotoPath = $this->asistenciaService->guardarFotoArchivo($request->file('foto'), 'store');
 
-                // 3. CREAR MARCACIÓN
                 $marcacion = AsistenciaDiaria::create([
-                    'asistencia_id'    => $asistencia->id,
-                    'tipo'             => $validated['tipo'],
-                    'marcada_en'       => $validated['fecha_hora'],
-                    'latitud'          => $validated['latitud'],
-                    'longitud'         => $validated['longitud'],
-                    'distancia_m'      => 0,
-                    'dentro_rango'     => $dentroRango,
+                    'asistencia_id' => $asistencia->id,
+                    'tipo' => $validated['tipo'],
+                    'marcada_en' => $validated['fecha_hora'],
+                    'latitud' => $validated['latitud'],
+                    'longitud' => $validated['longitud'],
+                    'distancia_m' => 0,
+                    'dentro_rango' => $dentroRango,
                     'estado_marcacion' => $estadoMarcacion,
-                    'motivo'           => $motivoFinal,
-                    'foto_url'         => $fotoPath,
-                    'offline_uuid'     => $validated['offline_uuid'] ?? null,
-                    'registrado_en'    => 'APP_ONLINE',
-                    'estado_revision'  => $estadoMarcacion === 'OBSERVADA' ? 'PENDIENTE' : 'APROBADA',
+                    'motivo' => $motivoFinal,
+                    'foto_url' => $fotoPath,
+                    'offline_uuid' => $validated['offline_uuid'] ?? null,
+                    'registrado_en' => 'APP_ONLINE',
+                    'estado_revision' => $estadoMarcacion === 'OBSERVADA' ? 'PENDIENTE' : 'APROBADA',
                 ]);
 
-                // 4. ACTUALIZAR HEADER
                 $this->actualizarHeaderAsistencia($asistencia, $validated['tipo'], $fecha, $calcResultado);
 
                 return response()->json([
                     'success' => true,
                     'message' => 'Asistencia registrada correctamente',
-                    'data'    => ['asistencia' => $asistencia, 'marcacion' => $marcacion],
+                    'data' => ['asistencia' => $asistencia, 'marcacion' => $marcacion],
                 ], 201);
             });
 
@@ -170,10 +168,13 @@ class AsistenciaController extends Controller
         }
     }
 
-    /* ================================================================
-     * HISTORIAL DEL DOCENTE (últimos 30 días)
-     * ================================================================ */
-
+    /**
+     * Retorna el historial de asistencias del docente autenticado de los últimos 30 días.
+     *
+     * Solo el propio docente puede consultar su historial; cualquier intento de consultar
+     * el historial de otro usuario resulta en un error 403.
+     * Incluye las relaciones de horario y marcaciones diarias.
+     */
     public function historial(Request $request, $usuarioId): JsonResponse
     {
         try {
@@ -197,10 +198,15 @@ class AsistenciaController extends Controller
         }
     }
 
-    /* ================================================================
-     * ESTADO DEL DÍA (Smart Shift Selection)
-     * ================================================================ */
-
+    /**
+     * Retorna el estado de marcación del día actual para el docente autenticado.
+     *
+     * Aplica selección inteligente de turno: si el docente tiene múltiples asignaciones
+     * activas en la institución, determina cuál es la más apropiada según la hora actual.
+     * Si se especifica institucion_id y/o horario_institucion_id en la solicitud, los utiliza
+     * como filtro; de lo contrario, usa la asignación principal del usuario.
+     * Expone las ventanas de marcación disponibles y la acción siguiente esperada (ENTRADA/SALIDA).
+     */
     public function estadoDia(Request $request): JsonResponse
     {
         /** @var \App\Models\UsuarioApp $user */
@@ -218,23 +224,23 @@ class AsistenciaController extends Controller
         }
 
         $emptyResponse = [
-            'server_now'     => $today->toIso8601String(),
-            'laborable'      => false,
-            'puede_marcar'   => false,
-            'next_action'    => 'NONE',
-            'windows'        => null,
+            'server_now' => $today->toIso8601String(),
+            'laborable' => false,
+            'puede_marcar' => false,
+            'next_action' => 'NONE',
+            'windows' => null,
             'mensaje_estado' => 'Sin asignación vigente con horario',
-            'horario'        => null,
+            'horario' => null,
         ];
 
         if (!$asignacion) {
             return response()->json(array_merge($emptyResponse, [
-                'motivo'              => 'Sin asignación vigente con horario',
-                'active_assignments'  => [],
+                'motivo' => 'Sin asignación vigente con horario',
+                'active_assignments' => [],
             ]));
         }
 
-        // Lista de asignaciones activas para el selector de turnos
+        // Carga todos los turnos activos para permitir que la app muestre el selector de turno
         $allAssignments = $this->getActiveAssignments($user->id, $institucionId, $today);
 
         $validacion = $this->asistenciaService->esDiaLaborableConHorario(
@@ -245,10 +251,10 @@ class AsistenciaController extends Controller
 
         if (!$validacion['laborable']) {
             return response()->json(array_merge($emptyResponse, [
-                'motivo'               => $validacion['motivo'],
-                'mensaje_estado'       => $validacion['motivo'],
-                'active_assignments'   => $allAssignments,
-                'current_horario_id'   => $asignacion->horario_institucion_id,
+                'motivo' => $validacion['motivo'],
+                'mensaje_estado' => $validacion['motivo'],
+                'active_assignments' => $allAssignments,
+                'current_horario_id' => $asignacion->horario_institucion_id,
             ]));
         }
 
@@ -260,26 +266,28 @@ class AsistenciaController extends Controller
         );
 
         return response()->json([
-            'server_now'              => $estadoMarcacion['server_now'],
-            'laborable'               => true,
-            'motivo'                  => null,
-            'puede_marcar'            => $estadoMarcacion['puede_marcar'],
-            'next_action'             => $estadoMarcacion['next_action'],
-            'active_assignments'      => $allAssignments,
-            'current_horario_id'      => $asignacion->horario_institucion_id,
-            'windows'                 => $estadoMarcacion['windows'],
-            'mensaje_estado'          => $estadoMarcacion['mensaje_estado'],
-            'institucion_id'          => (int) $asignacion->institucion_id,
-            'horario_institucion_id'  => (int) $asignacion->horario_institucion_id,
-            'horario'                 => $estadoMarcacion['horario'] ?? null,
-            'current_assignment_id'   => $asignacion->id,
+            'server_now' => $estadoMarcacion['server_now'],
+            'laborable' => true,
+            'motivo' => null,
+            'puede_marcar' => $estadoMarcacion['puede_marcar'],
+            'next_action' => $estadoMarcacion['next_action'],
+            'active_assignments' => $allAssignments,
+            'current_horario_id' => $asignacion->horario_institucion_id,
+            'windows' => $estadoMarcacion['windows'],
+            'mensaje_estado' => $estadoMarcacion['mensaje_estado'],
+            'institucion_id' => (int) $asignacion->institucion_id,
+            'horario_institucion_id' => (int) $asignacion->horario_institucion_id,
+            'horario' => $estadoMarcacion['horario'] ?? null,
+            'current_assignment_id' => $asignacion->id,
         ]);
     }
 
-    /* ================================================================
-     * RESUMEN SEMANAL
-     * ================================================================ */
-
+    /**
+     * Retorna el resumen de asistencias de la semana actual del docente autenticado.
+     *
+     * Genera una fila por cada día de la semana (lunes a domingo) indicando hora de entrada,
+     * hora de salida, si fue puntual y si faltó. Incluye totales al final.
+     */
     public function resumenSemanal(): JsonResponse
     {
         /** @var \App\Models\UsuarioApp $user */
@@ -300,33 +308,36 @@ class AsistenciaController extends Controller
             $header = $asistencias->get($fecha);
 
             $dias->push([
-                'fecha'   => $fecha,
-                'dia'     => $dia->isoFormat('dddd'),
+                'fecha' => $fecha,
+                'dia' => $dia->isoFormat('dddd'),
                 'entrada' => $header?->hora_entrada,
-                'salida'  => $header?->hora_salida,
+                'salida' => $header?->hora_salida,
                 'puntual' => $header && $header->estado_diario !== 'TARDANZA',
-                'faltó'   => !$header || $header->estado_diario === 'FALTA',
+                'faltó' => !$header || $header->estado_diario === 'FALTA',
             ]);
         }
 
         return response()->json([
             'usuario' => $user->id,
-            'desde'   => $inicioSemana->toDateString(),
-            'hasta'   => $finSemana->toDateString(),
+            'desde' => $inicioSemana->toDateString(),
+            'hasta' => $finSemana->toDateString(),
             'resumen' => $dias,
             'totales' => [
                 'dias_asistidos' => $dias->where('faltó', false)->count(),
-                'faltas'         => $dias->where('faltó', true)->count(),
-                'puntual'        => $dias->where('puntual', true)->count(),
-                'impuntual'      => $dias->where('puntual', false)->count(),
+                'faltas' => $dias->where('faltó', true)->count(),
+                'puntual' => $dias->where('puntual', true)->count(),
+                'impuntual' => $dias->where('puntual', false)->count(),
             ],
         ]);
     }
 
-    /* ================================================================
-     * RESUMEN MENSUAL (para gráfico de la app)
-     * ================================================================ */
-
+    /**
+     * Retorna datos de asistencia del mes actual formateados para gráficas en la app.
+     *
+     * Solo incluye los días laborables transcurridos hasta hoy, según el horario asignado.
+     * Devuelve arrays paralelos de etiquetas (días), asistencias (1/0) y faltas (1/0),
+     * listos para ser consumidos directamente por un componente de gráfica.
+     */
     public function resumenMensualGrafico(Request $request): JsonResponse
     {
         /** @var \App\Models\UsuarioApp $user */
@@ -339,11 +350,11 @@ class AsistenciaController extends Controller
 
         if (!$asignacion) {
             return response()->json([
-                'labels'       => [],
-                'asistencias'  => [],
-                'faltas'       => [],
-                'periodo'      => ['mes' => $hoy->isoFormat('MMMM YYYY'), 'inicio' => $inicioMes->toDateString(), 'fin' => $finMes->toDateString()],
-                'motivo'       => 'Sin asignación vigente con horario',
+                'labels' => [],
+                'asistencias' => [],
+                'faltas' => [],
+                'periodo' => ['mes' => $hoy->isoFormat('MMMM YYYY'), 'inicio' => $inicioMes->toDateString(), 'fin' => $finMes->toDateString()],
+                'motivo' => 'Sin asignación vigente con horario',
             ]);
         }
 
@@ -378,30 +389,34 @@ class AsistenciaController extends Controller
         }
 
         return response()->json([
-            'labels'                 => $labels,
-            'asistencias'            => $asistencias,
-            'faltas'                 => $faltas,
-            'periodo'                => ['mes' => $hoy->isoFormat('MMMM YYYY'), 'inicio' => $inicioMes->toDateString(), 'fin' => $finMes->toDateString()],
-            'institucion_id'         => $institucionId,
+            'labels' => $labels,
+            'asistencias' => $asistencias,
+            'faltas' => $faltas,
+            'periodo' => ['mes' => $hoy->isoFormat('MMMM YYYY'), 'inicio' => $inicioMes->toDateString(), 'fin' => $finMes->toDateString()],
+            'institucion_id' => $institucionId,
             'horario_institucion_id' => $horarioId,
         ]);
     }
 
-    /* ================================================================
-     * SINCRONIZACIÓN OFFLINE (batch)
-     * ================================================================ */
-
+    /**
+     * Procesa un lote de marcaciones registradas sin conexión desde la app móvil.
+     *
+     * Cada ítem del lote se valida de forma independiente; los que no pueden procesarse
+     * quedan en el arreglo «omitidas» con el motivo correspondiente. Aplica idempotencia
+     * por offline_uuid para evitar duplicados en caso de reintentos. Al finalizar retorna
+     * el conteo y detalle de marcaciones registradas y omitidas.
+     */
     public function syncMovil(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'asistencias'                    => 'required|array|min:1',
-            'asistencias.*.institucion_id'   => 'required|integer|exists:instituciones,id',
-            'asistencias.*.fecha_hora'       => 'required|date',
-            'asistencias.*.latitud'          => 'required|numeric',
-            'asistencias.*.longitud'         => 'required|numeric',
-            'asistencias.*.tipo'             => 'required|in:ENTRADA,SALIDA',
-            'asistencias.*.archivo'          => 'nullable|file|image|mimes:jpg,jpeg,png|max:2048',
-            'asistencias.*.offline_uuid'     => 'nullable|uuid',
+            'asistencias' => 'required|array|min:1',
+            'asistencias.*.institucion_id' => 'required|integer|exists:instituciones,id',
+            'asistencias.*.fecha_hora' => 'required|date',
+            'asistencias.*.latitud' => 'required|numeric',
+            'asistencias.*.longitud' => 'required|numeric',
+            'asistencias.*.tipo' => 'required|in:ENTRADA,SALIDA',
+            'asistencias.*.archivo' => 'nullable|file|image|mimes:jpg,jpeg,png|max:2048',
+            'asistencias.*.offline_uuid' => 'nullable|uuid',
         ]);
 
         $registradas = [];
@@ -409,7 +424,7 @@ class AsistenciaController extends Controller
 
         foreach ($validated['asistencias'] as $item) {
             try {
-                // Idempotencia
+                // Si el UUID ya fue procesado, se reutiliza el registro existente sin crear otro
                 if (!empty($item['offline_uuid'])) {
                     $existente = AsistenciaDiaria::where('offline_uuid', $item['offline_uuid'])->first();
                     if ($existente) {
@@ -439,13 +454,11 @@ class AsistenciaController extends Controller
                         return;
                     }
 
-                    // Header
                     $asistencia = Asistencia::firstOrCreate(
                         ['usuario_app_id' => $user->id, 'institucion_id' => $item['institucion_id'], 'fecha' => $fechaDia],
                         ['horario_institucion_id' => $asignacion->horario_institucion_id]
                     );
 
-                    // Cálculos
                     $institucion = Institucion::find($item['institucion_id']);
                     $dentroRango = $this->asistenciaService->estaDentroRango($item['latitud'], $item['longitud'], $institucion);
                     $horario     = HorarioInstitucion::find($asignacion->horario_institucion_id);
@@ -459,24 +472,23 @@ class AsistenciaController extends Controller
                         : null;
 
                     $marcacion = AsistenciaDiaria::create([
-                        'asistencia_id'    => $asistencia->id,
-                        'tipo'             => $item['tipo'],
-                        'marcada_en'       => $item['fecha_hora'],
-                        'latitud'          => $item['latitud'],
-                        'longitud'         => $item['longitud'],
-                        'dentro_rango'     => $dentroRango,
+                        'asistencia_id' => $asistencia->id,
+                        'tipo' => $item['tipo'],
+                        'marcada_en' => $item['fecha_hora'],
+                        'latitud' => $item['latitud'],
+                        'longitud' => $item['longitud'],
+                        'dentro_rango' => $dentroRango,
                         'estado_marcacion' => $valResult['estado'],
-                        'motivo'           => $valResult['motivo'],
-                        'foto_url'         => $fotoPath,
-                        'offline_uuid'     => $item['offline_uuid'] ?? null,
-                        'registrado_en'    => 'APP_OFFLINE',
-                        'synced_at'        => now(),
+                        'motivo' => $valResult['motivo'],
+                        'foto_url' => $fotoPath,
+                        'offline_uuid' => $item['offline_uuid'] ?? null,
+                        'registrado_en' => 'APP_OFFLINE',
+                        'synced_at' => now(),
                     ]);
 
-                    // Actualizar header
                     $this->actualizarHeaderAsistencia($asistencia, $item['tipo'], $fecha, null);
 
-                    // Recalcular estado diario
+                    // Recalcula el estado diario consolidado tras sincronizar la nueva marcación
                     $calculator = app(DailyStateCalculatorService::class);
                     $asistencia->update($calculator->calculate($asistencia));
 
@@ -490,20 +502,21 @@ class AsistenciaController extends Controller
         }
 
         return response()->json([
-            'success'              => true,
-            'registradas'          => count($registradas),
-            'omitidas'             => count($omitidas),
+            'success' => true,
+            'registradas' => count($registradas),
+            'omitidas' => count($omitidas),
             'detalles_registradas' => $registradas,
-            'detalles_omitidas'    => $omitidas,
+            'detalles_omitidas' => $omitidas,
         ]);
     }
 
-    /* ================================================================
-     * MÉTODOS PRIVADOS
-     * ================================================================ */
-
     /**
-     * Resolver la asignación activa basada en hora actual (Smart Shift Selection)
+     * Determina la asignación institucional más apropiada para el momento actual.
+     *
+     * Si el docente especificó un horario concreto, lo respeta siempre que exista una
+     * asignación vigente para él. Si tiene un único turno activo, lo retorna directamente.
+     * Con múltiples turnos activos, prioriza el que tiene ventana de marcación abierta;
+     * si ninguno la tiene, selecciona el más cercano temporalmente al momento actual.
      */
     private function resolveAsignacionActiva($user, int $institucionId, ?int $requestedHorarioId = null): ?UsuarioAppInstitucion
     {
@@ -520,7 +533,7 @@ class AsistenciaController extends Controller
 
         if ($asignaciones->isEmpty()) return null;
 
-        // Override explícito
+        // El usuario puede forzar un turno específico desde el selector de la app
         if ($requestedHorarioId) {
             $found = $asignaciones->firstWhere('horario_institucion_id', $requestedHorarioId);
             if ($found) return $found;
@@ -528,7 +541,7 @@ class AsistenciaController extends Controller
 
         if ($asignaciones->count() === 1) return $asignaciones->first();
 
-        // Selección inteligente: la más cercana al horario actual
+        // Con múltiples turnos, elige el que tiene menor distancia temporal a entrada o salida
         $bestAsignacion      = null;
         $minDistanceMinutes  = PHP_INT_MAX;
 
@@ -557,7 +570,11 @@ class AsistenciaController extends Controller
     }
 
     /**
-     * Obtener asignación principal del usuario
+     * Retorna la asignación institucional principal del docente.
+     *
+     * Considera únicamente asignaciones en estado ACTIVO con horario asignado y
+     * dentro del rango de fechas vigente. Cuando hay varias, prioriza la más reciente
+     * por fecha de inicio e identificador.
      */
     private function getAsignacionPrincipal(int $usuarioAppId): ?UsuarioAppInstitucion
     {
@@ -572,7 +589,10 @@ class AsistenciaController extends Controller
     }
 
     /**
-     * Lista de asignaciones activas para el selector de turnos
+     * Retorna la lista de turnos activos del docente en una institución para una fecha dada.
+     *
+     * El resultado se usa en la app para poblar el selector de turno cuando el docente
+     * tiene múltiples asignaciones simultáneas en la misma institución.
      */
     private function getActiveAssignments(int $userId, int $institucionId, Carbon $today): array
     {
@@ -586,17 +606,22 @@ class AsistenciaController extends Controller
             ->get()
             ->map(fn ($a) => [
                 'asignacion_id' => $a->id,
-                'horario_id'    => $a->horario->id,
-                'nombre_turno'  => $a->horario->nombre_turno,
-                'hora_entrada'  => $a->horario->hora_entrada,
-                'hora_salida'   => $a->horario->hora_salida,
-                'cargo'         => $a->cargo,
+                'horario_id' => $a->horario->id,
+                'nombre_turno' => $a->horario->nombre_turno,
+                'hora_entrada' => $a->horario->hora_entrada,
+                'hora_salida' => $a->horario->hora_salida,
+                'cargo' => $a->cargo,
             ])
             ->toArray();
     }
 
     /**
-     * Actualizar cabecera de asistencia con datos de la marcación
+     * Actualiza la cabecera de asistencia diaria tras registrar una marcación.
+     *
+     * Para la ENTRADA: establece el estado diario y los minutos de tardanza si hay resultado
+     * de cálculo, y guarda la hora más temprana registrada.
+     * Para la SALIDA: guarda la hora más tardía registrada.
+     * Siempre persiste los cambios en base de datos.
      */
     private function actualizarHeaderAsistencia(Asistencia $asistencia, string $tipo, Carbon $fecha, ?array $calcResultado): void
     {
@@ -606,11 +631,13 @@ class AsistenciaController extends Controller
                 $asistencia->minutos_tardanza = $calcResultado['minutos_tardanza'];
             }
             $hora = $fecha->format('H:i:s');
+            // Conserva la entrada más temprana en caso de marcaciones múltiples en el mismo día
             if (!$asistencia->hora_entrada || $hora < $asistencia->hora_entrada) {
                 $asistencia->hora_entrada = $hora;
             }
         } elseif ($tipo === 'SALIDA') {
             $hora = $fecha->format('H:i:s');
+            // Conserva la salida más tardía en caso de marcaciones múltiples en el mismo día
             if (!$asistencia->hora_salida || $hora > $asistencia->hora_salida) {
                 $asistencia->hora_salida = $hora;
             }

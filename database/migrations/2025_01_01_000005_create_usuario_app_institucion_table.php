@@ -4,6 +4,12 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
+/**
+ * Crea la tabla pivote `usuario_app_institucion`, que establece la relación N:M
+ * entre docentes e instituciones. Almacena además el horario asignado, el cargo,
+ * el periodo de vigencia y el estado de la asignación (PENDIENTE, ACTIVO, INACTIVO).
+ * Un docente puede tener distintos turnos en la misma institución.
+ */
 return new class extends Migration {
     public function up(): void
     {

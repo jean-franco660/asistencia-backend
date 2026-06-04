@@ -4,6 +4,12 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
+/**
+ * Crea la tabla `usuarios_web`, que almacena a los administradores y supervisores
+ * que gestionan el sistema desde el panel web. El campo `rol` determina el nivel de acceso
+ * y `estado` controla si el usuario fue autorizado por un super administrador.
+ * El campo `usuario_app_id` permite vincular un supervisor con su perfil de docente.
+ */
 return new class extends Migration {
     public function up(): void
     {

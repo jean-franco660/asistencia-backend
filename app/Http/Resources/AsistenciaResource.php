@@ -5,12 +5,20 @@ namespace App\Http\Resources;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
+/**
+ * Serializa el registro de asistencia diaria de un docente en una institución.
+ * Utilizado en los endpoints de consulta de asistencia, tanto para la app móvil como para el panel web.
+ * Incluye atributos calculados del modelo (situación, resultado, geolocalización, foto, turno)
+ * y relaciones cargadas condicionalmente para evitar consultas N+1.
+ */
 class AsistenciaResource extends JsonResource
 {
     /**
-     * Transform the resource into an array.
-     *
-     * @return array<string, mixed>
+     * Transforma el modelo Asistencia en un array para la respuesta JSON.
+     * Los campos 'situacion', 'resultado', 'latitud', 'longitud', 'dentro_rango', 'foto' y 'turno'
+     * son atributos calculados del modelo y no columnas de la base de datos.
+     * Las relaciones 'usuario', 'institucion', 'horario' y 'marcaciones' se incluyen
+     * únicamente si fueron precargadas con eager loading para evitar consultas adicionales.
      */
     public function toArray(Request $request): array
     {
@@ -25,8 +33,8 @@ class AsistenciaResource extends JsonResource
             'hora_salida' => $this->hora_salida,
             'minutos_tardanza' => $this->minutos_tardanza,
             'observacion' => $this->observacion,
-            
-            // Atributos dinámicos calculados (antes en $appends)
+
+            // Atributos calculados derivados de las marcaciones y el horario asignado
             'situacion' => $this->situacion,
             'resultado' => $this->resultado,
             'latitud' => $this->latitud,
@@ -35,7 +43,7 @@ class AsistenciaResource extends JsonResource
             'foto' => $this->foto,
             'turno' => $this->turno,
 
-            // Relaciones
+            // Relaciones incluidas solo si fueron precargadas
             'usuario' => $this->whenLoaded('usuario', function () {
                 return [
                     'id' => $this->usuario->id,
@@ -61,7 +69,7 @@ class AsistenciaResource extends JsonResource
             }),
             'marcaciones' => AsistenciaDiariaResource::collection($this->whenLoaded('marcaciones')),
             'marcaciones_pendientes' => $this->when(isset($this->marcaciones_pendientes), $this->marcaciones_pendientes),
-            
+
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];

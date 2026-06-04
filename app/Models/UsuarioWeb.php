@@ -12,31 +12,33 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Notifications\Notifiable;
 use App\Traits\Auditable;
 
+/**
+ * Representa a los usuarios del panel web administrativo (super administradores, administradores y supervisores).
+ *
+ * Gestiona la autenticación mediante email y contraseña, el control de acceso por rol y estado,
+ * la asignación de instituciones bajo supervisión, y la revisión de justificaciones.
+ * Los nuevos usuarios quedan en estado «pendiente» hasta ser autorizados, excepto el super administrador,
+ * que se autoriza automáticamente al crearse. Utiliza Sanctum para tokens de API y soft deletes.
+ */
 class UsuarioWeb extends Authenticatable
 {
     use HasFactory, HasApiTokens, SoftDeletes, Notifiable, Auditable;
 
     protected $table = 'usuarios_web';
 
-    /* =========================
-     * CONSTANTES - ROLES
-     * ========================= */
+
 
     public const ROL_SUPER_ADMIN = 'super_admin';
     public const ROL_ADMINISTRADOR = 'administrador';
     public const ROL_SUPERVISOR = 'supervisor';
 
-    /* =========================
-     * CONSTANTES - ESTADOS
-     * ========================= */
+
 
     public const ESTADO_PENDIENTE = 'pendiente';
     public const ESTADO_AUTORIZADO = 'autorizado';
     public const ESTADO_RECHAZADO = 'rechazado';
 
-    /* =========================
-     * FILLABLE / HIDDEN / CASTS
-     * ========================= */
+
 
     protected $fillable = [
         'nombre',
@@ -65,6 +67,10 @@ class UsuarioWeb extends Authenticatable
      * MUTATORS
      * ========================= */
 
+
+    /**
+     * Aplica hash bcrypt a la contraseña antes de persistirla. No hace nada si el valor está vacío.
+     */
     public function setPasswordAttribute($value): void
     {
         if (!empty($value)) {
@@ -72,44 +78,53 @@ class UsuarioWeb extends Authenticatable
         }
     }
 
+    /**
+     * Normaliza el email a minúsculas y sin espacios antes de persistirlo.
+     */
     public function setEmailAttribute($value): void
     {
         $this->attributes['email'] = strtolower(trim($value));
     }
 
+    /**
+     * Almacena el nombre con formato de título (primera letra de cada palabra en mayúscula).
+     */
     public function setNombreAttribute($value): void
     {
         $this->attributes['nombre'] = ucwords(strtolower(trim($value)));
     }
 
-    /* =========================
-     * EVENTOS DEL MODELO
-     * ========================= */
-
+    /**
+     * Define los comportamientos automáticos del modelo al crear y al eliminar registros.
+     *
+     * Al crear: autoriza automáticamente a los super administradores.
+     * Al eliminar: desvincula todas las instituciones asignadas al supervisor.
+     */
     protected static function booted()
     {
-        // Auto-autorizar SOLO a super_admin
         static::creating(function ($usuario) {
             if ($usuario->rol === self::ROL_SUPER_ADMIN) {
                 $usuario->estado = self::ESTADO_AUTORIZADO;
             }
         });
 
-        // Al eliminar (soft delete), desvincula instituciones
+        // Al eliminar (soft delete), desvincula instituciones para mantener la integridad referencial
         static::deleting(function ($usuario) {
             $usuario->instituciones()->detach();
         });
     }
 
-    /* =========================
-     * RELACIONES
-     * ========================= */
-
+    /**
+     * Retorna el docente vinculado a este usuario web, si existe.
+     */
     public function usuarioApp(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(UsuarioApp::class, 'usuario_app_id');
     }
 
+    /**
+     * Retorna las instituciones asignadas al supervisor con fechas de inicio y fin de supervisión.
+     */
     public function instituciones(): BelongsToMany
     {
         return $this->belongsToMany(
@@ -122,51 +137,74 @@ class UsuarioWeb extends Authenticatable
             ->withTimestamps();
     }
 
+    /**
+     * Retorna las justificaciones que este usuario web ha revisado o gestionado.
+     */
     public function justificacionesRevisadas(): HasMany
     {
         return $this->hasMany(Justificacion::class, 'usuario_web_id');
     }
 
+    /**
+     * Retorna el historial de importaciones de datos realizadas por este usuario.
+     */
     public function importaciones(): HasMany
     {
         return $this->hasMany(ImportacionLog::class, 'usuario_id');
     }
 
+    /**
+     * Retorna los registros de auditoría en los que este usuario fue el actor de la acción.
+     */
     public function auditLogsComoActor(): HasMany
     {
         return $this->hasMany(AuditLog::class, 'actor_id')
             ->where('actor_type', AuditLog::ACTOR_USUARIO_WEB);
     }
 
-    /* =========================
-     * SCOPES
-     * ========================= */
-
+    /**
+     * Filtra los usuarios con estado autorizado.
+     */
     public function scopeAutorizados($query)
     {
         return $query->where('estado', self::ESTADO_AUTORIZADO);
     }
 
+    /**
+     * Filtra los usuarios con estado pendiente de autorización.
+     */
     public function scopePendientes($query)
     {
         return $query->where('estado', self::ESTADO_PENDIENTE);
     }
 
+    /**
+     * Filtra los usuarios con estado rechazado.
+     */
     public function scopeRechazados($query)
     {
         return $query->where('estado', self::ESTADO_RECHAZADO);
     }
 
+    /**
+     * Filtra los usuarios por rol usando los valores de las constantes ROL_*.
+     */
     public function scopePorRol($query, string $rol)
     {
         return $query->where('rol', $rol);
     }
 
+    /**
+     * Filtra los usuarios con rol de supervisor.
+     */
     public function scopeSupervisores($query)
     {
         return $query->where('rol', self::ROL_SUPERVISOR);
     }
 
+    /**
+     * Filtra los usuarios con rol de administrador o super administrador.
+     */
     public function scopeAdministradores($query)
     {
         return $query->whereIn('rol', [
@@ -175,12 +213,18 @@ class UsuarioWeb extends Authenticatable
         ]);
     }
 
+    /**
+     * Filtra los usuarios autorizados y no eliminados (lógicamente activos).
+     */
     public function scopeActivos($query)
     {
         return $query->where('estado', self::ESTADO_AUTORIZADO)
             ->whereNull('deleted_at');
     }
 
+    /**
+     * Filtra los usuarios cuyo nombre o email contengan el término indicado.
+     */
     public function scopeBuscar($query, string $termino)
     {
         return $query->where(function ($q) use ($termino) {
@@ -188,10 +232,6 @@ class UsuarioWeb extends Authenticatable
                 ->orWhere('email', 'like', "%{$termino}%");
         });
     }
-
-    /* =========================
-     * HELPERS DE ROL
-     * ========================= */
 
     public function esSuperAdmin(): bool
     {
@@ -216,10 +256,6 @@ class UsuarioWeb extends Authenticatable
         ], true);
     }
 
-    /* =========================
-     * HELPERS DE ESTADO
-     * ========================= */
-
     public function estaAutorizado(): bool
     {
         return $this->estado === self::ESTADO_AUTORIZADO;
@@ -240,65 +276,89 @@ class UsuarioWeb extends Authenticatable
         return $this->estaAutorizado() && !$this->trashed();
     }
 
-    /* =========================
-     * HELPERS DE PERMISOS
-     * ========================= */
-
+    /**
+     * Verifica si el usuario puede acceder al sistema (autorizado y no eliminado).
+     *
+     * Combina el estado de autorización con la ausencia de soft delete.
+     */
     public function puedeAcceder(): bool
     {
         return $this->estaAutorizado() && $this->deleted_at === null;
     }
 
+    /**
+     * Indica si el usuario tiene supervisoria sobre la institución indicada.
+     *
+     * Los super administradores y administradores tienen acceso a todas las instituciones.
+     * Los supervisores solo acceden a las instituciones que les han sido asignadas.
+     */
     public function tieneSupervisoria(int $institucionId): bool
     {
-        // Super admin tiene acceso a todo
         if ($this->esSuperAdmin()) {
             return true;
         }
 
-        // Administradores tienen acceso a todo
         if ($this->esAdministrador()) {
             return true;
         }
 
-        // Supervisores solo a sus instituciones asignadas
+        // Los supervisores solo acceden a las instituciones que tienen asignadas
         return $this->instituciones()
             ->where('institucion_id', $institucionId)
             ->exists();
     }
 
+    /**
+     * Indica si el usuario puede gestionar justificaciones (solo administradores autorizados).
+     */
     public function puedeGestionarJustificaciones(): bool
     {
         return $this->estaAutorizado() &&
             $this->esAdminOSuperAdmin();
     }
 
+    /**
+     * Indica si el usuario puede realizar importaciones masivas de datos.
+     */
     public function puedeImportar(): bool
     {
         return $this->esAdminOSuperAdmin() && $this->estaAutorizado();
     }
 
+    /**
+     * Indica si el usuario puede gestionar otros usuarios del sistema.
+     */
     public function puedeGestionarUsuarios(): bool
     {
         return $this->esSuperAdmin() || $this->esAdministrador();
     }
 
+    /**
+     * Indica si el usuario puede ver instituciones de toda la UGEL (no solo las asignadas).
+     */
     public function puedeVerTodasInstituciones(): bool
     {
         return $this->esSuperAdmin() || $this->esAdministrador();
     }
 
+    /**
+     * Indica si el usuario puede editar la institución indicada.
+     *
+     * Los administradores pueden editar cualquier institución;
+     * los supervisores solo las que tienen asignadas.
+     */
     public function puedeEditarInstitucion(Institucion $institucion): bool
     {
-        // Super admin y admin pueden editar cualquier institución
         if ($this->esAdminOSuperAdmin()) {
             return true;
         }
 
-        // Supervisores solo pueden editar sus instituciones asignadas
         return $this->tieneSupervisoria($institucion->id);
     }
 
+    /**
+     * Indica si el usuario puede ver reportes globales de toda la UGEL.
+     */
     public function puedeVerReportesGlobales(): bool
     {
         return $this->esAdminOSuperAdmin();
@@ -345,11 +405,13 @@ class UsuarioWeb extends Authenticatable
     }
 
     /**
-     * Obtiene IDs de instituciones vigentes (útil para queries)
+     * Retorna los IDs de las instituciones vigentes del supervisor.
+     *
+     * Si es administrador o super administrador, retorna un arreglo vacío como señal
+     * de que tiene acceso irrestricto a todas las instituciones, evitando filtros innecesarios.
      */
     public function getInstitucionesVigentesIds(): array
     {
-        // Si es admin o super_admin, retorna array vacío (tiene acceso a todo)
         if ($this->esAdminOSuperAdmin()) {
             return [];
         }
@@ -397,10 +459,9 @@ class UsuarioWeb extends Authenticatable
         $this->instituciones()->detach($institucionId);
     }
 
-    /* =========================
-     * MÉTODOS ESTÁTICOS
-     * ========================= */
-
+    /**
+     * Retorna los roles disponibles para validación en formularios.
+     */
     public static function getRolesDisponibles(): array
     {
         return [
@@ -410,6 +471,9 @@ class UsuarioWeb extends Authenticatable
         ];
     }
 
+    /**
+     * Retorna los roles con sus etiquetas legibles para mostrar en selectores.
+     */
     public static function getRolesConEtiquetas(): array
     {
         return [
@@ -419,6 +483,9 @@ class UsuarioWeb extends Authenticatable
         ];
     }
 
+    /**
+     * Retorna los estados disponibles para validación en formularios.
+     */
     public static function getEstadosDisponibles(): array
     {
         return [
@@ -428,6 +495,9 @@ class UsuarioWeb extends Authenticatable
         ];
     }
 
+    /**
+     * Retorna los estados con sus etiquetas legibles para mostrar en selectores.
+     */
     public static function getEstadosConEtiquetas(): array
     {
         return [
@@ -437,10 +507,9 @@ class UsuarioWeb extends Authenticatable
         ];
     }
 
-    /* =========================
-     * AUDITORÍA
-     * ========================= */
-
+    /**
+     * Retorna la representación textual del usuario para los registros de auditoría.
+     */
     protected function getNombreAuditable(): string
     {
         return "{$this->nombre} ({$this->email})";

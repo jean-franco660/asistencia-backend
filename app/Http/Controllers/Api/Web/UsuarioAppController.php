@@ -36,7 +36,7 @@ class UsuarioAppController extends Controller
             ], 401);
         }
 
-        //  Validación 1: Verificar acceso habilitado
+        // Validación 1: Verificar acceso habilitado
         if (!$usuario->tieneAccesoHabilitado()) {
             return response()->json([
                 'success' => false,
@@ -44,7 +44,7 @@ class UsuarioAppController extends Controller
             ], 403);
         }
 
-        //  Validación 2: Verificar que tenga asignaciones activas
+        // Validación 2: Verificar que tenga asignaciones activas
         $asignacionesActivas = $usuario->asignacionesActivas()->with(['institucion', 'horario'])->get();
 
         if ($asignacionesActivas->isEmpty()) {
@@ -54,7 +54,7 @@ class UsuarioAppController extends Controller
             ], 403);
         }
 
-        //  Validación 3: Verificar que al menos una asignación tenga horario
+        // Validación 3: Verificar que al menos una asignación tenga horario
         $asignaciones = $asignacionesActivas->filter(fn($a) => $a->horario !== null);
 
         if ($asignaciones->isEmpty()) {
@@ -127,7 +127,7 @@ class UsuarioAppController extends Controller
                     ->where('estado', UsuarioAppInstitucion::ESTADO_ACTIVO);
             });
 
-            //  NUEVO: Excluir al supervisor logueado si también es usuario app
+            // NUEVO: Excluir al supervisor logueado si también es usuario app
             // Esto evita que el supervisor se vea a sí mismo en la lista de docentes
             if ($user->usuario_app_id) {
                 $query->where('id', '!=', $user->usuario_app_id);
@@ -155,7 +155,7 @@ class UsuarioAppController extends Controller
             $query->porSexo($request->sexo);
         }
 
-        //  Nuevo filtro por estado de asignación (ACTIVO, INACTIVO, PENDIENTE)
+        // Nuevo filtro por estado de asignación (ACTIVO, INACTIVO, PENDIENTE)
         if ($request->filled('estado')) {
             $query->whereHas('asignaciones', function ($q) use ($request) {
                 $q->where('estado', mb_strtoupper($request->estado));
@@ -245,7 +245,7 @@ class UsuarioAppController extends Controller
             // Crear asignaciones
             if ($request->filled('asignaciones')) {
                 foreach ($request->asignaciones as $asig) {
-                    //  NUEVO: Si no se especifica horario, buscar uno automáticamente
+                    // NUEVO: Si no se especifica horario, buscar uno automáticamente
                     $horarioId = $asig['horario_institucion_id'] ?? null;
 
                     if (!$horarioId) {
@@ -262,7 +262,7 @@ class UsuarioAppController extends Controller
                     UsuarioAppInstitucion::create([
                         'usuario_app_id' => $usuario->id,
                         'institucion_id' => $asig['institucion_id'],
-                        'horario_institucion_id' => $horarioId, //  Asignado automáticamente
+                        'horario_institucion_id' => $horarioId, // Asignado automáticamente
                         'cargo' => $asig['cargo'] ?? null,
                         'estado' => $asig['estado'] ?? UsuarioAppInstitucion::ESTADO_ACTIVO,
                         'fecha_inicio' => $asig['fecha_inicio'] ?? now(),
@@ -379,13 +379,13 @@ class UsuarioAppController extends Controller
                     'estado' => UsuarioAppInstitucion::ESTADO_INACTIVO,
                     'fecha_fin' => now()
                 ]);
-                \Log::info("ℹ️ [UsuarioApp] Asignaciones previas marcadas como INACTIVO");
+                \Log::info(" [UsuarioApp] Asignaciones previas marcadas como INACTIVO");
 
                 // Crear/actualizar nuevas asignaciones
                 foreach ($request->asignaciones as $index => $asig) {
-                    \Log::info("️ [UsuarioApp] Procesando asignación #{$index}", ['datos' => $asig]);
+                    \Log::info(" [UsuarioApp] Procesando asignación #{$index}", ['datos' => $asig]);
 
-                    //  NUEVO: Si no se especifica horario, buscar uno automáticamente
+                    // NUEVO: Si no se especifica horario, buscar uno automáticamente
                     $horarioId = $asig['horario_institucion_id'] ?? null;
 
                     if (!$horarioId) {
@@ -395,18 +395,18 @@ class UsuarioAppController extends Controller
 
                         if ($horario) {
                             $horarioId = $horario->id;
-                            \Log::info("ℹ️ [UsuarioApp] Horario auto-asignado: {$horario->id}");
+                            \Log::info(" [UsuarioApp] Horario auto-asignado: {$horario->id}");
                         }
                     }
 
-                    //  Robustez: Buscar asignación existente (incluso eliminada/soft-deleted) para evitar duplicados
+                    // Robustez: Buscar asignación existente (incluso eliminada/soft-deleted) para evitar duplicados
                     $asignacion = UsuarioAppInstitucion::withTrashed()
                         ->where('usuario_app_id', $usuario->id)
                         ->where('institucion_id', $asig['institucion_id'])
                         ->first();
 
                     if ($asignacion) {
-                        \Log::info("️ [UsuarioApp] Asignación existente encontrada ID: {$asignacion->id} (Trashed: {$asignacion->trashed()})");
+                        \Log::info(" [UsuarioApp] Asignación existente encontrada ID: {$asignacion->id} (Trashed: {$asignacion->trashed()})");
 
                         // Limpiar duplicados extra si existen (para corregir inconsistencias antiguas)
                         $duplicados = UsuarioAppInstitucion::withTrashed()
@@ -427,7 +427,7 @@ class UsuarioAppController extends Controller
 
                         if ($asignacion->trashed()) {
                             $asignacion->restore();
-                            \Log::info("️ [UsuarioApp] Asignación restaurada ID: {$asignacion->id}");
+                            \Log::info(" [UsuarioApp] Asignación restaurada ID: {$asignacion->id}");
                         }
                     } else {
                         $asignacion = new UsuarioAppInstitucion();
@@ -437,7 +437,7 @@ class UsuarioAppController extends Controller
                     }
 
                     $asignacion->fill([
-                        'horario_institucion_id' => $horarioId, //  Asignado automáticamente
+                        'horario_institucion_id' => $horarioId, // Asignado automáticamente
                         'cargo' => $asig['cargo'] ?? null,
                         'estado' => $asig['estado'] ?? UsuarioAppInstitucion::ESTADO_ACTIVO,
                         'fecha_inicio' => $asig['fecha_inicio'] ?? now(),
@@ -666,7 +666,7 @@ class UsuarioAppController extends Controller
                         'status' => 'actualizado'
                     ];
 
-                    \Log::info("Horario asignado automáticamente: {$asignacion->usuarioApp->codigo_modular} → {$horario->nombre_turno}");
+                    \Log::info("Horario asignado automáticamente: {$asignacion->usuarioApp->codigo_modular}  {$horario->nombre_turno}");
                 } else {
                     $sinHorario++;
 

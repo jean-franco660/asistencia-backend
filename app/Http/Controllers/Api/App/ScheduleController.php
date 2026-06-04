@@ -10,10 +10,21 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
+/**
+ * Gestiona la consulta y modificación de horarios asignados al docente desde la app móvil.
+ *
+ * Permite al docente ver sus horarios actuales por institución y actualizarlos,
+ * sujeto a la restricción de un solo cambio por mes por institución.
+ * Solo acceden docentes autenticados con token Sanctum.
+ */
 class ScheduleController extends Controller
 {
     /**
-     * Obtiene horarios disponibles y actuales del usuario
+     * Retorna los horarios disponibles y los actualmente seleccionados por el docente,
+     * agrupados por institución.
+     *
+     * Para cada institución asignada incluye todos los horarios activos disponibles
+     * y los identificadores de los horarios a los que el docente está vinculado.
      */
     public function getMisHorarios(Request $request): JsonResponse
     {
@@ -46,7 +57,14 @@ class ScheduleController extends Controller
     }
 
     /**
-     * Usuario actualiza sus horarios
+     * Actualiza los horarios del docente en una institución determinada.
+     *
+     * Aplica un límite de un cambio por mes por institución para cambios originados
+     * desde la app (origen APP). Los cambios realizados por administradores no cuentan
+     * para este límite. Elimina físicamente las asignaciones anteriores (forceDelete)
+     * para evitar conflictos de clave única con registros en soft delete, y preserva
+     * el cargo del docente al recrear las asignaciones. Registra el cambio en el log
+     * de historial de horarios.
      */
     public function actualizarHorarios(Request $request): JsonResponse
     {
@@ -58,15 +76,15 @@ class ScheduleController extends Controller
 
         $user = $request->user();
         $institucionId = $validated['institucion_id'];
-        $nuevosHorarios = array_unique($validated['horario_ids']); //  Eliminar duplicados
+        $nuevosHorarios = array_unique($validated['horario_ids']); // Descarta horarios repetidos en la solicitud
 
         DB::beginTransaction();
         try {
-            //  Verificar si el usuario ya cambió sus horarios este mes
+            // Solo se contabilizan los cambios iniciados por el propio docente, no los del administrador
             $primerDiaMes = now()->startOfMonth();
             $ultimoCambioEsteMes = HorarioCambioLog::where('usuario_app_id', $user->id)
                 ->where('institucion_id', $institucionId)
-                ->where('origen', 'APP') // Solo cambios desde la app, no desde admin
+                ->where('origen', 'APP')
                 ->where('created_at', '>=', $primerDiaMes)
                 ->exists();
 
@@ -79,7 +97,7 @@ class ScheduleController extends Controller
                 ], 403);
             }
 
-            // Obtener datos actuales incluyendo cargo (usando withTrashed para ver todo)
+            // Incluye registros eliminados para conservar el historial de cargo
             $asignacionesActuales = UsuarioAppInstitucion::withTrashed()
                 ->where('usuario_app_id', $user->id)
                 ->where('institucion_id', $institucionId)
@@ -87,16 +105,16 @@ class ScheduleController extends Controller
 
             $actuales = $asignacionesActuales->pluck('horario_institucion_id')->unique()->filter()->values()->toArray();
 
-            // Preservar el cargo del usuario (tomar el primero que no sea null)
+            // El cargo se mantiene para no perder la categoría del docente al regenerar las asignaciones
             $cargo = $asignacionesActuales->pluck('cargo')->filter()->first() ?? 'DOCENTE';
 
-            // FORCE DELETE para evitar errores de clave única con soft deleted rows
+            // El forceDelete evita que los registros en soft delete bloqueen la inserción por clave única
             UsuarioAppInstitucion::withTrashed()
                 ->where('usuario_app_id', $user->id)
                 ->where('institucion_id', $institucionId)
                 ->forceDelete();
 
-            // Crear nuevas asignaciones con el cargo preservado
+            // Recrea las asignaciones con el cargo original del docente
             foreach ($nuevosHorarios as $horarioId) {
                 UsuarioAppInstitucion::updateOrCreate(
                     [
@@ -112,7 +130,7 @@ class ScheduleController extends Controller
                 );
             }
 
-            // Registrar cambio en log
+            // Persiste el historial de cambio para auditoría y aplicación del límite mensual
             HorarioCambioLog::create([
                 'usuario_app_id' => $user->id,
                 'institucion_id' => $institucionId,

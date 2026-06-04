@@ -4,19 +4,33 @@ namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 
+/**
+ * Valida los datos para actualizar una institución educativa existente.
+ * Todos los campos son opcionales ('sometimes'), por lo que solo se validan
+ * si están presentes en la petición. La unicidad del código modular excluye
+ * el registro que se está actualizando para evitar falsos conflictos.
+ */
 class UpdateInstitucionRequest extends FormRequest
 {
+    /**
+     * Determina si el usuario tiene autorización para actualizar la institución.
+     * Los roles 'super_admin' y 'administrador' pueden editar cualquier institución.
+     * El rol 'supervisor' solo puede editar las instituciones a las que está asignado.
+     */
     public function authorize(): bool
     {
-        //  Super admin y administrador pueden editar cualquier institución
         if (in_array($this->user()->rol, ['super_admin', 'administrador'])) {
             return true;
         }
 
-        // Supervisor solo puede editar instituciones asignadas
         return $this->user()->instituciones->pluck('id')->contains($this->route('id'));
     }
 
+    /**
+     * Retorna las reglas de validación para la actualización de la institución.
+     * La unicidad del 'codigo_modular_ie' se valida ignorando el registro actual
+     * para permitir que se envíe el mismo código sin generar un conflicto de unicidad.
+     */
     public function rules(): array
     {
         $id = $this->route('id');

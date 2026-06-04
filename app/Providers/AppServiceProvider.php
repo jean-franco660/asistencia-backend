@@ -28,10 +28,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //  Registrar Observer para gestión automática de vigencia
+        // Registrar Observer para gestión automática de vigencia
         UsuarioAppInstitucion::observe(UsuarioAppInstitucionObserver::class);
 
-        //  Registrar Observer para auto-asignación de horarios a usuarios
+        // Registrar Observer para auto-asignación de horarios a usuarios
         HorarioInstitucion::observe(HorarioInstitucionObserver::class);
 
         Relation::morphMap([

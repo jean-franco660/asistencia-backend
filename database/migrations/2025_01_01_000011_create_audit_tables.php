@@ -4,12 +4,15 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
+/**
+ * Crea las tablas de auditoría del sistema:
+ * - `audit_logs`: registro genérico de acciones sobre cualquier modelo (Trait Auditable).
+ * - `horarios_cambios_log`: historial específico de modificaciones de horario por docente.
+ */
 return new class extends Migration {
     public function up(): void
     {
-        // =============================================
-        // AUDIT LOGS — Auditoría genérica (Trait Auditable)
-        // =============================================
+        // Registro genérico de acciones sobre modelos del sistema (Trait Auditable)
         Schema::create('audit_logs', function (Blueprint $table) {
             $table->id();
 
@@ -48,9 +51,7 @@ return new class extends Migration {
             $table->index(['accion', 'created_at'], 'idx_audit_accion_fecha');
         });
 
-        // =============================================
-        // HORARIOS CAMBIOS LOG — Historial de cambios de horario
-        // =============================================
+        // Historial de cambios de horario por docente, con origen (APP o panel de administración)
         Schema::create('horarios_cambios_log', function (Blueprint $table) {
             $table->id();
 

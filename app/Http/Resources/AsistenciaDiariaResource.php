@@ -5,12 +5,19 @@ namespace App\Http\Resources;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
+/**
+ * Serializa un registro de marcación individual (entrada o salida) de la asistencia diaria.
+ * Forma parte de la colección 'marcaciones' incluida en AsistenciaResource.
+ * Incluye datos de geolocalización, estado de marcación, información de revisión
+ * y soporte para sincronización offline mediante UUID.
+ */
 class AsistenciaDiariaResource extends JsonResource
 {
     /**
-     * Transform the resource into an array.
-     *
-     * @return array<string, mixed>
+     * Transforma el modelo en un array para la respuesta JSON.
+     * El campo 'marcada_en' y 'synced_at' se formatean explícitamente a 'Y-m-d H:i:s'
+     * para garantizar consistencia independientemente de la configuración de zona horaria.
+     * El campo 'dentro_rango' se castea a booleano para asegurar el tipo en el JSON.
      */
     public function toArray(Request $request): array
     {

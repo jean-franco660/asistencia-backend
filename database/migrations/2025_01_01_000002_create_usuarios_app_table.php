@@ -4,6 +4,11 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
+/**
+ * Crea la tabla `usuarios_app`, que representa a los docentes y personal que registran
+ * asistencia mediante la aplicación móvil. Autentican con código modular (identificador UGEL)
+ * en lugar de email. El soft delete conserva el historial ante bajas administrativas.
+ */
 return new class extends Migration {
     public function up(): void
     {
@@ -20,7 +25,7 @@ return new class extends Migration {
             $table->string('apellido_paterno', 100);
             $table->string('apellido_materno', 100)->nullable();
             $table->string('nombres', 150);
-            $table->char('sexo', 1)->nullable();
+            $table->char('sexo', 1)->nullable(); // 'M' = Masculino, 'F' = Femenino
 
             // Contacto
             $table->string('telefono', 20)->nullable()->index();

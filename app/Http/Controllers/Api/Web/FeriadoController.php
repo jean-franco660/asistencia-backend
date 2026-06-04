@@ -9,12 +9,23 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
+/**
+ * Gestiona los feriados nacionales e institucionales.
+ *
+ * Accesible para administradores y supervisores. Los administradores tienen control
+ * total sobre feriados nacionales e institucionales. Los supervisores solo pueden
+ * crear, actualizar y eliminar feriados institucionales de sus propias instituciones
+ * vigentes, sin posibilidad de modificar los nacionales.
+ */
 class FeriadoController extends Controller
 {
 
-
     /**
-     * LISTAR FERIADOS
+     * Lista los feriados activos accesibles según el rol del usuario.
+     *
+     * Los administradores ven todos los feriados. Los supervisores solo ven
+     * los feriados nacionales más los institucionales de sus instituciones vigentes.
+     * Los resultados se ordenan por mes y día.
      */
     public function index(Request $request)
     {
@@ -52,7 +63,11 @@ class FeriadoController extends Controller
     }
 
     /**
-     * CREAR FERIADO
+     * Crea un nuevo feriado nacional o institucional.
+     *
+     * Los supervisores solo pueden crear feriados institucionales para sus instituciones
+     * vigentes y no pueden crear feriados nacionales. La fecha puede enviarse directamente
+     * o construirse a partir de los campos 'dia' y 'mes'. Valida duplicados antes de insertar.
      */
     public function store(Request $request)
     {
@@ -79,16 +94,13 @@ class FeriadoController extends Controller
             }
         }
 
-        // Supervisor NO puede crear feriados nacionales
         if ($request->tipo === 'nacional' && $user->esSupervisor()) {
             return response()->json(['message' => 'Solo administradores pueden crear feriados nacionales'], 403);
         }
 
-        // Convertir fecha si viene día/mes
         $fecha = $request->fecha ?? 
             now()->year . '-' . str_pad($request->mes, 2, '0', STR_PAD_LEFT) . '-' . str_pad($request->dia, 2, '0', STR_PAD_LEFT);
 
-        // Validar duplicado
         $existe = Feriado::where('tipo', $request->tipo)
             ->where('institucion_id', $request->institucion_id)
             ->where('dia', $request->dia)
@@ -113,13 +125,16 @@ class FeriadoController extends Controller
     }
 
     /**
-     * ACTUALIZAR FERIADO
+     * Actualiza los campos de un feriado existente.
+     *
+     * Los supervisores no pueden modificar feriados nacionales ni feriados
+     * institucionales ajenos a sus instituciones vigentes. Si se cambia el día o mes,
+     * valida que no exista duplicado antes de actualizar.
      */
     public function update(Request $request, $id)
     {
         $user = $request->user();
 
-        // Validar que tenga permisos
         if (!$user->esAdminOSuperAdmin() && !$user->esSupervisor()) {
             return response()->json(['message' => 'No autorizado'], 403);
         }
@@ -167,7 +182,10 @@ class FeriadoController extends Controller
     }
 
     /**
-     * ELIMINAR FERIADO
+     * Elimina un feriado del sistema.
+     *
+     * Los supervisores no pueden eliminar feriados nacionales ni feriados
+     * institucionales de instituciones ajenas a las que tienen asignadas.
      */
     public function destroy(Request $request, $id)
     {
@@ -197,11 +215,16 @@ class FeriadoController extends Controller
     }
 
     /**
-     * IMPORTAR AUTOMÁTICAMENTE LOS FERIADOS NACIONALES
+     * Importa feriados nacionales peruanos del año en curso desde la API Nager.Date.
+     *
+     * Usa updateOrCreate por día y mes para evitar duplicados. En entorno local
+     * deshabilita la verificación SSL para facilitar el desarrollo. Solo los
+     * administradores y super_admin pueden ejecutar esta acción.
+     * Retorna el conteo de registros procesados y los errores encontrados.
      */
     public function actualizarAutomatico(Request $request)
     {
-        Log::info("=== ACTUALIZAR AUTOMATICO: INICIO ===");
+        Log::info('Inicio de actualización automática de feriados nacionales');
 
         $user = $request->user();
 
@@ -217,15 +240,13 @@ class FeriadoController extends Controller
 
             Log::info("Consultando API de feriados: {$url}");
 
-            // Crear base de la petición
             $requestHttp = Http::timeout(30);
 
-            // Si estamos en LOCAL desactivar SSL
+            // En entorno local se omite la verificación SSL para facilitar el desarrollo sin certificados
             if (app()->environment('local')) {
                 $requestHttp = $requestHttp->withoutVerifying();
             }
 
-            // Ejecutar la petición
             $response = $requestHttp->get($url);
 
             Log::info("Respuesta API Nager: Status " . $response->status());
@@ -284,7 +305,7 @@ class FeriadoController extends Controller
                 }
             }
 
-            Log::info("=== ACTUALIZAR AUTOMATICO: COMPLETADO ===", [
+            Log::info('Actualización automática de feriados completada', [
                 'procesados' => $procesados,
                 'errores' => $errores
             ]);

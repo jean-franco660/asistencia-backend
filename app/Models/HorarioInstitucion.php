@@ -9,24 +9,28 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Carbon\Carbon;
 use App\Traits\Auditable;
 
+/**
+ * Representa un horario de trabajo definido para una institución.
+ *
+ * Almacena los turnos (mañana, tarde, noche), las horas de entrada y salida,
+ * los márgenes de tolerancia en minutos y los días de la semana en que aplica
+ * (almacenados como arreglo JSON con códigos: L, M, X, J, V, S, D).
+ *
+ * Tabla: horarios_institucion
+ * Relaciones principales: institucion (Institucion), asignaciones (UsuarioAppInstitucion), asistencias (Asistencia)
+ */
 class HorarioInstitucion extends Model
 {
     use HasFactory, Auditable;
 
     protected $table = 'horarios_institucion';
 
-    /* =========================
-     * CONSTANTES - TURNOS
-     * ========================= */
-
+    // Constantes de turno
     public const TURNO_MANANA = 'MAÑANA';
     public const TURNO_TARDE = 'TARDE';
     public const TURNO_NOCHE = 'NOCHE';
 
-    /* =========================
-     * CONSTANTES - DÍAS
-     * ========================= */
-
+    // Códigos de día de la semana (X = miércoles, para evitar colisión con M de martes)
     public const DIA_LUNES = 'L';
     public const DIA_MARTES = 'M';
     public const DIA_MIERCOLES = 'X';
@@ -34,10 +38,6 @@ class HorarioInstitucion extends Model
     public const DIA_VIERNES = 'V';
     public const DIA_SABADO = 'S';
     public const DIA_DOMINGO = 'D';
-
-    /* =========================
-     * FILLABLE / CASTS
-     * ========================= */
 
     protected $fillable = [
         'institucion_id',
@@ -65,10 +65,9 @@ class HorarioInstitucion extends Model
         'tolerancia_salida_minutos' => 5,
     ];
 
-    /* =========================
-     * RELACIONES
-     * ========================= */
-
+    /**
+     * Institución a la que pertenece este horario.
+     */
     public function institucion(): BelongsTo
     {
         return $this->belongsTo(Institucion::class);
@@ -85,6 +84,9 @@ class HorarioInstitucion extends Model
         );
     }
 
+    /**
+     * Asignaciones activas (estado ACTIVO) de usuarios a este horario.
+     */
     public function asignacionesActivas(): HasMany
     {
         return $this->asignaciones()->where('estado', UsuarioAppInstitucion::ESTADO_ACTIVO);
@@ -101,6 +103,9 @@ class HorarioInstitucion extends Model
         );
     }
 
+    /**
+     * Justificaciones vinculadas a este horario.
+     */
     public function justificaciones(): HasMany
     {
         return $this->hasMany(
@@ -109,40 +114,57 @@ class HorarioInstitucion extends Model
         );
     }
 
-    /* =========================
-     * SCOPES
-     * ========================= */
-
+    /**
+     * Filtra horarios activos.
+     */
     public function scopeActivos($query)
     {
         return $query->where('activo', true);
     }
 
+    /**
+     * Filtra horarios inactivos.
+     */
     public function scopeInactivos($query)
     {
         return $query->where('activo', false);
     }
 
+    /**
+     * Filtra horarios de una institución específica.
+     */
     public function scopePorInstitucion($query, int $institucionId)
     {
         return $query->where('institucion_id', $institucionId);
     }
 
+    /**
+     * Filtra por el nombre del turno (MAÑANA, TARDE o NOCHE).
+     */
     public function scopePorTurno($query, string $turno)
     {
         return $query->where('nombre_turno', $turno);
     }
 
+    /**
+     * Filtra horarios de turno mañana.
+     */
     public function scopeTurnoManana($query)
     {
         return $query->where('nombre_turno', self::TURNO_MANANA);
     }
 
+    /**
+     * Filtra horarios de turno tarde.
+     */
     public function scopeTurnoTarde($query)
     {
         return $query->where('nombre_turno', self::TURNO_TARDE);
     }
 
+    /**
+     * Filtra horarios de turno noche.
+     */
     public function scopeTurnoNoche($query)
     {
         return $query->where('nombre_turno', self::TURNO_NOCHE);
@@ -165,20 +187,26 @@ class HorarioInstitucion extends Model
         return $query->whereJsonContains('dias_semana', $diaHoy);
     }
 
-    /* =========================
-     * ACCESSORS
-     * ========================= */
-
+    /**
+     * Retorna la hora de entrada formateada como 'H:i'.
+     */
     public function getHoraEntradaFormateadaAttribute(): string
     {
         return Carbon::parse($this->hora_entrada)->format('H:i');
     }
 
+    /**
+     * Retorna la hora de salida formateada como 'H:i'.
+     */
     public function getHoraSalidaFormateadaAttribute(): string
     {
         return Carbon::parse($this->hora_salida)->format('H:i');
     }
 
+    /**
+     * Calcula la duración del turno en horas.
+     * Si la hora de salida es anterior a la de entrada, asume que el turno cruza la medianoche.
+     */
     public function getDuracionHorasAttribute(): float
     {
         $entrada = Carbon::parse($this->hora_entrada);
@@ -191,6 +219,10 @@ class HorarioInstitucion extends Model
         return $entrada->diffInMinutes($salida) / 60;
     }
 
+    /**
+     * Retorna los días laborales como arreglo de códigos.
+     * Maneja tanto el formato JSON (arreglo) como el formato CSV heredado.
+     */
     public function getDiasLaboralesAttribute(): array
     {
         $dias = $this->dias_semana ?? [];
@@ -256,6 +288,9 @@ class HorarioInstitucion extends Model
         return implode(', ', array_map(fn($d) => $nombres[$d] ?? $d, $dias));
     }
 
+    /**
+     * Retorna el nombre del turno con formato legible.
+     */
     public function getTurnoFormateadoAttribute(): string
     {
         return match ($this->nombre_turno) {
@@ -266,12 +301,8 @@ class HorarioInstitucion extends Model
         };
     }
 
-    /* =========================
-     * HELPERS DE VALIDACIÓN
-     * ========================= */
-
     /**
-     * Verifica si este horario aplica para una fecha específica
+     * Verifica si el horario aplica para una fecha específica (activo y día de semana incluido).
      */
     public function aplicaParaFecha(Carbon $fecha): bool
     {
@@ -372,7 +403,7 @@ class HorarioInstitucion extends Model
     }
 
     /**
-     * Verifica si está activo
+     * Indica si el horario está activo.
      */
     public function estaActivo(): bool
     {
@@ -380,19 +411,15 @@ class HorarioInstitucion extends Model
     }
 
     /**
-     * Cuenta usuarios asignados a este horario
+     * Retorna el número de usuarios con asignación activa en este horario.
      */
     public function contarUsuariosAsignados(): int
     {
         return $this->asignacionesActivas()->count();
     }
 
-    /* =========================
-     * MÉTODOS DE NEGOCIO
-     * ========================= */
-
     /**
-     * Activa el horario
+     * Activa el horario y persiste el cambio.
      */
     public function activar(): bool
     {
@@ -401,7 +428,7 @@ class HorarioInstitucion extends Model
     }
 
     /**
-     * Desactiva el horario
+     * Desactiva el horario y persiste el cambio.
      */
     public function desactivar(): bool
     {
@@ -409,12 +436,8 @@ class HorarioInstitucion extends Model
         return $this->save();
     }
 
-    /* =========================
-     * MÉTODOS ESTÁTICOS
-     * ========================= */
-
     /**
-     * Obtiene la abreviación del día según la fecha
+     * Convierte el número de día de la semana (Carbon) al código de día usado en el sistema.
      */
     public static function getDiaAbreviado(Carbon $fecha): string
     {
@@ -430,7 +453,7 @@ class HorarioInstitucion extends Model
     }
 
     /**
-     * Obtiene todos los turnos disponibles
+     * Retorna la lista de turnos disponibles.
      */
     public static function getTurnosDisponibles(): array
     {
@@ -442,7 +465,7 @@ class HorarioInstitucion extends Model
     }
 
     /**
-     * Obtiene turnos con etiquetas
+     * Retorna los turnos con su etiqueta legible.
      */
     public static function getTurnosConEtiquetas(): array
     {
@@ -454,7 +477,7 @@ class HorarioInstitucion extends Model
     }
 
     /**
-     * Obtiene todos los días disponibles
+     * Retorna la lista de códigos de días disponibles.
      */
     public static function getDiasDisponibles(): array
     {
@@ -470,7 +493,7 @@ class HorarioInstitucion extends Model
     }
 
     /**
-     * Obtiene días con etiquetas
+     * Retorna los códigos de día con su nombre completo.
      */
     public static function getDiasConEtiquetas(): array
     {
@@ -485,10 +508,9 @@ class HorarioInstitucion extends Model
         ];
     }
 
-    /* =========================
-     * AUDITORÍA
-     * ========================= */
-
+    /**
+     * Retorna el nombre legible utilizado en el registro de auditoría.
+     */
     protected function getNombreAuditable(): string
     {
         return "{$this->nombre_turno} ({$this->hora_entrada} - {$this->hora_salida})";

@@ -9,6 +9,15 @@ use App\Models\UsuarioApp;
 use App\Models\UsuarioWeb;
 use Illuminate\Http\Request;
 
+/**
+ * Gestiona las justificaciones de inasistencia.
+ *
+ * Los docentes (UsuarioApp) pueden crear, ver y eliminar sus propias justificaciones
+ * desde la app móvil. Los usuarios web (administradores y supervisores) pueden
+ * aprobar o rechazar justificaciones pendientes de sus instituciones. Al aprobar,
+ * el estado de las asistencias del período se actualiza automáticamente a PRESENTE.
+ * Al rechazar, se actualizan a FALTA. La auditoría es gestionada por el Trait Auditable.
+ */
 class JustificacionController extends Controller
 {
 
@@ -26,8 +35,13 @@ class JustificacionController extends Controller
     }
 
     /**
-     * LISTAR JUSTIFICACIONES CON PAGINACIÓN
-     *  CORREGIDO: codigo_modular en lugar de codigo_modular_docente
+     * Lista las justificaciones según el rol del usuario autenticado.
+     *
+     * Los docentes solo ven sus propias justificaciones. Los supervisores ven las
+     * justificaciones de sus instituciones vigentes y pueden filtrar por usuario_app_id.
+     * Los administradores y super_admin ven todas. Filtros disponibles: estado, tipo,
+     * usuario_app_id, institucion_id y per_page.
+     * La respuesta transforma cada item al formato esperado por el frontend.
      */
     public function index(Request $request)
     {
@@ -43,7 +57,7 @@ class JustificacionController extends Controller
         $user = $request->user();
 
         $query = Justificacion::with([
-            'usuario:id,codigo_modular,apellido_paterno,apellido_materno,nombres',  //  CORRECTO
+            'usuario:id,codigo_modular,apellido_paterno,apellido_materno,nombres',
             'institucion:id,nombre,codigo_modular_ie',
             'revisor:id,nombre,rol',
         ]);
@@ -91,7 +105,7 @@ class JustificacionController extends Controller
                 'usuario' => $j->usuario ? [
                     'id' => $j->usuario->id,
                     'nombre' => $j->usuario->nombre_completo,
-                    'codigo_modular' => $j->usuario->codigo_modular,  //  CORRECTO
+                    'codigo_modular' => $j->usuario->codigo_modular,
                 ] : null,
                 'institucion' => $j->institucion ? [
                     'id' => $j->institucion->id,
@@ -118,13 +132,17 @@ class JustificacionController extends Controller
     }
 
     /**
-     * CREAR JUSTIFICACIÓN (solo desde la app móvil)
+     * Crea una nueva justificación. Solo disponible para docentes de la app móvil.
+     *
+     * Valida que la institución pertenezca a las asignaciones activas del docente.
+     * Las fechas no pueden ser futuras. Si se envía asistencia_id, se valida que
+     * corresponda al docente y a la institución indicados. El campo
+     * horario_institucion_id es opcional y permite vincular a un horario específico.
      */
     public function store(Request $request)
     {
         $user = $request->user();
 
-        // Solo docentes (UsuarioApp) pueden crear justificaciones
         if (!($user instanceof UsuarioApp)) {
             return response()->json([
                 'error' => 'Solo los docentes pueden crear justificaciones desde la app móvil'
@@ -134,9 +152,9 @@ class JustificacionController extends Controller
         // Validación
         $request->validate([
             'institucion_id' => 'required|exists:instituciones,id',
-            'horario_institucion_id' => 'nullable|exists:horarios_institucion,id', //  Para justificar horario específico
+            'horario_institucion_id' => 'nullable|exists:horarios_institucion,id', // Para justificar horario específico
             'tipo' => 'required|in:ENFERMEDAD,PERMISO_PERSONAL,LICENCIA,COMISION_SERVICIO,CAPACITACION,DUELO,MATERNIDAD,PATERNIDAD,OLVIDO_MARCACION,OTRO',
-            'fecha_inicio' => 'required|date|before_or_equal:today',  //  No permitir futuro
+            'fecha_inicio' => 'required|date|before_or_equal:today',  // No permitir futuro
             'fecha_fin' => 'required|date|after_or_equal:fecha_inicio|before_or_equal:today',
             'motivo' => 'required|string|max:1000',
             'asistencia_id' => 'nullable|exists:asistencias,id',
@@ -167,7 +185,7 @@ class JustificacionController extends Controller
             'asistencia_id' => $request->asistencia_id,
             'usuario_app_id' => $user->id,
             'institucion_id' => (int) $request->institucion_id,
-            'horario_institucion_id' => $request->horario_institucion_id, //  NUEVO
+            'horario_institucion_id' => $request->horario_institucion_id,
             'tipo' => $request->tipo,
             'fecha_inicio' => $request->fecha_inicio,
             'fecha_fin' => $request->fecha_fin,
@@ -182,14 +200,19 @@ class JustificacionController extends Controller
     }
 
     /**
-     * APROBAR JUSTIFICACIÓN (solo UsuarioWeb con permisos)
-     *  CORREGIDO: Eliminar auditoría manual duplicada - el Trait ya lo maneja
+     * Aprueba una justificación pendiente y actualiza las asistencias del período.
+     *
+     * Solo accesible para usuarios web. Valida que el supervisor tenga acceso a la
+     * institución. Materializa registros de asistencia faltantes para el período
+     * (en caso de fechas futuras) antes de actualizarlos a PRESENTE. Si la
+     * justificación tiene horario_institucion_id, solo actualiza las asistencias
+     * de ese horario; de lo contrario actualiza todos los horarios de la institución.
+     * La auditoría se registra automáticamente mediante el Trait Auditable.
      */
     public function aprobar(Request $request, $id)
     {
         $user = $request->user();
 
-        // Solo usuarios web pueden aprobar
         if (!($user instanceof UsuarioWeb)) {
             return response()->json(['error' => 'No autorizado'], 403);
         }
@@ -209,7 +232,7 @@ class JustificacionController extends Controller
             'observaciones' => 'nullable|string|max:500',
         ]);
 
-        //  SIMPLIFICADO: Solo actualizar, el Trait Auditable registrará automáticamente
+        // La auditoría se delega al Trait Auditable para evitar duplicación
         $justificacion->update([
             'estado' => Justificacion::ESTADO_APROBADO,
             'usuario_web_id' => $user->id,
@@ -217,7 +240,7 @@ class JustificacionController extends Controller
             'fecha_revision' => now(),
         ]);
 
-        // 1. Asegurar que existan registros de asistencia para las fechas futuras (Materialización On-Demand)
+        // Materializa registros de asistencia para el período en caso de fechas futuras
         $pivot = \App\Models\UsuarioAppInstitucion::where('usuario_app_id', $justificacion->usuario_app_id)
             ->where('institucion_id', $justificacion->institucion_id)
             ->where('estado', 'ACTIVO')
@@ -254,7 +277,7 @@ class JustificacionController extends Controller
         $queryVerificar = Asistencia::where('usuario_app_id', $justificacion->usuario_app_id)
             ->where('institucion_id', $justificacion->institucion_id);
 
-        //  FILTRAR POR HORARIO si está presente
+        // FILTRAR POR HORARIO si está presente
         if ($justificacion->horario_institucion_id) {
             $queryVerificar->where('horario_institucion_id', $justificacion->horario_institucion_id);
         }
@@ -273,14 +296,15 @@ class JustificacionController extends Controller
         $queryActualizar = Asistencia::where('usuario_app_id', $justificacion->usuario_app_id)
             ->where('institucion_id', $justificacion->institucion_id); // Misma institución
 
-        //  FILTRAR POR HORARIO si está presente en la justificación
+        // Si la justificación incluye un horario específico, solo actualiza ese horario;
+        // de lo contrario actualiza todos los horarios de la institución en el período
         if ($justificacion->horario_institucion_id) {
             $queryActualizar->where('horario_institucion_id', $justificacion->horario_institucion_id);
             \Log::info(' [Justificación] Filtrando por horario específico', [
                 'horario_id' => $justificacion->horario_institucion_id
             ]);
         } else {
-            \Log::info('️ [Justificación] SIN filtro de horario - actualizará TODOS los horarios de la institución');
+            \Log::info(' [Justificación] SIN filtro de horario - actualizará todos los horarios de la institución');
         }
 
         $actualizadas = $queryActualizar->whereBetween('fecha', [
@@ -294,11 +318,7 @@ class JustificacionController extends Controller
 
         \Log::info(' [Justificación] Asistencias actualizadas a PRESENTE: ' . $actualizadas);
 
-        //  ELIMINADO: auditoría manual duplicada
-        // El Trait Auditable ya registró automáticamente el 'updated'
-        // Si necesitas una acción personalizada 'aprobado', usar:
-        // $justificacion->auditarAccion('aprobado', "...", [...])
-        // Pero evita duplicar con el 'updated' automático
+        // La auditoría del evento 'updated' ya fue registrada automáticamente por el Trait Auditable
 
         return response()->json([
             'success' => true,
@@ -308,14 +328,16 @@ class JustificacionController extends Controller
     }
 
     /**
-     * RECHAZAR JUSTIFICACIÓN (solo UsuarioWeb con permisos)
-     *  CORREGIDO: Eliminar auditoría manual duplicada
+     * Rechaza una justificación pendiente y marca las asistencias del período como FALTA.
+     *
+     * Solo accesible para usuarios web. Valida que el supervisor tenga acceso a la
+     * institución. Requiere el campo 'observaciones' como obligatorio al rechazar.
+     * La auditoría se registra automáticamente mediante el Trait Auditable.
      */
     public function rechazar(Request $request, $id)
     {
         $user = $request->user();
 
-        // Solo usuarios web pueden rechazar
         if (!($user instanceof UsuarioWeb)) {
             return response()->json(['error' => 'No autorizado'], 403);
         }
@@ -335,7 +357,7 @@ class JustificacionController extends Controller
             'observaciones' => 'required|string|max:500',
         ]);
 
-        //  SIMPLIFICADO: Solo actualizar, el Trait maneja auditoría
+        // La auditoría del evento 'updated' ya fue registrada automáticamente por el Trait Auditable
         $justificacion->update([
             'estado' => Justificacion::ESTADO_RECHAZADO,
             'usuario_web_id' => $user->id,
@@ -355,7 +377,7 @@ class JustificacionController extends Controller
                 'observacion' => 'Justificación rechazada: ' . $request->observaciones
             ]);
 
-        //  ELIMINADO: auditoría manual duplicada
+        // La auditoría del evento 'deleted' se registra automáticamente mediante el Trait Auditable
 
         return response()->json([
             'success' => true,
@@ -365,7 +387,10 @@ class JustificacionController extends Controller
     }
 
     /**
-     * VER DETALLE
+     * Retorna el detalle completo de una justificación.
+     *
+     * Los docentes solo pueden ver sus propias justificaciones. Los usuarios web
+     * solo pueden ver justificaciones de sus instituciones asignadas.
      */
     public function show(Request $request, $id)
     {
@@ -391,7 +416,11 @@ class JustificacionController extends Controller
     }
 
     /**
-     * ELIMINAR JUSTIFICACIÓN
+     * Elimina una justificación pendiente.
+     *
+     * Solo se pueden eliminar justificaciones en estado PENDIENTE. Los docentes
+     * solo pueden eliminar sus propias justificaciones. Los usuarios web solo
+     * pueden eliminar justificaciones de sus instituciones asignadas.
      */
     public function destroy(Request $request, $id)
     {
@@ -418,7 +447,6 @@ class JustificacionController extends Controller
         }
 
         $justificacion->delete();
-        //  El Trait Auditable registrará automáticamente el 'deleted'
 
         return response()->json([
             'success' => true,

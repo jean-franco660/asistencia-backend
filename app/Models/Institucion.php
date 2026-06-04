@@ -54,7 +54,7 @@ class Institucion extends Model
     {
         return $this->belongsToMany(
             UsuarioApp::class,
-            'usuario_app_institucion',  //  Nombre correcto
+            'usuario_app_institucion',  // Nombre correcto
             'institucion_id',
             'usuario_app_id'
         )
@@ -250,7 +250,7 @@ class Institucion extends Model
 
         $earthRadius = 6371000; // metros
 
-        //  Cast explícito a float para satisfacer al analizador estático
+        // Cast explícito a float para satisfacer al analizador estático
         $latitud = (float) $this->latitud;
         $longitud = (float) $this->longitud;
 

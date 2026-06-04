@@ -29,11 +29,7 @@ use App\Http\Controllers\Api\Web\PerfilController;
 use App\Http\Controllers\Api\Web\ProvisioningController;
 use App\Http\Controllers\Api\Web\ScheduleManagementController;
 
-/*
-|--------------------------------------------------------------------------
-| RUTA DE ESTADO (PRUEBA)
-|--------------------------------------------------------------------------
-*/
+// Endpoint de salud para verificar que la API responde; no requiere autenticación
 Route::get('/status', fn () => response()->json(['ok' => true, 'message' => 'API funcionando correctamente']));
 
 /*
@@ -42,7 +38,7 @@ Route::get('/status', fn () => response()->json(['ok' => true, 'message' => 'API
 |--------------------------------------------------------------------------
 */
 Route::prefix('v1/app')->group(function () {
-    // Login con código modular
+    // Login con código modular y contraseña; aplica throttle específico para login
     Route::post('/login', [UsuarioAppController::class, 'login'])->middleware('throttle:login');
 
     // Rutas protegidas con token
@@ -57,6 +53,7 @@ Route::prefix('v1/app')->group(function () {
         // Asistencias (App)
         Route::post('/asistencia', [AppAsistenciaController::class, 'store']);
         Route::get('/asistencia/{usuarioId}', [AppAsistenciaController::class, 'historial']);
+        // Permite sincronizar marcaciones realizadas sin conexión desde la app móvil
         Route::post('/asistencias/sincronizar', [AppAsistenciaController::class, 'syncMovil']);
         Route::get('/estado-dia', [AppAsistenciaController::class, 'estadoDia']);
 
@@ -93,7 +90,7 @@ Route::prefix('v1/web')->middleware(['auth:sanctum', 'throttle:api'])->group(fun
     Route::post('/perfil/cambiar-password', [PerfilController::class, 'cambiarPassword']);
     Route::post('/perfil/cambiar-email', [PerfilController::class, 'cambiarEmail']);
 
-    // Logout
+    // Logout: invalida el token actual de Sanctum sin afectar otras sesiones activas
     Route::post('/logout', function (Request $request) {
         $request->user()->currentAccessToken()->delete();
         return response()->json(['message' => 'Sesión cerrada correctamente']);
@@ -112,6 +109,7 @@ Route::prefix('v1/web')->middleware(['auth:sanctum', 'throttle:api'])->group(fun
         Route::put('/{id}', [UsuarioWebController::class, 'update']);
         Route::delete('/{id}', [UsuarioWebController::class, 'destroy']);
 
+        // Autorizar/Rechazar: throttle reducido para evitar aprobaciones masivas por error
         Route::middleware('throttle:acciones-criticas')->group(function () {
             Route::post('/autorizar/{id}', [UsuarioWebController::class, 'autorizar']);
             Route::post('/rechazar/{id}', [UsuarioWebController::class, 'rechazar']);
@@ -131,7 +129,7 @@ Route::prefix('v1/web')->middleware(['auth:sanctum', 'throttle:api'])->group(fun
 
     /*
     |--------------------------------------------------------------------------
-    | USUARIOS APP (Docentes) — Gestión desde el panel web
+    | USUARIOS APP (Docentes)  Gestión desde el panel web
     |--------------------------------------------------------------------------
     */
     Route::prefix('usuarios-app')->group(function () {
@@ -142,6 +140,7 @@ Route::prefix('v1/web')->middleware(['auth:sanctum', 'throttle:api'])->group(fun
         Route::post('/', [UsuarioAppController::class, 'store']);
         Route::get('/{id}', [UsuarioAppController::class, 'show'])->whereNumber('id');
         Route::put('/{id}', [UsuarioAppController::class, 'update'])->whereNumber('id');
+        // PATCH acepta actualizaciones parciales del mismo recurso
         Route::patch('/{id}', [UsuarioAppController::class, 'update'])->whereNumber('id');
         Route::delete('/{id}', [UsuarioAppController::class, 'destroy'])->whereNumber('id');
         Route::patch('/{id}/asignar-horario', [UsuarioAppController::class, 'asignarHorario'])->whereNumber('id');
@@ -240,7 +239,7 @@ Route::prefix('v1/web')->middleware(['auth:sanctum', 'throttle:api'])->group(fun
 
     /*
     |--------------------------------------------------------------------------
-    | JUSTIFICACIONES (Web — Aprobar/Rechazar)
+    | JUSTIFICACIONES (Web  Aprobar/Rechazar)
     |--------------------------------------------------------------------------
     */
     Route::prefix('justificaciones')->group(function () {
@@ -248,6 +247,7 @@ Route::prefix('v1/web')->middleware(['auth:sanctum', 'throttle:api'])->group(fun
         Route::get('/{id}', [JustificacionController::class, 'show']);
         Route::delete('/{id}', [JustificacionController::class, 'destroy']);
 
+        // Aprobar/Rechazar: throttle reducido para evitar acciones masivas accidentales
         Route::middleware('throttle:acciones-criticas')->group(function () {
             Route::post('/{id}/aprobar', [JustificacionController::class, 'aprobar']);
             Route::post('/{id}/rechazar', [JustificacionController::class, 'rechazar']);
@@ -297,11 +297,8 @@ Route::prefix('v1/web')->middleware(['auth:sanctum', 'throttle:api'])->group(fun
     });
 });
 
-/*
-|--------------------------------------------------------------------------
-| RUTA PÚBLICA PARA SERVIR LOGOS
-|--------------------------------------------------------------------------
-*/
+// Sirve los logos de instituciones desde el disco público; accesible sin autenticación
+// El patrón '.*' permite nombres de archivo con puntos o rutas anidadas
 Route::get('v1/web/logos/{filename}', function ($filename) {
     $path = 'logos/' . $filename;
     if (!Storage::disk('public')->exists($path)) {

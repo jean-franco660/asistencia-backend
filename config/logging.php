@@ -46,7 +46,7 @@ return [
     | of powerful log handlers and formatters that you're free to use.
     |
     | Available drivers: "single", "daily", "slack", "syslog",
-    |                    "errorlog", "monolog", "custom", "stack"
+    |                   "errorlog", "monolog", "custom", "stack"
     |
     */
 

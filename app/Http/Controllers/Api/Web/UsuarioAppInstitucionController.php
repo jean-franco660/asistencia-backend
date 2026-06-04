@@ -37,13 +37,13 @@ class UsuarioAppInstitucionController extends Controller
 
             // TODO: Registrar en auditoría cuando se implemente
             // AsignacionAudit::create([
-            //     'usuario_app_institucion_id' => $asignacion->id,
-            //     'usuario_web_id' => auth()->id(),
-            //     'accion' => 'INACTIVAR',
-            //     'fecha_fin_anterior' => $fechaFinAnterior,
-            //     'fecha_fin_nueva' => $validated['fecha_fin'],
-            //     'motivo' => $validated['motivo'],
-            //     'observacion' => $validated['observacion']
+            // 'usuario_app_institucion_id' => $asignacion->id,
+            // 'usuario_web_id' => auth()->id(),
+            // 'accion' => 'INACTIVAR',
+            // 'fecha_fin_anterior' => $fechaFinAnterior,
+            // 'fecha_fin_nueva' => $validated['fecha_fin'],
+            // 'motivo' => $validated['motivo'],
+            // 'observacion' => $validated['observacion']
             // ]);
         });
 

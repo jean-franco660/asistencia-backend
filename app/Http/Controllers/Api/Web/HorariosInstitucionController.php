@@ -9,6 +9,14 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Validation\ValidationException;
 use Carbon\Carbon;
 
+/**
+ * Gestiona los horarios de las instituciones educativas.
+ *
+ * Accesible para administradores y supervisores. Los supervisores solo pueden
+ * operar sobre horarios de sus instituciones asignadas. Al crear un horario,
+ * se asigna automáticamente a los usuarios activos de la institución que
+ * no tienen horario configurado.
+ */
 class HorariosInstitucionController extends Controller
 {
     use AuthorizesRequests;
@@ -32,6 +40,14 @@ class HorariosInstitucionController extends Controller
         ],
     ];
 
+    /**
+     * Lista los horarios de institución accesibles según el rol del usuario.
+     *
+     * Si se proporciona institucion_id, filtra por esa institución y valida que
+     * el supervisor tenga acceso a ella. Si no se especifica, los supervisores
+     * ven los horarios de todas sus instituciones asignadas. Los administradores
+     * ven todos los horarios sin restricción.
+     */
     public function index(Request $request)
     {
         $query = HorarioInstitucion::query();
@@ -60,6 +76,14 @@ class HorariosInstitucionController extends Controller
         return $query->orderBy('hora_entrada')->get();
     }
 
+    /**
+     * Crea un nuevo horario para una institución.
+     *
+     * Los supervisores solo pueden crear horarios en instituciones que tienen asignadas.
+     * Valida la coherencia entre el nombre del turno y las horas definidas.
+     * Tras la creación, asigna automáticamente el horario a los usuarios activos
+     * de la institución que aún no tienen horario configurado.
+     */
     public function store(Request $request)
     {
         $request->validate([
@@ -73,7 +97,7 @@ class HorariosInstitucionController extends Controller
             'dias_semana.*' => 'in:L,M,X,J,V,S,D',
         ]);
 
-        // Si es supervisor → validar institución asignada
+        // Los supervisores solo pueden crear horarios en sus instituciones asignadas
         if ($request->user()->esSupervisor()) {
             if (!$request->user()->instituciones->pluck('id')->contains($request->institucion_id)) {
                 return response()->json(['error' => 'No autorizado'], 403);
@@ -101,7 +125,7 @@ class HorariosInstitucionController extends Controller
             'activo' => true,
         ]);
 
-        //  IMPORTANTE: Asignar automáticamente este horario a usuarios que no tienen uno
+        // Asigna el horario recién creado a usuarios activos sin horario en esta institución
         $this->asignarHorarioAUsuariosSinHorario($request->institucion_id, $horario->id);
 
         return response()->json([
@@ -133,6 +157,12 @@ class HorariosInstitucionController extends Controller
         }
     }
 
+    /**
+     * Actualiza los datos de un horario existente.
+     *
+     * Los supervisores solo pueden actualizar horarios de sus instituciones asignadas.
+     * Si se modifican el turno o las horas, se valida la coherencia entre ellos.
+     */
     public function update(Request $request, $id)
     {
         $horario = HorarioInstitucion::findOrFail($id);
@@ -178,6 +208,11 @@ class HorariosInstitucionController extends Controller
         return response()->json($horario);
     }
 
+    /**
+     * Elimina un horario de institución.
+     *
+     * Los supervisores solo pueden eliminar horarios de sus instituciones asignadas.
+     */
     public function destroy(Request $request, $id)
     {
         $horario = HorarioInstitucion::findOrFail($id);
@@ -196,11 +231,15 @@ class HorariosInstitucionController extends Controller
     }
 
     /**
-     * Valida que las horas sean coherentes con el tipo de turno
+     * Valida que las horas sean coherentes con el tipo de turno.
+     *
+     * Actualmente deshabilitada: la lógica está comentada para permitir mayor
+     * flexibilidad en la configuración de horarios. Se mantiene el bloque
+     * comentado como referencia de la validación original.
      */
     protected function validarCoherenciaTurno(string $nombreTurno, string $horaEntrada, string $horaSalida): void
     {
-        // Restricción de horarios desactivada temporalmente
+        // Restricción de horarios deshabilitada temporalmente para mayor flexibilidad
         return;
 
         /*

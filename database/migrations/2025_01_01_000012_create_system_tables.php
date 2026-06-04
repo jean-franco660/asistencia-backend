@@ -4,12 +4,16 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
+/**
+ * Crea las tablas de infraestructura del sistema:
+ * - `personal_access_tokens`: tokens de autenticación de Laravel Sanctum.
+ * - `jobs` / `failed_jobs`: colas de trabajos asíncronos (importaciones, cálculos, etc.).
+ * - `importaciones_log`: seguimiento del estado y resultado de cada proceso de importación.
+ */
 return new class extends Migration {
     public function up(): void
     {
-        // =============================================
-        // PERSONAL ACCESS TOKENS (Sanctum)
-        // =============================================
+        // Tokens de autenticación gestionados por Laravel Sanctum
         Schema::create('personal_access_tokens', function (Blueprint $table) {
             $table->id();
             $table->morphs('tokenable');
@@ -21,9 +25,7 @@ return new class extends Migration {
             $table->timestamps();
         });
 
-        // =============================================
-        // JOBS (Cola de trabajos — importaciones, etc.)
-        // =============================================
+        // Cola de trabajos asíncronos (importaciones masivas, cálculos programados, etc.)
         Schema::create('jobs', function (Blueprint $table) {
             $table->bigIncrements('id');
             $table->string('queue')->index();
@@ -34,9 +36,7 @@ return new class extends Migration {
             $table->unsignedInteger('created_at');
         });
 
-        // =============================================
-        // FAILED JOBS
-        // =============================================
+        // Registro de jobs que fallaron para su diagnóstico y reintento
         Schema::create('failed_jobs', function (Blueprint $table) {
             $table->id();
             $table->string('uuid')->unique();
@@ -47,9 +47,7 @@ return new class extends Migration {
             $table->timestamp('failed_at')->useCurrent();
         });
 
-        // =============================================
-        // IMPORTACIONES LOG
-        // =============================================
+        // Seguimiento del estado y resultado de cada proceso de importación de datos
         Schema::create('importaciones_log', function (Blueprint $table) {
             $table->id();
 
