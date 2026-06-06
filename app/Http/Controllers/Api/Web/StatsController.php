@@ -22,16 +22,11 @@ class StatsController extends Controller
         $mes = $today->month;
 
         $isAdmin = $user->esAdminOSuperAdmin();
-        /* ============================================================
-            INSTITUCIONES DEL ÁMBITO
-        ============================================================ */
+
         $institucionIds = $isAdmin
             ? Institucion::pluck('id')
             : $user->instituciones()->pluck('instituciones.id');
 
-        /* ============================================================
-            CONTADORES GENERALES
-        ============================================================ */
         $docentesCount = $isAdmin
             ? UsuarioApp::count()
             : UsuarioApp::whereHas(
@@ -42,9 +37,6 @@ class StatsController extends Controller
 
         $instCount = $institucionIds->count();
 
-        /* ============================================================
-            FERIADOS (SOLO INFORMACIÓN, NO AFECTA ASISTENCIAS)
-        ============================================================ */
 
         // Feriado nacional
         $feriadoNac = Feriado::where('tipo', 'nacional')
@@ -65,10 +57,6 @@ class StatsController extends Controller
 
         $hoyNoLaborable = !!$feriado;
         $motivoNoLaborable = optional($feriado)->descripcion;
-
-        /* ============================================================
-            VALIDACIÓN DE HORARIO (solo supervisor)
-        ============================================================ */
 
         if (!$hoyNoLaborable && !$isAdmin) {
 
@@ -94,10 +82,6 @@ class StatsController extends Controller
                 $motivoNoLaborable = 'Día no laborable por horario';
             }
         }
-
-        /* ============================================================
-            LÓGICA REAL DE ASISTENCIAS Y FALTAS HOY
-        ============================================================ */
 
         // Obtener registros de hoy (Headers)
         $registrosHoy = Asistencia::whereIn('institucion_id', $institucionIds)
@@ -125,10 +109,6 @@ class StatsController extends Controller
                 $faltasHoy++;
             }
         }
-
-        /* ============================================================
-            ESTADÍSTICAS ADICIONALES
-        ============================================================ */
 
         // Instituciones activas (con al menos un docente o actividad reciente)
         $institucionesActivas = Institucion::whereHas('asignacionesActivas')
@@ -168,10 +148,6 @@ class StatsController extends Controller
         $justificacionesRechazadas = \App\Models\Justificacion::where('estado', 'RECHAZADO')
             ->whereIn('institucion_id', $institucionIds)
             ->count();
-
-        /* ============================================================
-            RESPUESTA FINAL (ESTRUCTURA EXPANDIDA)
-        ============================================================ */
 
         return response()->json([
             // NUEVA ESTRUCTURA ANIDADA

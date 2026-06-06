@@ -25,8 +25,11 @@ class LoginAppRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'codigo_modular' => 'required_without:codigo|string',
-            'codigo' => 'required_without:codigo_modular|string', // Nombre alternativo aceptado por compatibilidad con clientes anteriores
+            // Aceptar código modular (campo `codigo_modular` o `codigo`) o `dni`
+            // Permitir códigos alfanuméricos como DOC2025001
+            'codigo_modular' => ['required_without_all:codigo,dni','string','regex:/^[A-Za-z0-9]+$/'],
+            'codigo' => ['required_without_all:codigo_modular,dni','string','regex:/^[A-Za-z0-9]+$/'], // Nombre alternativo aceptado por compatibilidad con clientes anteriores
+            'dni' => 'required_without_all:codigo_modular,codigo|string',
             'password' => 'required|string|min:8',
         ];
     }
@@ -34,8 +37,11 @@ class LoginAppRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'codigo_modular.required_without' => 'El código modular es obligatorio',
-            'codigo.required_without' => 'El código modular es obligatorio',
+            'codigo_modular.required_without_all' => 'El código modular o el DNI es obligatorio',
+            'codigo.required_without_all' => 'El código modular o el DNI es obligatorio',
+            'codigo_modular.regex' => 'El código modular sólo puede contener letras y números (ej: DOC2025001)',
+            'codigo.regex' => 'El código sólo puede contener letras y números (ej: DOC2025001)',
+            'dni.required_without_all' => 'El DNI o el código modular es obligatorio',
             'password.required' => 'La contraseña es obligatoria',
             'password.min' => 'La contraseña debe tener al menos :min caracteres',
         ];

@@ -14,7 +14,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
-
+use Illuminate\Support\Facades\Log;
 class UsuarioAppController extends Controller
 {
     use AuthorizesRequests;
@@ -24,15 +24,21 @@ class UsuarioAppController extends Controller
      */
     public function login(LoginAppRequest $request): JsonResponse
     {
-        // Normalizar código modular
-        $codigo = strtoupper(trim($request->codigo_modular ?? $request->codigo));
+        // Permitir autenticación por DNI o por código modular (alfanumérico)
+        $dni = $request->input('dni');
 
-        $usuario = UsuarioApp::where('codigo_modular', $codigo)->first();
+        if ($dni) {
+            $usuario = UsuarioApp::where('dni', trim($dni))->first();
+        } else {
+            // Normalizar código modular (acepta letras y números)
+            $codigo = strtoupper(trim($request->codigo_modular ?? $request->codigo));
+            $usuario = UsuarioApp::where('codigo_modular', $codigo)->first();
+        }
 
         if (!$usuario || !Hash::check($request->password, $usuario->password)) {
             return response()->json([
                 'success' => false,
-                'message' => 'Código modular o contraseña incorrectos'
+                'message' => 'Credenciales incorrectas (código/DNI o contraseña)'
             ], 401);
         }
 
@@ -255,7 +261,7 @@ class UsuarioAppController extends Controller
 
                         if ($horario) {
                             $horarioId = $horario->id;
-                            \Log::info("Horario asignado automáticamente: Usuario {$usuario->codigo_modular}, Horario {$horario->nombre_turno}");
+                            Log::info("Horario asignado automáticamente: Usuario {$usuario->codigo_modular}, Horario {$horario->nombre_turno}");
                         }
                     }
 
@@ -292,7 +298,7 @@ class UsuarioAppController extends Controller
     /**
      * Muestra un usuario específico
      */
-    public function show($id): JsonResponse
+    public function show(int $id): JsonResponse
     {
         // Cargar TODAS las asignaciones (no solo activas) para ver vigencia completa
         $usuario = UsuarioApp::with(['asignaciones.institucion', 'asignaciones.horario'])
@@ -350,9 +356,9 @@ class UsuarioAppController extends Controller
     /**
      * Actualiza un usuario
      */
-    public function update(UpdateUsuarioAppRequest $request, $id): JsonResponse
+    public function update(UpdateUsuarioAppRequest $request, int $id): JsonResponse
     {
-        \Log::info(" [UsuarioApp] Iniciando actualización de usuario ID: {$id}", ['request' => $request->all()]);
+        Log::info(" [UsuarioApp] Iniciando actualización de usuario ID: {$id}", ['request' => $request->all()]);
 
         $usuario = UsuarioApp::findOrFail($id);
         $this->authorize('update', $usuario);
@@ -368,22 +374,22 @@ class UsuarioAppController extends Controller
             }
 
             $usuario->update($data);
-            \Log::info(" [UsuarioApp] Datos básicos actualizados usuario ID: {$id}");
+            Log::info(" [UsuarioApp] Datos básicos actualizados usuario ID: {$id}");
 
             // Actualizar asignaciones si se envían
             if ($request->has('asignaciones')) {
-                \Log::info(" [UsuarioApp] Procesando asignaciones para usuario ID: {$id}", ['asignaciones' => $request->asignaciones]);
+                Log::info(" [UsuarioApp] Procesando asignaciones para usuario ID: {$id}", ['asignaciones' => $request->asignaciones]);
 
                 // Desactivar asignaciones actuales
                 $usuario->asignaciones()->update([
                     'estado' => UsuarioAppInstitucion::ESTADO_INACTIVO,
                     'fecha_fin' => now()
                 ]);
-                \Log::info(" [UsuarioApp] Asignaciones previas marcadas como INACTIVO");
+                Log::info(" [UsuarioApp] Asignaciones previas marcadas como INACTIVO");
 
                 // Crear/actualizar nuevas asignaciones
                 foreach ($request->asignaciones as $index => $asig) {
-                    \Log::info(" [UsuarioApp] Procesando asignación #{$index}", ['datos' => $asig]);
+                    Log::info(" [UsuarioApp] Procesando asignación #{$index}", ['datos' => $asig]);
 
                     // NUEVO: Si no se especifica horario, buscar uno automáticamente
                     $horarioId = $asig['horario_institucion_id'] ?? null;
@@ -395,7 +401,7 @@ class UsuarioAppController extends Controller
 
                         if ($horario) {
                             $horarioId = $horario->id;
-                            \Log::info(" [UsuarioApp] Horario auto-asignado: {$horario->id}");
+                            Log::info(" [UsuarioApp] Horario auto-asignado: {$horario->id}");
                         }
                     }
 
@@ -406,7 +412,7 @@ class UsuarioAppController extends Controller
                         ->first();
 
                     if ($asignacion) {
-                        \Log::info(" [UsuarioApp] Asignación existente encontrada ID: {$asignacion->id} (Trashed: {$asignacion->trashed()})");
+                        Log::info(" [UsuarioApp] Asignación existente encontrada ID: {$asignacion->id} (Trashed: {$asignacion->trashed()})");
 
                         // Limpiar duplicados extra si existen (para corregir inconsistencias antiguas)
                         $duplicados = UsuarioAppInstitucion::withTrashed()
@@ -416,7 +422,7 @@ class UsuarioAppController extends Controller
                             ->get(); // Obtener para loggear antes de borrar
 
                         if ($duplicados->count() > 0) {
-                            \Log::warning(" [UsuarioApp] Eliminando {$duplicados->count()} duplicados encontrados", ['ids' => $duplicados->pluck('id')]);
+                            Log::warning(" [UsuarioApp] Eliminando {$duplicados->count()} duplicados encontrados", ['ids' => $duplicados->pluck('id')]);
 
                             UsuarioAppInstitucion::withTrashed()
                                 ->where('usuario_app_id', $usuario->id)
@@ -427,13 +433,13 @@ class UsuarioAppController extends Controller
 
                         if ($asignacion->trashed()) {
                             $asignacion->restore();
-                            \Log::info(" [UsuarioApp] Asignación restaurada ID: {$asignacion->id}");
+                            Log::info(" [UsuarioApp] Asignación restaurada ID: {$asignacion->id}");
                         }
                     } else {
                         $asignacion = new UsuarioAppInstitucion();
                         $asignacion->usuario_app_id = $usuario->id;
                         $asignacion->institucion_id = $asig['institucion_id'];
-                        \Log::info(" [UsuarioApp] Creando NUEVA asignación para Institución ID: {$asig['institucion_id']}");
+                        Log::info(" [UsuarioApp] Creando NUEVA asignación para Institución ID: {$asig['institucion_id']}");
                     }
 
                     $asignacion->fill([
@@ -444,12 +450,12 @@ class UsuarioAppController extends Controller
                         'fecha_fin' => $asig['fecha_fin'] ?? null,
                     ]);
                     $asignacion->save();
-                    \Log::info(" [UsuarioApp] Asignación guardada/actualizada ID: {$asignacion->id}", ['estado' => $asignacion->estado]);
+                    Log::info(" [UsuarioApp] Asignación guardada/actualizada ID: {$asignacion->id}", ['estado' => $asignacion->estado]);
                 }
             }
 
             DB::commit();
-            \Log::info(" [UsuarioApp] Transacción completada exitosamente para usuario ID: {$id}");
+            Log::info(" [UsuarioApp] Transacción completada exitosamente para usuario ID: {$id}");
 
             return response()->json([
                 'success' => true,
@@ -459,7 +465,7 @@ class UsuarioAppController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
-            \Log::error(" [UsuarioApp] Error en transacción update: " . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
+            Log::error(" [UsuarioApp] Error en transacción update: " . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
 
             return response()->json([
                 'success' => false,
@@ -471,7 +477,7 @@ class UsuarioAppController extends Controller
     /**
      * Elimina un usuario
      */
-    public function destroy($id): JsonResponse
+    public function destroy(int $id): JsonResponse
     {
         $usuario = UsuarioApp::findOrFail($id);
         $this->authorize('delete', $usuario);
@@ -540,7 +546,7 @@ class UsuarioAppController extends Controller
     /**
      * Habilita/deshabilita acceso de un usuario
      */
-    public function cambiarAcceso(Request $request, $id): JsonResponse
+    public function cambiarAcceso(Request $request, int $id): JsonResponse
     {
         $usuario = UsuarioApp::findOrFail($id);
         $this->authorize('update', $usuario);
@@ -579,7 +585,7 @@ class UsuarioAppController extends Controller
     /**
      * Asigna horario a un usuario y activa su asignación
      */
-    public function asignarHorario(Request $request, $id): JsonResponse
+    public function asignarHorario(Request $request, int $id): JsonResponse
     {
         $usuario = UsuarioApp::findOrFail($id);
         $this->authorize('update', $usuario);
@@ -666,7 +672,7 @@ class UsuarioAppController extends Controller
                         'status' => 'actualizado'
                     ];
 
-                    \Log::info("Horario asignado automáticamente: {$asignacion->usuarioApp->codigo_modular}  {$horario->nombre_turno}");
+                    Log::info("Horario asignado automáticamente: {$asignacion->usuarioApp->codigo_modular}  {$horario->nombre_turno}");
                 } else {
                     $sinHorario++;
 
@@ -750,7 +756,7 @@ class UsuarioAppController extends Controller
      */
     public function logout(Request $request): JsonResponse
     {
-        $request->user()->currentAccessToken()->delete();
+        optional($request->user()->currentAccessToken())->delete();
 
         return response()->json([
             'success' => true,

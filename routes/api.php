@@ -199,6 +199,9 @@ Route::prefix('v1/web')->middleware(['auth:sanctum', 'throttle:api'])->group(fun
         Route::post('/', [HorariosInstitucionController::class, 'store']);
         Route::put('/{id}', [HorariosInstitucionController::class, 'update']);
         Route::delete('/{id}', [HorariosInstitucionController::class, 'destroy']);
+        Route::get('/asignaciones', [ScheduleManagementController::class, 'index']);
+        Route::get('/historial', [ScheduleManagementController::class, 'historial']);
+        Route::post('/modificar-asignacion', [ScheduleManagementController::class, 'modificarHorarios']);
     });
 
     /*

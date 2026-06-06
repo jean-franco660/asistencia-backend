@@ -35,9 +35,6 @@ class SupervisorDashboardController extends Controller
             ]);
         }
 
-        /* ============================================================
-            ESTADÍSTICAS AGREGADAS
-        ============================================================ */
 
         // Total de usuarios app en todas las instituciones del supervisor
         $totalUsuariosApp = \App\Models\UsuarioApp::whereHas(  // camelCase
